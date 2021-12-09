@@ -9,6 +9,8 @@ README last updated: A, Boyce 09/12/2021
 
 ----------------------------- CITATION -----------------------------
 
+If you use this code please cite the following manuscript:
+
 Bodin, T., Leiva, J., Romanowicz, B., Maupin, V. & Yuan, H. (2016) Imaging anisotropic layering with Bayesian inversion of multiple data types. Geophys. J. Int. 206, 605–629. doi: 10.1093/gji/ggw124.
   
 ----------------------------- OUTLINE  -----------------------------
