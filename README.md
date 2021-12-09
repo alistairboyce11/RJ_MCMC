@@ -22,7 +22,8 @@ Bodin, T., Leiva, J., Romanowicz, B., Maupin, V. & Yuan, H. (2016) Imaging aniso
 5. Makefile                        : Fortran compilation file (uses mpif90)
 6. Model_deep_REF.in               : Reference model (Currently PREM)
 7. RJ_MCMC_test_nlay.f90           : MAIN CODE
-8. plot_test_results.py            : Plotting scripts in python
+8. src/                            : Supporting code & functions
+9. plot_test_results.py            : Plotting scripts in python
 
 ----------------------------- DETAILS   -----------------------------
 
