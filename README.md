@@ -13,14 +13,14 @@ Bodin, T., Leiva, J., Romanowicz, B., Maupin, V. & Yuan, H. (2016) Imaging aniso
   
 ----------------------------- OUTLINE  -----------------------------
 
-LICENSE
-README.md
-data_params.sh
-params.sh                       : parameter file for main code
-Makefile                        : Fortran compilation file (uses mpif90)
-Model_deep_REF.in               : Reference model (Currently PREM)
-RJ_MCMC_test_nlay.f90           : MAIN CODE
-plot_test_results.py            : Plotting scripts in python
+1. LICENSE
+2. README.md
+3. data_params.sh
+4. params.sh                       : parameter file for main code
+5. Makefile                        : Fortran compilation file (uses mpif90)
+6. Model_deep_REF.in               : Reference model (Currently PREM)
+7. RJ_MCMC_test_nlay.f90           : MAIN CODE
+8. plot_test_results.py            : Plotting scripts in python
 
 ----------------------------- DETAILS   -----------------------------
 
