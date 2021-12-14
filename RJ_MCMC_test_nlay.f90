@@ -73,7 +73,7 @@ include 'params.h'
     ! Parameters for Displaying results 
     !-------------------------------------------- 
 
-    integer, parameter :: display = 100 ! 1000 ! display results in OUT/mpi.out 
+    integer, parameter :: display = 10 ! 1000 ! display results in OUT/mpi.out 
     !every display samples
 
      !discretezation for the posterior distribution.
@@ -101,7 +101,7 @@ include 'params.h'
 
     !****************************************************************
 
-    real , EXTERNAL    ::    gasdev,ran3,interp ! Fortran functions for random variables and interpolation.
+    real , EXTERNAL    ::    gasdev,ran3,interp ! Functions for random variables and interpolation.
     real log, sqrt
 
     integer i,ii,sample,ind,th,ount,k ! various indices
@@ -137,7 +137,7 @@ include 'params.h'
     real sigmav,sigmav_old,sigmav_new,AR_birth_old   !proposal on velocity when Birth move  
     real d_obsdcR(ndatadmax),d_obsdcL(ndatadmax),d_obsdcRe(ndatadmax),d_obsdcLe(ndatadmax) !observed data
     real inorout(21000),inorouts(21000)
-	integer members(21000),io ! mpi related variables
+    integer members(21000),io ! mpi related variables
     integer ndatad_R,ndatad_L,ndatad_R_tmp,ndatad_L_tmp !number of observed data points
     real pxi,p_vp,pd1,pv1,pd2,pv2,pAd_R,pAd_L ! related to observed data for azimuthal anisotropy
     ! Geometry parameters
@@ -289,93 +289,82 @@ include 'params.h'
     vpref_max=maxval(model_ref(j:nptref,4)*vpvs*(1+vpvsv_max/100.)*(1+width))
     
     ! Edit lines below to match periods of synethetic data to real data
-	! Add / remove overtones as necessary.
+    ! Add / remove overtones as necessary.
     if (testing) then !!!!!!!testing: create synthetic model
         write(*,*)'testing'
         ndatad_R=0
         j=0
         ! careful: periods listed by decreasing period, increasing harmonic order
-        do i=360,40,-5 !synthetic periods, harmonics, uncertainties ! Could do -10 for speed?
+        do i=200,40,-5 !synthetic periods, harmonics, uncertainties
             j=j+1
             peri_R(j)=real(i)
             d_obsdcRe(j)=0.01
             n_R(j)=0
         end do
-        do i=240,40,-5          ! Could do -10?
+        do i=200,50,-5
             j=j+1
             peri_R(j)=real(i)
             d_obsdcRe(j)=0.01
             n_R(j)=1
         end do
-        do i=160,40,-5          ! Could do -10?
+        do i=200,50,-5
             j=j+1
             peri_R(j)=real(i)
             d_obsdcRe(j)=0.01
             n_R(j)=2
         end do
-        do i=90,40,-5           ! Could do -10?
+        do i=150,50,-5
             j=j+1
             peri_R(j)=real(i)
             d_obsdcRe(j)=0.01
             n_R(j)=3
         end do
-        do i=50,40,-5
+        do i=100,50,-5
             j=j+1
             peri_R(j)=real(i)
             d_obsdcRe(j)=0.01
             n_R(j)=4
         end do
-        do i=50,40,-5
-            j=j+1
-            peri_R(j)=real(i)
-            d_obsdcRe(j)=0.01
-            n_R(j)=5
-        end do
         ndatad_R=j
-        wmin_R=1000./(maxval(peri_R(:ndatad_R))+10)
+        wmin_R=1000./(maxval(peri_R(:ndatad_R))+2)
         wmax_R=1000./(minval(peri_R(:ndatad_R))-2)
         nmin_R=minval(n_R(:ndatad_R))
         nmax_R=maxval(n_R(:ndatad_R))
+        
         ndatad_L=0
         j=0
-        do i=360,40,-5 !synthetic periods, harmonics, uncertainties ! Could do -10 for speed?
+        do i=200,40,-5
             j=j+1
             peri_L(j)=real(i)
             d_obsdcLe(j)=0.02
             n_L(j)=0
         end do
-        do i=240,40,-5          ! Could do -10?
+        do i=200,50,-5
             j=j+1
             peri_L(j)=real(i)
             d_obsdcLe(j)=0.02
             n_L(j)=1
         end do
-        do i=160,40,-5          ! Could do -10?
+        do i=200,50,-5
             j=j+1
             peri_L(j)=real(i)
             d_obsdcLe(j)=0.02
             n_L(j)=2
         end do
-        do i=90,40,-5           ! Could do -10?
+        do i=150,50,-5
             j=j+1
             peri_L(j)=real(i)
             d_obsdcLe(j)=0.02
             n_L(j)=3
         end do
-        do i=50,40,-5
+        do i=100,50,-5
             j=j+1
             peri_L(j)=real(i)
             d_obsdcLe(j)=0.02
             n_L(j)=4
         end do
-        do i=50,40,-5
-            j=j+1
-            peri_L(j)=real(i)
-            d_obsdcLe(j)=0.02
-            n_L(j)=5
-        end do
         ndatad_L=j
-        wmin_L=1000./(maxval(peri_L(:ndatad_L))+10)
+        wmin_L=1000./(maxval(peri_L(:ndatad_L))+2)
         wmax_L=1000./(minval(peri_L(:ndatad_L))-2)
         nmin_L=minval(n_L(:ndatad_L))
         nmax_L=maxval(n_L(:ndatad_L))
@@ -384,49 +373,22 @@ include 'params.h'
         !tref=sum(peri_L(:ndatad_L))/ndatad_L
         
         ! create synthetic model
-        ! This is where to start editing the test synthetic models
         npt=0
-        ! Dorians model
-!         do i=1,33
-!             voro(i,1)=20*i !depth of interface
-!             voro(i,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
-!             voro(i,3)=0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
-!             voro(i,4)=0.3-0.5/33.*i !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in params.h
-!             npt=npt+1
-!         end do
-		
-        ! Als model
+        
         do i=1,33
             voro(i,1)=20*i !depth of interface
-            if (i.ge.5 .and. i.lt.15) then ! 100-300km depth fast, 500-600km slow
-				voro(i,2)=0.1  !vsv=vsv_prem*(1+voro(i,2))
-	            voro(i,4)=0.05 !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in params.h
-			elseif (i.ge.25 .and. i.lt.30) then
-				voro(i,2)=-0.15  !vsv=vsv_prem*(1+voro(i,2))
-	            voro(i,4)=-0.075 !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in params.h
-			else
-				voro(i,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
-	            voro(i,4)=0.0 !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in params.h
-			end if
-				
-			if (i.ge.20 .and. i.lt.25) then ! 400-500km depth anisotropic layer
-				voro(i,3)=1.2
-			else
-				voro(i,3)=1.0 !xi=voro(i,3), -1 for isotropic layer
-			end if
-			
+            voro(i,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
+            voro(i,3)=0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
+            voro(i,4)=0.3-0.5/33.*i !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in params.h
             npt=npt+1
         end do
-				
-		
         
         ! take voro, combine it with prem into a format suitable for minos
         call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
             r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
         
         !calculate synthetic dispersion curves
-        if (ndatad_R>0) then         
-            
+        if (ndatad_R>0) then
             jcom=3 !rayleigh waves
             nmodes=0
             call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
@@ -437,7 +399,6 @@ include 'params.h'
         endif
         
         if (ndatad_L>0) then
-            
             jcom=2 !love waves
             nmodes=0
             call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
@@ -486,7 +447,7 @@ include 'params.h'
         end do
         close(51)
         
-        wmin_R=1000./(maxval(peri_R)+10)
+        wmin_R=1000./(maxval(peri_R)+2)
         wmax_R=1000./(minval(peri_R)-2)
         nmin_R=minval(n_R)
         nmax_R=maxval(n_R) ! formerly minval(n_R) 221121 AB
@@ -506,16 +467,16 @@ include 'params.h'
         enddo
         close(51)! close the file
         
-        wmin_L=1000./(maxval(peri_L)+10)
+        wmin_L=1000./(maxval(peri_L)+2)
         wmax_L=1000./(minval(peri_L)-2)
         nmin_L=minval(n_L)
         nmax_L=maxval(n_L) ! formerly minval(n_L) 221121 AB
         
         if (ndatad_R>=ndatad_L) tref=sum(peri_R(:ndatad_R))/ndatad_R
         if (ndatad_L>ndatad_R) tref=sum(peri_L(:ndatad_L))/ndatad_L
-
+        
         write(*,*)'DONE READING REAL DATA'
-    
+        
     endif
     !***************************************************
     !***************************************************
@@ -525,11 +486,10 @@ include 'params.h'
 
     !**************************************************************
     
-    ! Initilalise sigma (noise parameter) - High for initial acceptance criteria
-49  Ad_R = Ad_R_max-pAd_R ! Ad_R_min+ran3(ra)*(Ad_R_max-Ad_R_min) ! 
-    Ad_L = Ad_L_max-pAd_L ! Ad_L_min+ran3(ra)*(Ad_L_max-Ad_L_min) ! 
-	if ((Ad_R>Ad_R_max).or.(Ad_R<Ad_R_min).or.(Ad_L>Ad_L_max).or.(Ad_L<Ad_L_min)) goto 49
-    ! write(*,*)Ad_R,Ad_L
+    ! Initilalise sigma (noise parameter)
+    Ad_R = Ad_R_max-pAd_R! Ad_min+ran3(ra)*(Ad_R_max-Ad_min)
+    Ad_L = Ad_L_max-pAd_L
+
     ! Initial number of cells
     !------------------------------------
 
@@ -556,15 +516,10 @@ include 'params.h'
             voro(i,4)= vpvsv_min+(vpvsv_max-vpvsv_min)*ran3(ra)
         enddo
 
-		
-		if ((ndatad_R>0).or.(ndatad_L>0)) then
-            call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-                r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
-		endif
-		
-
         if (ndatad_R>0) then
             nmodes=0
+            call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+                r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
             jcom=3 !rayleigh waves
             call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
                 qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_R,wmax_R,nmin_R,nmax_R,&
@@ -575,6 +530,8 @@ include 'params.h'
         
         if (ndatad_L>0) then
             nmodes=0
+            call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+                r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
             jcom=2 !love waves
             call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
                 qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_L,wmax_L,nmin_L,nmax_L,&
@@ -612,25 +569,25 @@ include 'params.h'
     liked_L=0
     
     do i=1,ndatad_R ! calculate misfit -> log-likelihood of initial model
-        lsd_R=lsd_R+(d_obsdcR(i)-d_cR(i))**2 								! Sum of squared misfits
+        lsd_R=lsd_R+(d_obsdcR(i)-d_cR(i))**2                                ! Sum of squared misfits
         liked_R=liked_R+(d_obsdcR(i)-d_cR(i))**2/(2*(Ad_R*d_obsdcRe(i))**2) ! gaussian errors
     enddo
     do i=1,ndatad_L
         lsd_L=lsd_L+(d_obsdcL(i)-d_cL(i))**2
         liked_L=liked_L+(d_obsdcL(i)-d_cL(i))**2/(2*(Ad_L*d_obsdcLe(i))**2) 
     enddo
-	
+    
     lsd_R_min=lsd_R
     lsd_L_min=lsd_L
     likemax=lsd_R+lsd_L
     
-    like= liked_R + liked_L 			! Combined log likelihood for R and L
+    like= liked_R + liked_L             ! Combined log likelihood for R and L
     
     write(*,*)like
     
-    sample=0	! Sampling counter (nsamples)
-    th=0.  		! Chain thinning counter
-    ount=0 		! Total: burn-in+nsamples
+    sample=0    ! Sampling counter (nsamples)
+    th=0        ! Chain thinning counter
+    ount=0      ! Total: burn-in+nsamples
     PrP=0
     PrV=0
     PrB=0
@@ -662,7 +619,7 @@ include 'params.h'
     do while (sample<nsample) ! main loop, sample: number of sample post burn-in
         ount=ount+1
         malayv=malay
-        if (mod(ount,every)==0) then ! check regularly if acceptance rates are in an acceptable range, else change proposal width. Something to do with 44%
+        if (mod(ount,every)==0) then ! check regularly if acceptance rates are in an acceptable range, else change proposal width.
         
             if ((Ac_vp/(Pr_vp+1))>0.54) p_vp=p_vp*(1+perturb)! if not increase width of proposition density
             if ((Ac_vp/(Pr_vp+1))<0.34) p_vp=p_vp*(1-perturb)! or decrease it
@@ -831,7 +788,7 @@ include 'params.h'
             endif     
         elseif (u<0.3) then !change position--------------------------------------------
             move=.true.
-			! Depth of first and last depth points are fixed
+            ! Depth of first and last depth points are fixed
             ind=1+ceiling(ran3(ra)*(npt-1))
             if (ind==1) ind=2
  
@@ -852,7 +809,7 @@ include 'params.h'
             if ((voro_prop(ind,1)<=d_min).or.(voro_prop(ind,1)>=d_max)) then
                 out=0
             endif
-			! Check prior on velocity when moving cell location.
+            ! Check prior on velocity when moving cell location.
             if ((voro_prop(ind,2)<=-width).or.(voro_prop(ind,2)>=width)) then
                 out=0
             endif
@@ -994,7 +951,7 @@ include 'params.h'
             endif
         
         !else
-		! Will never be above 1 so can use 1.1 below.
+        ! Will never be above 1 so can use 1.1 below.
         elseif (u<1.1) then !death of an anisotropic layer!---------------------------------------    
             deatha = .true.
             PrDa = PrDa + 1
@@ -1027,14 +984,9 @@ include 'params.h'
         !**************************************************************************
         if (out==1) then
 
-			
-			
-			if ((ndatad_R>0).or.(ndatad_L>0)) then
-	            call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-	                r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
-			endif
-
             if (ndatad_R>0) then
+                call combine(model_ref,nptref,nic_ref,noc_ref,voro_prop,npt_prop,d_max,&
+                    r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
                 jcom=3 !rayleigh waves
                 nmodes=0
                 call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
@@ -1045,12 +997,15 @@ include 'params.h'
                 ndatad_R,ier)
                 if (ier) then 
                     out=0
+                    write(*,*)"INVALID PROPOSED MODEL..."
                     goto 1142
                 endif
 
             endif
             
             if (ndatad_L>0) then
+                call combine(model_ref,nptref,nic_ref,noc_ref,voro_prop,npt_prop,d_max,&
+                    r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
                 jcom=2 !love waves
                 nmodes=0
                 call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
@@ -1061,6 +1016,7 @@ include 'params.h'
                 
                 if (ier) then 
                     out=0
+                    write(*,*)"INVALID PROPOSED MODEL..."
                     goto 1142
                 endif
 
@@ -1086,12 +1042,11 @@ include 'params.h'
    1142 Accept = .false.
         
         ! now check if we accept the new model - different treatement depending on the change
-		! When out = 0 log(out) becomes nan so if statements yield false.
+        ! When out = 0 log(out) becomes nan so if statements yield false.
         if (birth) then!------------------------------------------------------------------
     
-            if (log(ran3(ra))<log(out) + log(real(npt)+1)&
-				-log(real(npt_prop)+1) - &
-                log(2*width)-logprob_vsv &!-log(vpvsv_max-vpvsv_min)-logprob_vp&
+            if (log(ran3(ra))<log(out) + log(real(npt)+1)-log(real(npt_prop)+1) -&
+                log(2*width)-logprob_vsv&!-log(vpvsv_max-vpvsv_min)-logprob_vp&
                 -like_prop+like) then ! transdimensional case
                 accept=.true.
                 AcB=AcB+1
@@ -1101,7 +1056,7 @@ include 'params.h'
         
             if (log(ran3(ra))<log(out) + log(real(npt)+1)&
                 -log(real(npt_prop)+1) + &
-                log(2*width)+logprob_vsv &!+log(vpvsv_max-vpvsv_min)+logprob_vp&
+                log(2*width)+logprob_vsv&!+log(vpvsv_max-vpvsv_min)+logprob_vp&
                 -like_prop+like) then! transdimensional case
                 accept=.true.
                 AcD=AcD+1
@@ -1170,10 +1125,10 @@ include 'params.h'
                     
             
             if (lsd_R<lsd_R_min)then
-                lsd_R_min = lsd_R            
+                lsd_R_min = lsd_R
             endif
             if (lsd_L<lsd_L_min)then
-                lsd_L_min = lsd_L            
+                lsd_L_min = lsd_L
             endif
 
             
@@ -1594,7 +1549,7 @@ include 'params.h'
         close(71)
 
         open(54,file=dirname//'/Convergence_misfit.out',status='replace')
-        write(54,*)burn_in,nsample ! ,burn_in,nsample
+        write(54,*)burn_in,nsample,burn_in,nsample
         do i=1,nsample+burn_in
             write(54,*)convd_R(i),convd_Rs(i),convd_L(i),convd_Ls(i)
         enddo
@@ -1629,28 +1584,28 @@ include 'params.h'
         close(45)
 
         open(54,file=dirname//'/Convergence_Birth.out',status='replace')
-        write(54,*)burn_in,nsample ! ,burn_in,nsample
+        write(54,*)burn_in,nsample,burn_in,nsample
         do i=1,nsample+burn_in
             write(54,*)convB(i),convBs(i),convBa(i),convBas(i)
         enddo
         close(54)
         
         open(54,file=dirname//'/Convergence_Death.out',status='replace')
-        write(54,*)burn_in,nsample !,burn_in,nsample
+        write(54,*)burn_in,nsample,burn_in,nsample
         do i=1,nsample+burn_in
             write(54,*)convD(i),convDs(i),convDa(i),convDas(i)
         enddo
         close(54)
         
         open(54,file=dirname//'/Convergence_vp.out',status='replace')
-        write(54,*)burn_in,nsample !,burn_in,nsample
+        write(54,*)burn_in,nsample,burn_in,nsample
         do i=1,nsample+burn_in
             write(54,*)convvp(i),convvps(i)
         enddo
         close(54)
         
         open(54,file=dirname//'/Convergence_xi.out',status='replace')
-        write(54,*)burn_in,nsample ! ,burn_in,nsample
+        write(54,*)burn_in,nsample,burn_in,nsample
         do i=1,nsample+burn_in
             write(54,*)convxi(i),convxis(i)
         enddo
