@@ -718,18 +718,6 @@ include 'params.h'
             logcratio=logcratio+log(d_obsdcLe(i))/widening-log(d_obsdcLe_alt(i,:))
         enddo
         
-        logcratioref=0
-        do i=1,ndatad_R
-            logcratioref=logcratioref+log(d_obsdcRe(i))/widening-log(d_obsdcRe(i))
-        enddo
-        do i=1,ndatad_L
-            logcratioref=logcratioref+log(d_obsdcLe(i))/widening-log(d_obsdcLe(i))
-        enddo
-        
-        
-        
-        
-        
         write(*,*)'getting initial likelihood'
         !***********************************************************
     
