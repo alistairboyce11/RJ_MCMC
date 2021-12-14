@@ -24,8 +24,8 @@ include 'params.h'
 
     character (len=*), parameter :: dirname = 'OUT_TESTJOINT1'
     character*8, parameter :: storename = 'STORFFC1'
-    integer, parameter :: burn_in = 10000! 55000 !Burn-in period
-    integer, parameter :: nsample = 30000! 50000!Post burn-in
+    integer, parameter :: burn_in = 20000! 55000 !Burn-in period
+    integer, parameter :: nsample = 20000! 50000!Post burn-in
     integer, parameter :: thin = 50    !Thinning of the chain 
 
     integer, parameter :: Scratch = 1     ! 0: Start from Stored model 1: Start from scratch
@@ -97,10 +97,13 @@ include 'params.h'
     
     ! parameters for joint inversion
     integer, parameter :: numdis_max=2
-    real, parameter :: logalpha_min=-500
-    real, parameter :: logalpha_max=500
-    integer, parameter :: num_logalpha=500
-    real, parameter :: widening=100
+    real, parameter :: logalpha_min=-200
+    real, parameter :: logalpha_max=20
+    integer, parameter :: num_logalpha=200
+    real, parameter :: widening_start=1.1
+    integer, parameter :: n_w=10
+    real,parameter :: widening_step=0.1
+    integer,parameter :: nsample_widening=20000
 
     !***************************************************************
 
@@ -192,6 +195,14 @@ include 'params.h'
     real logalhists(num_logalpha,numdis_max),logalhist(num_logalpha,numdis_max)
     real logalpharefhist(num_logalpha),logalpharefhists(num_logalpha)
     real like_w,like_prop_w
+    
+    integer i_w
+    real widening_prop,widening
+    real mean_best(numdis_max),mean_prop(numdis_max),mean_props(numdis_max),meandiff_hist(n_w,numdis_max)
+    real alphahist(num_logalpha,numdis_max,n_w),alphahists(num_logalpha,numdis_max,n_w)
+    real alphamax(numdis_max),alpharefmax
+    real alphamax_prop(numdis_max),alpharefmax_prop
+    real alphamax_props(numdis_max),alpharefmax_props
 
     ! todo: implement a test with raylquo
 1000 format(I4)
@@ -408,7 +419,7 @@ include 'params.h'
         end do
         
         do i=10,20
-            voro(i,2)=voro(i,2)+0.001
+            voro(i,2)=voro(i,2)+0.01
         enddo
 !         voro(10,4)=0.3
 !         voro(11,4)=0.3
@@ -448,7 +459,7 @@ include 'params.h'
             call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,ndatad_L,ier)
         endif
 
-        d_obsdcR_alt(:ndatad_R,1)=d_cR(:ndatad_R)        
+        d_obsdcR_alt(:ndatad_R,1)=d_cR(:ndatad_R)
         d_obsdcL_alt(:ndatad_L,1)=d_cL(:ndatad_L)
         
         !add errors
@@ -482,7 +493,7 @@ include 'params.h'
         end do
         
         do i=10,20
-            voro(i,2)=voro(i,2)-0.001
+            voro(i,2)=voro(i,2)-0.01
         enddo
 !         voro(10,4)=0.3
 !         voro(11,4)=0.3
@@ -605,13 +616,22 @@ include 'params.h'
 
     !**************************************************************
     
+    write(*,*)dirname
+    
     widening_prop=widening_start
+    
     mean_best=-1000000000
     alphahists=0
+    alphahist=0
     
     do i_w=1,n_w
         
-        write(*,*)dirname
+        
+        
+        alphamax_prop=-1000000
+        alpharefmax_prop=-1000000
+        mean_prop=0
+        mean_props=0
         
         pxi = 0.4             ! proposal for change in xi
         p_vp = 0.1           ! proposal for change in vp/vsv
@@ -646,12 +666,11 @@ include 'params.h'
         j=0
         tes=.false.
         do while(.not.tes)
-    50      tes=.true.
+    150      tes=.true.
             
             ! create a starting model randomly
             npt = milay+ran3(ra)*(malay-milay)!(12-milay)!(maxlay-minlay)
-            if ((npt>malay).or.(npt<milay)) goto 50
-            write(*,*)npt
+            if ((npt>malay).or.(npt<milay)) goto 150
             j=j+1
             do i=1,npt
     
@@ -694,7 +713,6 @@ include 'params.h'
     
         enddo
     
-        write(*,*)'DONE INITIALIZING'
         
         ! isoflag says if a layer is isotropic
         do i=1,npt
@@ -708,17 +726,7 @@ include 'params.h'
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! Check and double-check
-        write(*,*)'getting the ratio of the uncertainties'
-        logcratio=0
         
-        do i=1,ndatad_R
-            logcratio=logcratio+log(d_obsdcRe(i))/widening-log(d_obsdcRe_alt(i,:))
-        enddo
-        do i=1,ndatad_L
-            logcratio=logcratio+log(d_obsdcLe(i))/widening-log(d_obsdcLe_alt(i,:))
-        enddo
-        
-        write(*,*)'getting initial likelihood'
         !***********************************************************
     
         !                 Get initial likelihood
@@ -743,8 +751,9 @@ include 'params.h'
         likemax=lsd_R+lsd_L
         
         like= (liked_R + liked_L)
-        like_w=like/widening
+        like_w=like/widening_prop
         
+        write(*,*)widening_prop
         write(*,*)like,like_w
         
         sample=0
@@ -776,9 +785,8 @@ include 'params.h'
         
         recalculated=0
         
-        write(*,*)'all initialized' 
     
-        do while (sample<nsample) ! main loop, sample: number of sample post burn-in
+        do while (sample<nsample_widening) ! main loop, sample: number of sample post burn-in
             ount=ount+1
             malayv=malay
             if (mod(ount,every)==0) then ! check regularly if acceptance rates are in an acceptable range, else change proposal width
@@ -1153,7 +1161,7 @@ include 'params.h'
                     ndatad_R,ier)
                     if (ier) then 
                         out=0
-                        goto 1142
+                        goto 11142
                     endif
     
                 endif
@@ -1171,7 +1179,7 @@ include 'params.h'
                     
                     if (ier) then 
                         out=0
-                        goto 1142
+                        goto 11142
                     endif
     
                 endif
@@ -1192,9 +1200,9 @@ include 'params.h'
             endif 
             
             like_prop=(liked_R_prop+liked_L_prop) !log-likelihood of the proposed model
-            like_prop_w=like_prop/widening
+            like_prop_w=like_prop/widening_prop
             
-       1142 Accept = .false.
+       11142 Accept = .false.
             
             ! now check if we accept the new model - different treatement depending on the change
             if (birth) then!------------------------------------------------------------------
@@ -1217,13 +1225,13 @@ include 'params.h'
                 endif
             
             elseif (noisd_R) then !@@@@@@@@@@@@@@@@@@@@@@@@@@@@ logrsig  @@@@@@@@@@@@
-                logrsig=ndatad_R*log(Ad_R/Ad_R_prop)/widening ! ATTENTION avc ld 2
+                logrsig=ndatad_R*log(Ad_R/Ad_R_prop)/widening_prop ! ATTENTION avc ld 2
                 if (log(ran3(ra))<logrsig+log(out)-like_prop_w+like_w) then ! hierarchical case
                     accept=.true.
                     Acnd_R=Acnd_R+1
                 endif
             elseif (noisd_L) then !@@@@@@@@@@@@@@@@@@@@@@@@@@@@ logrsig  @@@@@@@@@@@@
-                logrsig=ndatad_L*log(Ad_L/Ad_L_prop)/widening ! ATTENTION avc ld 2
+                logrsig=ndatad_L*log(Ad_L/Ad_L_prop)/widening_prop ! ATTENTION avc ld 2
                 if (log(ran3(ra))<logrsig+log(out)-like_prop_w+like_w) then ! hierarchical case
                     accept=.true.
                     Acnd_L=Acnd_L+1
@@ -1289,12 +1297,16 @@ include 'params.h'
                     end do
                     like_alt=like_alt_R+like_alt_L
                     
-                    logalpha(idis)=ndatad_R*(1/widening-1)*log(Ad_R)&
-                    +ndatad_L*(1/widening-1)*log(Ad_L)&
-                    +like/widening-like_alt
+                    logalpha(idis)=ndatad_R*(1/widening_prop-1)*log(Ad_R)&
+                    +ndatad_L*(1/widening_prop-1)*log(Ad_L)&
+                    +like_w-like_alt
                 enddo
                 !write(*,*)'logcratio',logcratio
                 !write(*,*)'logalpha',logalpha
+                
+                logalpharef=ndatad_R*(1/widening_prop-1)*log(Ad_R)&
+                +ndatad_L*(1/widening_prop-1)*log(Ad_L)&
+                +like_w-like
                 
         
             endif
@@ -1331,12 +1343,18 @@ include 'params.h'
                 
                 IF (mod(ount,thin)==0) THEN
                     
-                    if (logalpha>logalphamax_prop)
-                        logalphamax_prop=logalpha
+                    do idis=1,numdis
+                        if (logalpha(idis)>alphamax_prop(idis)) then
+                            alphamax_prop(idis)=logalpha(idis)
+                        endif
+                    enddo
+                    
+                    if (logalpharef>alpharefmax_prop) then
+                        alpharefmax_prop=logalpharef
+                    endif
                     
                     mean_prop=mean_prop+logalpha
                     th = th + 1
-                    histo(npt)=histo(npt)+alpharef !histogram of number of layers
                     
                     alpha=exp(logalpha)
                     alphasum=alphasum+exp(logalpha)
@@ -1345,23 +1363,39 @@ include 'params.h'
                         i_al=ceiling((logalpha(idis)-logalpha_min)/(logalpha_max-logalpha_min)*num_logalpha)
                         if (i_al<logalpha_min) i_al=1
                         if (i_al>logalpha_max) i_al=num_logalpha
-                        logalhist_w(i_al,idis,i_w)=logalhist_w(i_al,idis,i_w)+1
+                        alphahist(i_al,idis,i_w)=alphahist(i_al,idis,i_w)+1
                     enddo
 
                 endif
     
             endif
+            IF ((mod(ount,display).EQ.0)) then!.and.(mod(ran,24).EQ.0)) THEN
+
+                write(*,*)'processor number',ran+1,'/',nbproc
+                write(*,*)'sample:',ount,'/',burn_in+nsample
+                write(*,*)'number of cells:',npt
+                write(*,*)'Ad_R',Ad_R,'Ad_L',Ad_L
+                write(*,*)'Acceptance rates'
+                write(*,*)'AR_move',100*AcP(1)/PrP(1),100*AcP(2)/PrP(2)
+                write(*,*)'AR_value',100*AcV(1)/PrV(1),100*AcV(2)/PrV(2)
+
+                write(*,*)'AR_Birth',100*AcB/PrB,'AR_Death',100*AcD/PrD,'sigmav',sigmav
+                write(*,*)'AR_Birtha',100*AcBa/PrBa,'AR_Deatha',100*AcDa/PrDa
+                write(*,*)'AR_xi',100*Acxi/Prxi,'pxi',pxi
+                write(*,*)'AR__vp',100*Ac_vp/Pr_vp,'p_vp',p_vp
+                write(*,*)'AR_Ad_R',100*Acnd_R/Prnd_R,'pAd_R',pAd_R
+                write(*,*)'AR_Ad_L',100*Acnd_L/Prnd_L,'pAd_L',pAd_L
+                write(*,*)'npt_iso',npt_iso,'npt_ani',npt_ani
+                write(*,*)'widening',widening_prop
+                !write(*,*)Ar_birth_old,sigmav_old,sigmav
+                write(*,*)'-----------------------------------------'
+                write(*,*)
+                write(*,*)
+                
+                recalculated=0
+                
+            END IF
         end do !End Markov chain
-        mean_prop=mean_prop/th
-        
-        ! best fitting model
-        write(filenamemax,"('/bestmodel_',I3.3,'_.out')") rank    
-        open(56,file=dirname//filenamemax,status='replace')
-        write(56,*) nptmax,likemax
-        do i=1,npt
-            write(56,*)voromax(i,1),voromax(i,2),voromax(i,3),voromax(i,4)
-        enddo
-        close(56)
         
         k=0
         if (th.ne.0) then !normalize averages
@@ -1411,20 +1445,15 @@ include 'params.h'
 
 
         call MPI_Group_incl(group_world, j, members, good_group, ierror)
-        !IF (ran==0) write(*,*)'1'
-        !write(*,*)ran,members(1:9)
         call MPI_Comm_create(MPI_COMM_WORLD, good_group, MPI_COMM_small, ierror)
-        !IF (ran==0) write(*,*)'2'
 
-        do i=1,disd
-            if (histochs(i)<0) write(*,*)'haaaaaaaaaaaaaaaaaaaaaaaa'
-        enddo
-
-        !-!
         if (flag==1) then
             
-            call MPI_REDUCE(alphamax_prop,alphamax_props,1,MPI_Real,OP_mpi_max,0,MPI_COMM_small,ierror)
+            call MPI_REDUCE(alphamax_prop,alphamax_props,numdis_max,MPI_Real,MPI_MAX,0,MPI_COMM_small,ierror)
+            call MPI_REDUCE(alpharefmax_prop,alpharefmax_props,1,MPI_Real,MPI_MAX,0,MPI_COMM_small,ierror)
             call MPI_REDUCE(mean_prop,mean_props,1,MPI_Real,MPI_sum,0,MPI_COMM_small,ierror)
+            call MPI_REDUCE(alphahist,alphahists,num_logalpha*numdis_max*n_w,MPI_Real,MPI_MAX,&
+                 0,MPI_COMM_small,ierror)
 
             write(*,*)'rank=',ran,'th=',th
 
@@ -1437,16 +1466,41 @@ include 'params.h'
         
         mean_props=mean_props/j-alphamax_props
         meandiff_hist(i_w,:)=mean_props
-        if (mean_prop>mean_best) then
+        if (sum(mean_props**2)<sum(mean_best**2)) then
             mean_best=mean_props
             widening=widening_prop
             alphamax=alphamax_props
+            alpharefmax=alpharefmax_props
         endif
-        write(*,*)i_w,widening_prop,widening,mean_best,mean_props
+        IF (ran==members(1)) THEN
+            write(*,*)'New widening tested: '
+            write(*,*)i_w,widening_prop,widening,'best',mean_best(:numdis),'props',mean_props(:numdis)
+        endif
         widening_prop=widening_prop+widening_step
         
     enddo
     
+    write(*,*)'writing outputs of widening tests'
+    
+    IF (ran==members(1)) THEN
+
+        open(65,file=dirname//'/mean_prop.out',status='replace')
+        write(65,*)widening_start,widening_step,n_w,numdis
+        do i=1,n_w
+            write(65,*)meandiff_hist(i,:)
+        enddo
+        close(65)
+        
+        open(65,file=dirname//'/alphahist.out',status='replace')
+        write(*,*)logalpha_min,logalpha_max,num_logalpha
+        write(65,*)widening_start,widening_step,n_w,numdis
+        do i=1,n_w
+            do j=1,numdis
+                write(65,*)alphahists(:,j,i)
+            enddo
+        enddo
+        close(65)
+    ENDIF
     !**************************************************************
     
     !    True loop
@@ -1467,7 +1521,7 @@ include 'params.h'
   
     
   
-    ra=rank !seed for RNG
+    !ra=rank !seed for RNG
     ran=rank
     inorout=0
     inorouts=0
@@ -1624,26 +1678,6 @@ include 'params.h'
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! Check and double-check
     write(*,*)'getting the ratio of the uncertainties'
-    logcratio=0
-    
-    do i=1,ndatad_R
-        logcratio=logcratio+log(d_obsdcRe(i))/widening-log(d_obsdcRe_alt(i,:))
-    enddo
-    do i=1,ndatad_L
-        logcratio=logcratio+log(d_obsdcLe(i))/widening-log(d_obsdcLe_alt(i,:))
-    enddo
-    
-    logcratioref=0
-    do i=1,ndatad_R
-        logcratioref=logcratioref+log(d_obsdcRe(i))/widening-log(d_obsdcRe(i))
-    enddo
-    do i=1,ndatad_L
-        logcratioref=logcratioref+log(d_obsdcLe(i))/widening-log(d_obsdcLe(i))
-    enddo
-    
-    
-    
-    
     
     write(*,*)'getting initial likelihood'
     !***********************************************************
@@ -2238,7 +2272,8 @@ include 'params.h'
             
             logalpharef=ndatad_R*(1/widening-1)*log(Ad_R)&
             +ndatad_L*(1/widening-1)*log(Ad_L)&
-            +like/widening-like!&
+            +like/widening-like&
+            -alpharefmax
             !+logcratioref
             !-(1/widening-1)*(ndatad_R+ndatad_L)/2&
             !
@@ -2269,18 +2304,10 @@ include 'params.h'
                 
                 logalpha(idis)=ndatad_R*(1/widening-1)*log(Ad_R)&
                 +ndatad_L*(1/widening-1)*log(Ad_L)&
-                +like/widening-like_alt!& 
-                !+logcratio(idis)
-                !-(1/widening-1)*(ndatad_R+ndatad_L)/2&
-                !+logcratio(idis)
-              
-                !-sum((d_obsdCL_alt(:,idis)**2-d_obsdCL**2)/(d_obsdCLe_alt(:,idis)*d_obsdCLe))/&
-                !(2*Ad_L**2*d_obsdCLe_alt(i,idis)*d_obsdCLe(i))&
-                !-sum((d_obsdCR_alt(:,idis)**2-d_obsdCR**2)/(d_obsdCRe_alt(:,idis)*d_obsdCRe))/&
-                !(2*Ad_R**2*d_obsdCRe_alt(i,idis)*d_obsdCRe(i))
+                +like/widening-like_alt& 
+                -alphamax(idis)
+
             enddo
-            !write(*,*)'logcratio',logcratio
-            !write(*,*)'logalpha',logalpha
             
     
         endif
@@ -2330,14 +2357,14 @@ include 'params.h'
                 d_cRdelta=d_cRdelta+(d_cR**2)*alpharef
                 d_cLdelta=d_cLdelta+(d_cL**2)*alpharef
                 
-                write(*,*)'logcratio',logcratio
-                write(*,*)'like_alt',like_alt
-                write(*,*)'logalpha',logalpha
-                write(*,*)'alpha',alpha
-                write(*,*)'logcratioref',logcratioref
-                write(*,*)'like',like
-                write(*,*)'logalpharef',logalpharef
-                write(*,*)'alpharef',alpharef
+!                 write(*,*)'logcratio',logcratio
+!                 write(*,*)'like_alt',like_alt
+!                 write(*,*)'logalpha',logalpha
+!                 write(*,*)'alpha',alpha
+!                 write(*,*)'logcratioref',logcratioref
+!                 write(*,*)'like',like
+!                 write(*,*)'logalpharef',logalpharef
+!                 write(*,*)'alpharef',alpharef
                 
                 i_al=ceiling((logalpharef-logalpha_min)/(logalpha_max-logalpha_min)*num_logalpha)
                 logalpharefhist(i_al)=logalpharefhist(i_al)+1
