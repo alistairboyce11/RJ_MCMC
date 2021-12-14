@@ -200,6 +200,11 @@ include 'params.h'
     !***********************************************************************
 
     CALL cpu_time(t1)  !Tic. start counting time 
+    
+    call MPI_INIT(ierror)
+    call MPI_COMM_SIZE(MPI_COMM_WORLD, nbproc, ierror) ! MPI_COMM_WORLD: communicator (https://www.open-mpi.org/doc/v4.0/man3/MPI_Comm_size.3.php)
+    call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierror) ! https://www.open-mpi.org/doc/v4.0/man3/MPI_Comm_rank.3.php
+    call MPI_Comm_group(MPI_COMM_WORLD,group_world,ierror) ! https://www.open-mpi.org/doc/v3.0/man3/MPI_Comm_group.3.php
  
 
     !Start Parralelization of the code. From now on, the code is run on each
@@ -605,11 +610,6 @@ include 'params.h'
     alphahists=0
     
     do i_w=1,n_w
-    
-        call MPI_INIT(ierror)
-        call MPI_COMM_SIZE(MPI_COMM_WORLD, nbproc, ierror) ! MPI_COMM_WORLD: communicator (https://www.open-mpi.org/doc/v4.0/man3/MPI_Comm_size.3.php)
-        call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierror) ! https://www.open-mpi.org/doc/v4.0/man3/MPI_Comm_rank.3.php
-        call MPI_Comm_group(MPI_COMM_WORLD,group_world,ierror) ! https://www.open-mpi.org/doc/v3.0/man3/MPI_Comm_group.3.php
         
         write(*,*)dirname
         
@@ -717,18 +717,6 @@ include 'params.h'
         do i=1,ndatad_L
             logcratio=logcratio+log(d_obsdcLe(i))/widening-log(d_obsdcLe_alt(i,:))
         enddo
-        
-        logcratioref=0
-        do i=1,ndatad_R
-            logcratioref=logcratioref+log(d_obsdcRe(i))/widening-log(d_obsdcRe(i))
-        enddo
-        do i=1,ndatad_L
-            logcratioref=logcratioref+log(d_obsdcLe(i))/widening-log(d_obsdcLe(i))
-        enddo
-        
-        
-        
-        
         
         write(*,*)'getting initial likelihood'
         !***********************************************************
@@ -1377,24 +1365,12 @@ include 'params.h'
         
         k=0
         if (th.ne.0) then !normalize averages
-            avvs=avvs/th
-            avvp=avvp/th
-            avxi=avxi/th
-            probani=100*probani/th
             
-            d_cRmoy=d_cRmoy/th
-            d_cLmoy=d_cLmoy/th
-            d_cRdelta=d_cRdelta/th
-            d_cLdelta=d_cLdelta/th
+            mean_prop=mean_prop/th
             
             inorout(ran+1)=1
             k=k+1
-            do idis=1,numdis
-                avvs_alt(:,idis)=avvs_alt(:,idis)/alphasum(idis)
-                avvp_alt(:,idis)=avvp_alt(:,idis)/alphasum(idis)
-                avxi_alt(:,idis)=avxi_alt(:,idis)/alphasum(idis)
-                probani_alt(:,idis)=100*probani_alt(:,idis)/alphasum(idis)
-            enddo
+            
         else
             write(*,*)
             write(*,*)'rank=',ran,'th=',th
@@ -1446,93 +1422,27 @@ include 'params.h'
 
         !-!
         if (flag==1) then
-            call MPI_REDUCE(convBa,convBas,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(convB,convBs,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(convDa,convDas,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(convD,convDs,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(convvp,convvps,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(convxi,convxis,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(histoch,histochs,disd,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(ML_Ad_R,ML_Ad_Rs,disA,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(ML_Ad_L,ML_Ad_Ls,disA,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(avvs,avvss,disd,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(avvp,avvps,disd,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(avxi,avxis,disd,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(probani,probanis,disd,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(postvs,postvss,disd*disv,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(postxi,postxis,disd*disv,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(postvp,postvps,disd*disv,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(ncell,ncells,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(convd_R,convd_Rs,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(convd_L,convd_Ls,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(histo,histos,malay,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(TRA,TRAs,malay*(malay+1),MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(convAd_R,convAd_Rs,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(convAd_L,convAd_Ls,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            ! 
-            call MPI_REDUCE(d_cRmoy,d_cRmoys,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(d_cLmoy,d_cLmoys,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(d_cRdelta,d_cRdeltas,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(d_cLdelta,d_cLdeltas,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
             
-            call MPI_REDUCE(avvs_alt,avvss_alt,disd*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(avvp_alt,avvps_alt,disd*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(avxi_alt,avxis_alt,disd*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(probani_alt,probanis_alt*numdis_max,disd,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(histo_alt,histos_alt,malay*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(postvs_alt,postvss_alt,disd*disv*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(postxi_alt,postxis_alt,disd*disv*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(postvp_alt,postvps_alt,disd*disv*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(logalhist,logalhists,num_logalpha*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(logalpharefhist,logalpharefhists,num_logalpha,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-
-            do i=1,disd
-                if (histochs(i)<0) write(*,*)'hiiiiiiiiiiiiiiiii'
-            enddo
-
-            d_cRmoys=d_cRmoys/j
-            d_cLmoys=d_cLmoys/j
-            d_cRdeltas=sqrt(d_cRdeltas/j-d_cRmoys**2)
-            d_cLdeltas=sqrt(d_cLdeltas/j-d_cLmoys**2)
-            
-            convPs=convPs/j
-            convBs=convBs/j
-            convBas=convBas/j
-            convDs=convDs/j
-            convDas=convDas/j
-            convvps=convvps/j
-            convxis=convxis/j
-     
-            probanis=probanis/j
-            probanis_alt=probanis_alt/j
+            call MPI_REDUCE(alphamax_prop,alphamax_props,1,MPI_Real,OP_mpi_max,0,MPI_COMM_small,ierror)
+            call MPI_REDUCE(mean_prop,mean_props,1,MPI_Real,MPI_sum,0,MPI_COMM_small,ierror)
 
             write(*,*)'rank=',ran,'th=',th
 
-            avvss=avvss/j
-            avvps=avvps/j
-            avxis=avxis/j
-            convd_Rs=convd_Rs/j
-            convd_Ls=convd_Ls/j
-            convAd_Rs=convAd_Rs/j
-            convAd_Ls=convAd_Ls/j
-            ncells=ncells/j
-            
-            avvss_alt=avvss_alt/j
-            avvps_alt=avvps_alt/j
-            avxis_alt=avxis_alt/j
+            call MPI_Group_free(good_group, ierror)
+            call MPI_Comm_free(MPI_COMM_small, ierror)
+            call MPI_BARRIER(MPI_COMM_WORLD, ierror)
 
         endif
         ! todo: bring together different cores
         
-        mean_prop=mean/burnin*thin-alphamax_prop
-        meandiff_hist(i_w)=mean_prop
+        mean_props=mean_props/j-alphamax_props
+        meandiff_hist(i_w,:)=mean_props
         if (mean_prop>mean_best) then
-            mean_best=mean_prop
+            mean_best=mean_props
             widening=widening_prop
-            logalphamax12=alphamax12_prop
-            logalphamax11=alphamax11_prop
+            alphamax=alphamax_props
         endif
-        write(*,*)i_w,widening_prop,widening,mean_best,mean
+        write(*,*)i_w,widening_prop,widening,mean_best,mean_props
         widening_prop=widening_prop+widening_step
         
     enddo
@@ -1542,11 +1452,6 @@ include 'params.h'
     !    True loop
     
     !**************************************************************
-    
-    call MPI_INIT(ierror)
-    call MPI_COMM_SIZE(MPI_COMM_WORLD, nbproc, ierror) ! MPI_COMM_WORLD: communicator (https://www.open-mpi.org/doc/v4.0/man3/MPI_Comm_size.3.php)
-    call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierror) ! https://www.open-mpi.org/doc/v4.0/man3/MPI_Comm_rank.3.php
-    call MPI_Comm_group(MPI_COMM_WORLD,group_world,ierror) ! https://www.open-mpi.org/doc/v3.0/man3/MPI_Comm_group.3.php
     
     write(*,*)dirname
     
@@ -2961,8 +2866,8 @@ include 'params.h'
     if (ran==0) write(*,*)'time taken by the code was',(t2-t1)/3600,'hours'
 
     call MPI_FINALIZE(ierror)! Terminate the parralelization
-
-
+    
+    
 end! end the main program
 
 
@@ -3070,10 +2975,11 @@ FUNCTION ran3(idum)
 END
 
 !-------------------------------------------------------------------
-!                        
-!    interpolation
+!
+!    create new mpi operation for alpha
 ! 
 ! ----------------------------------------------------------------------------
+
 
 
 !the code is finished. 
