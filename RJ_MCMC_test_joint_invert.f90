@@ -25,7 +25,7 @@ include 'data_joint.h'
     real log, sqrt
 
     integer i,ii,sample,ind,th,ount,k ! various indices
-    logical ier ! error flag for dispersion curves
+    logical ier, error_flag ! error flags for dispersion curves and minos_bran
     integer npt,npt_prop,npt_iso,npt_ani ! numbers of points, isotropic, anisotropic
     logical accept,tes,birth,birtha,death,deatha,move,value,noisd_R,noisd_L,ani,change_vp !which parameter did we change?
     logical testing
@@ -117,7 +117,6 @@ include 'data_joint.h'
     
     character filebycore*15
 
-    ! todo: implement a test with raylquo
 1000 format(I4)
 
 
@@ -130,7 +129,6 @@ include 'data_joint.h'
     call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierror) ! https://www.open-mpi.org/doc/v4.0/man3/MPI_Comm_rank.3.php
     call MPI_Comm_group(MPI_COMM_WORLD,group_world,ierror) ! https://www.open-mpi.org/doc/v3.0/man3/MPI_Comm_group.3.php
     
-    write(filebycore,"('/output_',I3.3,'.out')") rank
     !Start Parralelization of the code. From now on, the code is run on each
     !processor independently, with ra = the number of the proc.
 
@@ -361,7 +359,10 @@ include 'data_joint.h'
             jcom=3 !rayleigh waves
             call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
                 qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_R,wmax_R,nmin_R,nmax_R,&
-                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo)
+                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
+            if (error_flag) then
+                tes=.false.
+            end if
             call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,ndatad_R,ier)
             if (ier) tes=.false.
         endif
@@ -373,7 +374,10 @@ include 'data_joint.h'
             jcom=2 !love waves
             call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
                 qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_L,wmax_L,nmin_L,nmax_L,&
-                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo)
+                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
+            if (error_flag) then
+                tes=.false.
+            end if
             call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,ndatad_L,ier)
             
             if (ier) tes=.false.
@@ -837,7 +841,11 @@ include 'data_joint.h'
                 nmodes=0
                 call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
                     qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_R,wmax_R,nmin_R,nmax_R,&
-                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo)
+                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
+                if (error_flag) then 
+                    out=0
+                    goto 1142
+                endif
                 
                 call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR_prop,&
                 ndatad_R,ier)
@@ -855,7 +863,11 @@ include 'data_joint.h'
                 nmodes=0
                 call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
                     qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_L,wmax_L,nmin_L,nmax_L,&
-                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo)
+                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
+                if (error_flag) then 
+                    out=0
+                    goto 1142
+                endif
                 call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL_prop,&
                 ndatad_L,ier)
                 
