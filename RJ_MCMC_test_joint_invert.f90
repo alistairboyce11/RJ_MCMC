@@ -24,7 +24,8 @@ include 'data_joint.h'
     real , EXTERNAL    ::    gasdev,ran3,interp
     real log, sqrt
 
-    integer i,ii,sample,ind,th,ount,k ! various indices
+    integer i,ii,sample,ind,ount,k ! various indices
+    real th
     logical ier, error_flag ! error flags for dispersion curves and minos_bran
     integer npt,npt_prop,npt_iso,npt_ani ! numbers of points, isotropic, anisotropic
     logical accept,tes,birth,birtha,death,deatha,move,value,noisd_R,noisd_L,ani,change_vp !which parameter did we change?
@@ -237,7 +238,7 @@ include 'data_joint.h'
   
     
   
-    !ra=rank !seed for RNG
+    ra=rank !seed for RNG
     ran=rank
     inorout=0
     inorouts=0
@@ -673,14 +674,14 @@ include 'data_joint.h'
             if ((Ad_R_prop<=Ad_R_min).or.(Ad_R_prop>=Ad_R_max)) then
                 out=0
             endif
-        elseif (u<0.5) then ! Change noise parameter for love waves
-            noisd_L=.true.
-            Prnd_L = Prnd_L + 1
-            Ad_L_prop = Ad_L+gasdev(ra)*pAd_L
-            !Check if oustide bounds of prior
-            if ((Ad_L_prop<=Ad_L_min).or.(Ad_L_prop>=Ad_L_max)) then
-                out=0
-            endif         
+!         elseif (u<0.5) then ! Change noise parameter for love waves
+!             noisd_L=.true.
+!             Prnd_L = Prnd_L + 1
+!             Ad_L_prop = Ad_L+gasdev(ra)*pAd_L
+!             !Check if oustide bounds of prior
+!             if ((Ad_L_prop<=Ad_L_min).or.(Ad_L_prop>=Ad_L_max)) then
+!                 out=0
+!             endif         
         
         elseif (u<.6) then ! change vsv-----------------------------------
             
@@ -1079,7 +1080,9 @@ include 'data_joint.h'
             IF (mod(ount,thin)==0) THEN
                 
                 alpharef=exp(logalpharef)
+                write(*,*)alpharef
                 th = th + alpharef
+                write(*,*)'th',th
                 histo(npt)=histo(npt)+alpharef !histogram of number of layers
                 
                 alpha=exp(logalpha)
@@ -1141,7 +1144,7 @@ include 'data_joint.h'
                 
                 ! Write Posterior matrix!-----------------------------------------------------------------
                 j=1
-                
+                write(*,*)'writing posterior matrix'
                 do i=disd,1,-1
                     d=rearth-((i-1)*prof/real(disd-1))*1000.
                     
@@ -1190,7 +1193,7 @@ include 'data_joint.h'
                         
                         stop "xi>disv"
                     endif
-
+                    
                     postvs(i,ind_vsv)=postvs(i,ind_vsv)+alpharef
                     postvs_alt(i,ind_vsv,:)=postvs_alt(i,ind_vsv,:)+alpha
                     
@@ -1250,7 +1253,7 @@ include 'data_joint.h'
             !**********************************************************************
 
         endif
-        IF ((mod(ount,display).EQ.0)) then!.and.(mod(ran,24).EQ.0)) THEN
+        IF ((mod(ount,display).EQ.0).and.(mod(ran,50).EQ.0)) THEN
 
             write(*,*)'processor number',ran+1,'/',nbproc
             write(*,*)'sample:',ount,'/',burn_in+nsample
@@ -1282,6 +1285,7 @@ include 'data_joint.h'
 
         !endif
     end do !End Markov chain
+    write(*,*)maxval(postvs)
     
 !     ! best fitting model
 !     write(filenamemax,"('/bestmodel_',I3.3,'_.out')") rank    
@@ -1294,6 +1298,7 @@ include 'data_joint.h'
     
     k=0
     if (th.ne.0) then !normalize averages
+        write(*,*)'averages getting normalized'
         avvs=avvs/th
         avvp=avvp/th
         avxi=avxi/th
@@ -1331,6 +1336,8 @@ include 'data_joint.h'
 
     j=0
     k=0
+    write(*,*)'nbprocs',nbproc
+    write(*,*)'inorouts',inorouts(1)
     do i=1,nbproc
         j=j+inorouts(i)
         if (inorouts(i).ne.0) then
@@ -1346,6 +1353,7 @@ include 'data_joint.h'
 
     !***************************************************************************
     flag=0
+    write(*,*)'j',j
     do i=1,j
         if (ran==members(i)) flag=1
     enddo
@@ -1360,7 +1368,8 @@ include 'data_joint.h'
     do i=1,disd
         if (histochs(i)<0) write(*,*)'haaaaaaaaaaaaaaaaaaaaaaaa'
     enddo
-
+    write(*,*)maxval(postvs)
+    write(*,*)'flag',flag
     !-!
     if (flag==1) then
         call MPI_REDUCE(convBa,convBas,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
@@ -1439,6 +1448,8 @@ include 'data_joint.h'
         avxis_alt=avxis_alt/j
 
     endif
+    
+    write(*,*)maxval(postvs),maxval(postvss)
 
     !***********************************************************************
 
