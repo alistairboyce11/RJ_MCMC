@@ -64,4 +64,4 @@
 
 ! maximum distance between mode and period
        real maxdis
-       parameter (maxdis=3.)
+       parameter (maxdis=30.)
