@@ -112,10 +112,17 @@ c      frequency normalization    = vn/rn
 c
 c**************************************************************************
 
+c     subroutine minos_bran(ifanis2,tref2,N2,nic2,noc2,r2,rho2,vpv2,
+c    &vph2,vsv2,vsh2,qkappa2,qshear2,eta2,eps2,wgrav2,jcom2,lmin2,
+c    &lmax2,wmin2,wmax2,nmin2,nmax2,nmodes_max,i_mode,n_mode,l_mode,
+c    &c_ph,period,raylquo)
+c     ------ Al Edits ------ 
       subroutine minos_bran(ifanis2,tref2,N2,nic2,noc2,r2,rho2,vpv2,
      &vph2,vsv2,vsh2,qkappa2,qshear2,eta2,eps2,wgrav2,jcom2,lmin2,
      &lmax2,wmin2,wmax2,nmin2,nmax2,nmodes_max,i_mode,n_mode,l_mode,
-     &c_ph,period,raylquo)
+     &c_ph,period,raylquo,error_flag)
+
+
 c      implicit none
 c      integer,parameter:  if_deck=1 !model in tabular form
 c      integer,parameter:  Nmax=350 !max number of layers
@@ -148,8 +155,10 @@ c      real,intent(in):    r(Nmax),rho(Nmax),vpv(Nmax),vph(Nmax),vsv(Nmax),vsh(N
      +  fl1,fl2,fl3,sfl3,jcom,nord,l,kg,kount,knsw,ifanis,iback
       common/eifx/vpv(mk),vph(mk),vsv(mk),vsh(mk),eta(mk),wrk(mk*10)
       common/rindx/nic,noc,nsl,nicp1,nocp1,nslp1,n
-      
-      
+c     ------ Al Edits ------ 
+      integer :: error_flag
+      error_flag = 0
+
       ifanis=ifanis2
       N=N2
       nic=nic2
@@ -178,14 +187,21 @@ c      real,intent(in):    r(Nmax),rho(Nmax),vpv(Nmax),vph(Nmax),vsv(Nmax),vsh(N
       wgrav=wgrav2
       call model(ifdeck)
       ifreq=1
+c     print *,'model done'
+c     call wtable(ifreq,nmodes_max,i_mode,n_mode,l_mode,c_ph,period,
+c    +raylquo,wmin,wmax,lmin,lmax,nmin,nmax)
+c     ------ Al Edits ------ 
       call wtable(ifreq,nmodes_max,i_mode,n_mode,l_mode,c_ph,period,
-     +raylquo,wmin,wmax,lmin,lmax,nmin,nmax)
-      
+     +raylquo,wmin,wmax,lmin,lmax,nmin,nmax,error_flag)
+
       return
       end subroutine minos_bran
 
+c     subroutine wtable(ifreq,nmodes_max,i_mode,n_mode,l_mode,c_ph,
+c    +period,raylquo,wmin,wmax,lmin,lmax,normin,normax)
+c     ------ Al Edits ------ 
       subroutine wtable(ifreq,nmodes_max,i_mode,n_mode,l_mode,c_ph,
-     +period,raylquo,wmin,wmax,lmin,lmax,normin,normax)
+     +period,raylquo,wmin,wmax,lmin,lmax,normin,normax,error_flag)
 c*** makes up table of frequencies ***
       implicit real*8(a-h,o-z)
       integer,intent(in) :: nmodes_max
@@ -195,12 +211,17 @@ c*** makes up table of frequencies ***
       integer,intent(in) :: ifreq
       integer,dimension(nmodes_max),intent(out) :: n_mode,l_mode
       real,dimension(nmodes_max),intent(out) :: c_ph,period,raylquo
+c     ------ Al Edits ------ 
+      integer :: error_flag
       common/bits/pi,rn,vn,wn,w,wsq,wray,qinv,cg,wgrav,tref,fct,eps,fl,
      +  fl1,fl2,fl3,sfl3,jcom,nord,l,kg,kount,knsw,ifanis,iback
       common/shanks/b(46),c(10),dx,step(8),stepf,maxo,in
       common/mtab/we(2),de(2),ke(2),wtry,bm
       dimension wt(2)
       data inss/5/
+c     ------ Al Edits ------ 
+      error_flag = 0
+
       cmhz=pi/500.d0
       stepf=1.d0    
 c      print *,'enter eps and wgrav'
@@ -216,6 +237,8 @@ c     +   g12.4,'  gravity cut off =',g12.4,' rad/s',///,6x,'mode',
 c     +   8x,'phs vel',7x,'w(mhz)',10x,'t(secs)',6x,'grp vel(km/s)',
 c     +   8x,'q',13x,'raylquo',/)
       call steps(eps)
+c     print *,eps
+      
 c      print *,'enter jcom (1=rad;2=tor;3=sph;4=ictor)'
 c      read(*,*) jcom
 cc MB added one line below
@@ -239,11 +262,14 @@ c      print *,lmin,lmax,wmin,wmax,normin,normax
       normax=max(normax,normin)
 	  ncall = 0
       do 50 nor=normin,normax
+c***  print *,'wtable: POS: 009' !!! Confusing stuff
+c***  print *, normin,normax,nor !!! Confusing stuff
       wt(1)=wmin
       wt(2)=wmax
       wtry=0.d0
       bm=0.d0
       do 10 l=lmin,lmax
+c***  print *, lmin, lmax, l !!! This is printing mode numbers set in RJ_MCMC.f
       if(wt(1).ge.wmax) goto 50
       nord=nor
       nup=nor
@@ -261,20 +287,43 @@ c      print *,lmin,lmax,wmin,wmax,normin,normax
       sfl3=sqrt(fl3)
       we(1)=wt(1)
       we(2)=wt(2)
+c     print *,'wtable: POS: 001'
+c***  if(wtry.ne.0.d0) print *,'wtable: POS: 008', wtry
       if(wtry.ne.0.d0) we(2)=wtry
       call detqn(we(1),ke(1),de(1),0)
+c     if(ke(1).gt.ndn) print *,'wtable: POS: 002'
       if(ke(1).gt.ndn) goto 10
-      call detqn(we(2),ke(2),de(2),0)
+c***  Al Check statement -- start --  
+      if(we(2).lt.0) then
+c       print *,'wtable: CALL detqn: we(2).lt.0'
+c       print *, 'we(2),ke(2),de(2),0'
+c       print *, we(2),ke(2),de(2),0
+c       Comment next line        
+c       call detqn(we(2),ke(2),de(2),0)
+c       Uncomment next two lines.  specify error_flag further up somewhere.
+        error_flag = 1
+        return
+      else
+        error_flag = 0
+        call detqn(we(2),ke(2),de(2),0)
+      end if
+c     Al Check statement -- end --  
+c     Original line
+c     call detqn(we(2),ke(2),de(2),0)
       if(ke(2).lt.nup) then
          we(2)=wt(2)
          call detqn(we(2),ke(2),de(2),0)
+c        if(ke(2).lt.nup) print *,'wtable: POS: 003'
          if(ke(2).lt.nup) goto 50
       end if
+c     print *,'wtable: POS: 004'
 c*** bracket this mode ***
       wx=0.5d0*(we(1)+we(2))
       ktry=0
+c  15 if(ke(1).eq.ndn.and.ke(2).eq.nup) print *,'wtable: POS: 005'
    15 if(ke(1).eq.ndn.and.ke(2).eq.nup) goto 40
       ktry=ktry+1
+c     if(ktry.gt.50) print *,'wtable: POS: 006'
       if(ktry.gt.50) goto 10
       call detqn(wx,kx,dx,0)
       if(kx.le.ndn) then
@@ -288,6 +337,8 @@ c*** bracket this mode ***
       end if
       wx=0.5d0*(we(1)+we(2))
       goto 15
+c     print *,'wtable: POS: 007'
+
 c*** find roots ***
    40 knsw=0
       maxo=8
@@ -374,6 +425,7 @@ c*** write out frequencies ***
       wmhz=1000.d0/tcom
       cvel=b*rn/(l+0.5)/1000.
       if(ifreq.eq.1) then
+c       print *, "rotspl: POS: 002"
         wdiff=(b-wray*wn)/b
         gcom=vn*cg/1000.d0
         qmod=0.d0
@@ -395,6 +447,7 @@ c  200   format(i5,a2,i5,6g16.7)
         raylquo(i_mode)=wdiff
         call modout(b,qmod,gcom,ncall)
       else
+c       print *, "rotspl: POS: 003"
         cg=5000./vn
 c*** we estimate group velocity using previous frequencies
         if(bm.ne.0.d0) cg=(b-bm)/wn
@@ -415,6 +468,7 @@ c        write(iout,200) nord,kchar(jcom),l,cvel,wmhz,tcom,gcom
         raylquo(i_mode)=0.
       end if
       wtry=b+2.d0*cg*wn
+c     print *, "rotspl: POS: 001", wtry, b, cg, wn
       wt(1)=b
       bm=b
       return
@@ -633,6 +687,12 @@ c**** of the secular determinant as det and the count of zero crossings.
       kount=0
       kg=0
       fct=0.d0
+c***  Al Check statement    
+c***  print *,'detqn:  POS: 001'
+c***  if(wdim.lt.0) then
+c***    print *, 'wdim, knt, det, ifeif, wn, w'
+c***    print *, wdim,knt,det,ifeif,wn,w
+c***  end if
       if(tref.gt.0.d0) fct=2.d0*dlog(tref*wdim)/pi
       goto (2,3,1,3),jcom
     1 if(wdim.le.wgrav) kg=1
@@ -821,7 +881,7 @@ c*** toroidal modes ***
         enddo
       enddo
       return
-      end
+      end subroutine detqn
 
       subroutine sprpmn(jf,jl,f,h,nvesm,iexp)
 c*** propagate a minor vector in a solid region from level jf to jl ***
@@ -936,7 +996,7 @@ c*** propagate a minor vector in a solid region from level jf to jl ***
       if(i.eq.jl) return
       i=i+jud
       go to 10
-      end
+      end subroutine sprpmn
 
       subroutine fprpmn(jf,jl,f,h,nvefm,iexp)
 c*** propagate the minor vector in a fluid region from level jf to jl ***

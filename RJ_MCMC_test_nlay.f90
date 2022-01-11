@@ -26,7 +26,7 @@ include 'params.h'
     character*8, parameter :: storename = 'STORFFC1'     ! This is where output models are saved
     integer, parameter :: burn_in = 90000 ! 9000! 55000 !Burn-in period
     integer, parameter :: nsample = 100000 ! 10000! 50000!Post burn-in
-    integer, parameter :: thin = 100 ! 50    !Thinning of the chain 
+    integer, parameter :: thin = 50    !Thinning of the chain 
 
     integer, parameter :: Scratch = 1     ! 0: Start from Stored model 1: Start from scratch
     integer, parameter :: store = 100 ! 99999999    !Store models every "store" iteration. 
@@ -105,7 +105,7 @@ include 'params.h'
     real log, sqrt
 
     integer i,ii,sample,ind,th,ount,k ! various indices
-    logical ier ! error flag for dispersion curves
+    logical ier, error_flag ! error flags for dispersion curves and minos_bran
     integer npt,npt_prop,npt_iso,npt_ani ! numbers of points, isotropic, anisotropic
     logical accept,tes,birth,birtha,death,deatha,move,value,noisd_R,noisd_L,ani,change_vp !which parameter did we change?
     logical testing
@@ -201,7 +201,6 @@ include 'params.h'
   
     testing=.true.
     if (testing) write(*,*)'testing with synthetic model'
-  
     ra=rank !seed for RNG
     ran=rank
     inorout=0
@@ -295,76 +294,88 @@ include 'params.h'
         ndatad_R=0
         j=0
         ! careful: periods listed by decreasing period, increasing harmonic order
-        do i=200,40,-5 !synthetic periods, harmonics, uncertainties
+        do i=360,40,-10 !synthetic periods, harmonics, uncertainties
             j=j+1
             peri_R(j)=real(i)
             d_obsdcRe(j)=0.01
             n_R(j)=0
         end do
-        do i=200,50,-5
+        do i=240,40,-10
             j=j+1
             peri_R(j)=real(i)
             d_obsdcRe(j)=0.01
             n_R(j)=1
         end do
-        do i=200,50,-5
+        do i=160,40,-10
             j=j+1
             peri_R(j)=real(i)
             d_obsdcRe(j)=0.01
             n_R(j)=2
         end do
-        do i=150,50,-5
+        do i=90,40,-10
             j=j+1
             peri_R(j)=real(i)
             d_obsdcRe(j)=0.01
             n_R(j)=3
         end do
-        do i=100,50,-5
+        do i=50,40,-5
             j=j+1
             peri_R(j)=real(i)
             d_obsdcRe(j)=0.01
             n_R(j)=4
         end do
+        do i=50,40,-5
+            j=j+1
+            peri_R(j)=real(i)
+            d_obsdcRe(j)=0.01
+            n_R(j)=5
+        end do
         ndatad_R=j
-        wmin_R=1000./(maxval(peri_R(:ndatad_R))+2)
+        wmin_R=1000./(maxval(peri_R(:ndatad_R))+20)
         wmax_R=1000./(minval(peri_R(:ndatad_R))-2)
         nmin_R=minval(n_R(:ndatad_R))
         nmax_R=maxval(n_R(:ndatad_R))
         
         ndatad_L=0
         j=0
-        do i=200,40,-5
+        do i=360,40,-10 !synthetic periods, harmonics, uncertainties
             j=j+1
             peri_L(j)=real(i)
             d_obsdcLe(j)=0.02
             n_L(j)=0
         end do
-        do i=200,50,-5
+        do i=240,40,-10
             j=j+1
             peri_L(j)=real(i)
             d_obsdcLe(j)=0.02
             n_L(j)=1
         end do
-        do i=200,50,-5
+        do i=160,40,-10
             j=j+1
             peri_L(j)=real(i)
             d_obsdcLe(j)=0.02
             n_L(j)=2
         end do
-        do i=150,50,-5
+        do i=90,40,-10
             j=j+1
             peri_L(j)=real(i)
             d_obsdcLe(j)=0.02
             n_L(j)=3
         end do
-        do i=100,50,-5
+        do i=50,40,-5
             j=j+1
             peri_L(j)=real(i)
             d_obsdcLe(j)=0.02
             n_L(j)=4
         end do
+        do i=50,40,-5
+            j=j+1
+            peri_L(j)=real(i)
+            d_obsdcLe(j)=0.02
+            n_L(j)=5
+        end do
         ndatad_L=j
-        wmin_L=1000./(maxval(peri_L(:ndatad_L))+2)
+        wmin_L=1000./(maxval(peri_L(:ndatad_L))+20)
         wmax_L=1000./(minval(peri_L(:ndatad_L))-2)
         nmin_L=minval(n_L(:ndatad_L))
         nmax_L=maxval(n_L(:ndatad_L))
@@ -393,9 +404,10 @@ include 'params.h'
             nmodes=0
             call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
                 qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_R,wmax_R,nmin_R,nmax_R,&
-                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo) ! calculate normal modes
+                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
+            if (error_flag) stop "INVALID INITIAL MODEL - RAYLEIGH - minos_bran.f FAIL 001"
             call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,ndatad_R,ier) ! extract phase velocities from minos output (pretty ugly)
-            if (ier) stop "INVALID INITIAL MODEL - CHANGE PERIODS or MODEL"
+            if (ier) stop "INVALID INITIAL MODEL - RAYLEIGH - CHANGE PERIODS or MODEL"
         endif
         
         if (ndatad_L>0) then
@@ -403,9 +415,10 @@ include 'params.h'
             nmodes=0
             call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
                 qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_L,wmax_L,nmin_L,nmax_L,&
-                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo)
+                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
+            if (error_flag) stop "INVALID INITIAL MODEL - LOVE - minos_bran.f FAIL 002"
             call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,ndatad_L,ier)
-            if (ier) stop "INVALID INITIAL MODEL - CHANGE PERIODS or MODEL"
+            if (ier) stop "INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
         endif
 
         d_obsdcR(:ndatad_R)=d_cR(:ndatad_R)
@@ -516,15 +529,24 @@ include 'params.h'
             voro(i,4)= vpvsv_min+(vpvsv_max-vpvsv_min)*ran3(ra)
         enddo
 
+
         if (ndatad_R>0) then
             nmodes=0
             call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+            write(*,*)"Combined for RAYLEIGH"
             jcom=3 !rayleigh waves
             call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
                 qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_R,wmax_R,nmin_R,nmax_R,&
-                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo)
+                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
+            if (error_flag) then
+                tes=.false.
+                write(*,*)"Minos_bran FAILED for RAYLEIGH 003"
+            else
+                write(*,*)"Minos_bran SUCCESS for RAYLEIGH"
+            end if
             call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,ndatad_R,ier)
+            write(*,*)"dispersion_minos for RAYLEIGH"
             if (ier) tes=.false.
         endif
         
@@ -532,12 +554,20 @@ include 'params.h'
             nmodes=0
             call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+            write(*,*)"Combined for LOVE"
             jcom=2 !love waves
             call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
                 qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_L,wmax_L,nmin_L,nmax_L,&
-                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo)
+                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
+            if (error_flag) then
+                tes=.false.
+                write(*,*)"Minos_bran FAILED for LOVE 004"
+            else
+                write(*,*)"Minos_bran SUCCESS for LOVE"
+            end if
             call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,ndatad_L,ier)
-            
+            write(*,*)"dispersion_minos for LOVE"
+
             if (ier) tes=.false.
         endif
         
@@ -703,7 +733,7 @@ include 'params.h'
         liked_L_prop=liked_L
         
     
-        npt_prop = npt        
+        npt_prop = npt
     
         lsd_R_prop = lsd_R
         lsd_L_prop =lsd_L
@@ -991,13 +1021,18 @@ include 'params.h'
                 nmodes=0
                 call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
                     qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_R,wmax_R,nmin_R,nmax_R,&
-                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo)
+                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
+                if (error_flag) then 
+                    out=0
+                    write(*,*)"INVALID PROPOSED MODEL - RAYLEIGH - minos_bran.f FAIL 005"
+                    goto 1142
+                endif
                 
                 call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR_prop,&
                 ndatad_R,ier)
                 if (ier) then 
                     out=0
-                    write(*,*)"INVALID PROPOSED MODEL..."
+                    write(*,*)"INVALID PROPOSED MODEL - RAYLEIGH..."
                     goto 1142
                 endif
 
@@ -1010,13 +1045,20 @@ include 'params.h'
                 nmodes=0
                 call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
                     qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_L,wmax_L,nmin_L,nmax_L,&
-                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo)
+                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
+
+                if (error_flag) then 
+                    out=0
+                    write(*,*)"INVALID PROPOSED MODEL - LOVE - minos_bran.f FAIL 006"
+                    goto 1142
+                endif
+                
                 call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL_prop,&
                 ndatad_L,ier)
                 
                 if (ier) then 
                     out=0
-                    write(*,*)"INVALID PROPOSED MODEL..."
+                    write(*,*)"INVALID PROPOSED MODEL - LOVE..."
                     goto 1142
                 endif
 
@@ -1114,7 +1156,7 @@ include 'params.h'
         
             liked_L=liked_L_prop
             liked_R=liked_R_prop
-            lsd_L=lsd_L_prop        
+            lsd_L=lsd_L_prop
             lsd_R=lsd_R_prop
             npt=npt_prop
             Ad_R=Ad_R_prop
@@ -1122,7 +1164,6 @@ include 'params.h'
             
             d_cR=d_cR_prop
             d_cL=d_cL_prop
-                    
             
             if (lsd_R<lsd_R_min)then
                 lsd_R_min = lsd_R
@@ -1130,8 +1171,6 @@ include 'params.h'
             if (lsd_L<lsd_L_min)then
                 lsd_L_min = lsd_L
             endif
-
-            
             
             !**********************************************************************
                 
@@ -1140,7 +1179,6 @@ include 'params.h'
             !**********************************************************************
             
             if ((lsd_L+lsd_R).lt.likemax) then
-                        
                 
                 voromax=voro
                 nptmax=npt
