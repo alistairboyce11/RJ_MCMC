@@ -24,7 +24,8 @@ include 'data_joint.h'
     real , EXTERNAL    ::    gasdev,ran3,interp
     real log, sqrt
 
-    integer i,ii,sample,ind,th,ount,k ! various indices
+    integer i,ii,sample,ind,ount,k ! various indices
+    real th
     logical ier, error_flag ! error flags for dispersion curves and minos_bran
     integer npt,npt_prop,npt_iso,npt_ani ! numbers of points, isotropic, anisotropic
     logical accept,tes,birth,birtha,death,deatha,move,value,noisd_R,noisd_L,ani,change_vp !which parameter did we change?
@@ -64,6 +65,7 @@ include 'data_joint.h'
     integer nptref,malayv ! number of points in reference model, number of layers in voro
     real convBs(nsample+burn_in),convB(nsample+burn_in),convPs(nsample+burn_in),convP(nsample+burn_in) ! birth rates, vp change rates
     real convvp(nsample+burn_in),convvps(nsample+burn_in),convxis(nsample+burn_in),convxi(nsample+burn_in)
+    real convvs1(nsample+burn_in),convvs1s(nsample+burn_in),convvs2s(nsample+burn_in),convvs2s(nsample+burn_in)
     real convBas(nsample+burn_in),convBa(nsample+burn_in) ! anisotropic birth rates
     real convDs(nsample+burn_in),convD(nsample+burn_in),convDas(nsample+burn_in),convDa(nsample+burn_in)
 
@@ -100,11 +102,36 @@ include 'data_joint.h'
     real avxis_alt(disd,numdis_max),avvss_alt(disd,numdis_max),avvps_alt(disd,numdis_max)
     real d_obsdcR_alt(ndatadmax,numdis_max),d_obsdcL_alt(ndatadmax,numdis_max)
     real d_obsdcRe_alt(ndatadmax,numdis_max),d_obsdcLe_alt(ndatadmax,numdis_max) !observed data
+    real d_cRmoy_alt(ndatadmax,numdis_max),d_cLmoy_alt(ndatadmax,numdis_max)
+    real d_cRdelta_alt(ndatadmax,numdis_max),d_cLdelta_alt(ndatadmax,numdis_max) 
+    real d_cRmoy_alts(ndatadmax,numdis_max),d_cLmoy_alts(ndatadmax,numdis_max)
+    real d_cRdelta_alts(ndatadmax,numdis_max),d_cLdelta_alts(ndatadmax,numdis_max) 
     real histo_alt(maxlay,numdis_max),probani_alt(disd,numdis_max)
-    real histos_alt(maxlay,numdis_max),probanis_alt(disd,numdis_max)
+    real histo_alts(maxlay,numdis_max),probanis_alt(disd,numdis_max)
     real logalhists(num_logalpha,numdis_max),logalhist(num_logalpha,numdis_max)
     real logalpharefhist(num_logalpha),logalpharefhists(num_logalpha)
-    real like_w,like_prop_w
+    real histoch_alt(disd,numdis_max),histoch_alts(disd,numdis_max)
+    real ML_Ad_R_alt(disA,numdis_max),ML_Ad_R_alts(disA,numdis_max),& !histogram of uncertainty parameters
+        ML_Ad_L_alt(disA,numdis_max),ML_Ad_L_alts(disA,numdis_max)
+    real like_w,like_prop_w,TRA_alt(malay,malay+1,numdis_max),TRA_alts(malay,malay+1,numdis_max)
+    
+    ! widened results
+    real th_wide
+    real histo_wide(maxlay),probani_wide(disd)
+    real histo_wides(maxlay),probanis_wide(disd)
+    real histoch_wide(disd),histoch_wides(disd)
+    real ML_Ad_R_wide(disA),ML_Ad_R_wides(disA),& !histogram of uncertainty parameters
+        ML_Ad_L_wide(disA),ML_Ad_L_wides(disA)
+    real avvs_wide(disd),avvp_wide(disd),avxi_wide(disd)
+    real avxis_wide(disd),avvss_wide(disd),avvps_wide(disd)
+    real postvp_wide(disd,disv),postvs_wide(disd,disv),postxi_wide(disd,disv)
+    real postvp_wides(disd,disv),postvs_wides(disd,disv),postxi_wides(disd,disv) ! posteriors
+    real probani_wide(disd),probani_wides(disd) !anisotropy probabilities
+    real d_cRmoy_wide(ndatadmax),d_cLmoy_wide(ndatadmax)
+    real d_cRdelta_wide(ndatadmax),d_cLdelta_wide(ndatadmax) 
+    real d_cRmoy_wides(ndatadmax),d_cLmoy_wides(ndatadmax)
+    real d_cRdelta_wides(ndatadmax),d_cLdelta_wides(ndatadmax) 
+    real TRA_wide(malay,malay+1),TRA_wides(malay,malay+1)
     
     integer i_w
     real widening_prop,widening
@@ -237,7 +264,7 @@ include 'data_joint.h'
   
     
   
-    !ra=rank !seed for RNG
+    ra=rank !seed for RNG
     ran=rank
     inorout=0
     inorouts=0
@@ -258,10 +285,22 @@ include 'data_joint.h'
     lsd_L=0
     histoch=0
     histochs=0
+    histoch_alt=0
+    histoch_alts=0
+    histoch_wide=0
+    histoch_wides=0
     ML_Ad_R=0
     ML_Ad_Rs=0
     ML_Ad_L=0
     ML_Ad_Ls=0
+    ML_Ad_R_alt=0
+    ML_Ad_R_alts=0
+    ML_Ad_L_alt=0
+    ML_Ad_L_alts=0
+    ML_Ad_R_wide=0
+    ML_Ad_R_wides=0
+    ML_Ad_L_wide=0
+    ML_Ad_L_wides=0
     probani=0
     probanis=0
     
@@ -289,6 +328,10 @@ include 'data_joint.h'
     convAd_Ls=0
     TRA=0
     TRAs=0
+    TRA_alt=0
+    TRA_alts=0
+    TRA_wide=0
+    TRA_wides=0
     d_cRmoy=0
     d_cLmoy=0
     d_cRmoys=0
@@ -297,6 +340,22 @@ include 'data_joint.h'
     d_cLdelta=0
     d_cRdeltas=0
     d_cLdeltas=0 
+    d_cRmoy_alt=0
+    d_cLmoy_alt=0
+    d_cRmoy_alts=0
+    d_cLmoy_alts=0
+    d_cRdelta_alt=0
+    d_cLdelta_alt=0
+    d_cRdelta_alts=0
+    d_cLdelta_alts=0 
+    d_cRmoy_wide=0
+    d_cLmoy_wide=0
+    d_cRmoy_wides=0
+    d_cLmoy_wides=0
+    d_cRdelta_wide=0
+    d_cLdelta_wide=0
+    d_cRdelta_wides=0
+    d_cLdelta_wides=0 
     ier=.false.
     
     avvs_alt=0
@@ -306,12 +365,22 @@ include 'data_joint.h'
     avvss_alt=0
     avvps_alt=0
     histo_alt=0
+    histo_alts=0
     probani_alt=0
-    histos_alt=0
     probanis_alt=0
     logalhists=0
     logalhist=0
     alphasum=0
+    avvs_wide=0
+    avvp_wide=0
+    avxi_wide=0
+    avxis_wide=0
+    avvss_wide=0
+    avvps_wide=0
+    histo_wide=0
+    histo_wides=0
+    probani_wide=0
+    probanis_wide=0
     
     !**************************************************************
 
@@ -333,24 +402,46 @@ include 'data_joint.h'
     do while(.not.tes)
 50      tes=.true.
         
-        ! create a starting model randomly
-        !npt = milay+ran3(ra)*(malay-milay)!(12-milay)!(maxlay-minlay)
-        npt=10
-        if ((npt>malay).or.(npt<milay)) goto 50
-        !write(*,*)npt
-        j=j+1
-        do i=1,npt
-
-            voro(i,1)= d_min+ran3(ra)*(d_max-d_min) 
-            voro(i,2)= (-width+2*width*ran3(ra))
-!             if (ran3(ra)<0.5) then
-!                 voro(i,3)= xi_min+(xi_max-xi_min)*ran3(ra)
-!             else
-!                 voro(i,3)= -1
-!             endif
-            voro(i,3)=-1
-            voro(i,4)= 0!vpvsv_min+(vpvsv_max-vpvsv_min)*ran3(ra)
-        enddo
+        if (getting_old) then
+            write(filenamemax,"('/last_model_',I3.3,'.inout')") rank    
+            open(65,file=dirname//filenamemax,status='old')
+            read(65,*,IOSTAT=io)Ad_R
+            read(65,*,IOSTAT=io)Ad_L
+            read(65,*,IOSTAT=io)pxi
+            read(65,*,IOSTAT=io)p_vp
+            read(65,*,IOSTAT=io)pAd_R
+            read(65,*,IOSTAT=io)pAd_L
+            read(65,*,IOSTAT=io)pv1
+            read(65,*,IOSTAT=io)pv2
+            read(65,*,IOSTAT=io)pd1
+            read(65,*,IOSTAT=io)pd2
+            read(65,*,IOSTAT=io)sigmav
+            read(65,*,IOSTAT=io)npt
+            do i=1,npt
+                read(65,*,IOSTAT=io)voro(i,1),voro(i,2),voro(i,3),voro(i,4)
+            enddo
+            close(65)
+        else
+        
+            ! create a starting model randomly
+            npt = milay+ran3(ra)*(malay-milay)!(12-milay)!(maxlay-minlay)
+            !npt=11
+            if ((npt>malay).or.(npt<milay)) goto 50
+            !write(*,*)npt
+            j=j+1
+            do i=1,npt
+    
+                voro(i,1)= d_min+ran3(ra)*(d_max-d_min) 
+                voro(i,2)= (-width+2*width*ran3(ra))
+                if (ran3(ra)<0.5) then
+                    voro(i,3)= xi_min+(xi_max-xi_min)*ran3(ra)
+                else
+                    voro(i,3)= -1
+                endif
+                !voro(i,3)=-1
+                voro(i,4)= vpvsv_min+(vpvsv_max-vpvsv_min)*ran3(ra)
+            enddo
+        endif
 
         if (ndatad_R>0) then
             nmodes=0
@@ -437,7 +528,11 @@ include 'data_joint.h'
     
     sample=0
     th=0
-    ount=0
+    if (getting_old) then
+        ount=burn_in-burn_in_widening
+    else
+        ount=0
+    endif
     PrP=0
     PrV=0
     PrB=0
@@ -595,54 +690,55 @@ include 'data_joint.h'
         if (u<0) then
             continue
         
-!         elseif (u<0.1) then !change xi--------------------------------------------
-!             if (npt_ani.ne.0) then
-!                 ani=.true.
-!                 ! Choose randomly an anisotropic cell among the npt_ani possibilities
-!                 ind2 = ceiling(ran3(ra)*(npt_ani))
-!                 if (ind2==0) ind2=1 !number of the anisotropic cell
-!                     
-!                 j=0
-!                 do ii=1,npt
-!                     if (isoflag(ii).eqv..false.) j=j+1
-!                     if (j==ind2) then
-!                         ind=ii ! number of the cell in voro
-!                         exit
-!                     endif
-!                 enddo
-!                 
-!                 Prxi=Prxi+1 !increase counter to calculate acceptance rates
-!                 if (ind>npt) stop "684"
-!                 if (voro(ind,3)==-1) stop "874"
-!                 voro_prop(ind,3)=voro(ind,3)+gasdev(ra)*pxi
-!                 if (isoflag(ind).eqv..true.) stop "isoflag1"
-!                 
-!                 !Check if oustide bounds of prior
-!                 if ((voro_prop(ind,3)<=xi_min).or.(voro_prop(ind,3)>=xi_max)) then
-!                     out=0
-!                 endif
-!             endif
-!         elseif (u<0.2) then !change vp --------------------------------------------
-!             change_vp=.true.
-!                 
-!             ! Choose a random cell
-!             ind=ceiling(ran3(ra)*npt)
-!             if (ind==0) ind=1
-!             
-!             Pr_vp=Pr_vp+1
-!             if (ind>npt) then
-!                 out=0
-!             else
-!                 voro_prop(ind,4)=voro(ind,4)+gasdev(ra)*p_vp
-!             
-!                 !Check if oustide bounds of prior
-!                 if ((voro_prop(ind,4)<=vpvsv_min).or.(voro_prop(ind,4)>=vpvsv_max)) out=0
-!                 
-!             endif     
+        elseif (u<0.1) then !change xi--------------------------------------------
+            if (npt_ani.ne.0) then
+                ani=.true.
+                ! Choose randomly an anisotropic cell among the npt_ani possibilities
+                ind2 = ceiling(ran3(ra)*(npt_ani))
+                if (ind2==0) ind2=1 !number of the anisotropic cell
+                    
+                j=0
+                do ii=1,npt
+                    if (isoflag(ii).eqv..false.) j=j+1
+                    if (j==ind2) then
+                        ind=ii ! number of the cell in voro
+                        exit
+                    endif
+                enddo
+                
+                Prxi=Prxi+1 !increase counter to calculate acceptance rates
+                if (ind>npt) stop "684"
+                if (voro(ind,3)==-1) stop "874"
+                voro_prop(ind,3)=voro(ind,3)+gasdev(ra)*pxi
+                if (isoflag(ind).eqv..true.) stop "isoflag1"
+                
+                !Check if oustide bounds of prior
+                if ((voro_prop(ind,3)<=xi_min).or.(voro_prop(ind,3)>=xi_max)) then
+                    out=0
+                endif
+            endif
+        elseif (u<0.2) then !change vp --------------------------------------------
+            change_vp=.true.
+                
+            ! Choose a random cell
+            ind=ceiling(ran3(ra)*npt)
+            if (ind==0) ind=1
+            
+            Pr_vp=Pr_vp+1
+            if (ind>npt) then
+                out=0
+            else
+                voro_prop(ind,4)=voro(ind,4)+gasdev(ra)*p_vp
+            
+                !Check if oustide bounds of prior
+                if ((voro_prop(ind,4)<=vpvsv_min).or.(voro_prop(ind,4)>=vpvsv_max)) out=0
+                
+            endif     
         elseif (u<0.3) then !change position--------------------------------------------
             move=.true.
             ind=1+ceiling(ran3(ra)*(npt-1))
             if (ind==1) ind=2
+            !write(*,*)ind
  
             !if (ount.GT.burn_in) then 
             if (voro(ind,1)<(d_max/2)) then
@@ -664,6 +760,7 @@ include 'data_joint.h'
             if ((voro_prop(ind,2)<=-width).or.(voro_prop(ind,2)>=width)) then
                 out=0
             endif
+            !if (out==1) write(*,*)voro_prop(ind,1)
  
         elseif (u<0.4) then ! Change noise parameter for rayleigh waves
             noisd_R=.true.
@@ -687,6 +784,7 @@ include 'data_joint.h'
             value=.true.
             ind=ceiling(ran3(ra)*npt)
             if (ind==0) ind=1
+            
             !if (ount.GT.burn_in) then 
             !write(*,*)voro(ind,1),d_max/2
             if (voro(ind,1)<(d_max/2)) then
@@ -710,118 +808,119 @@ include 'data_joint.h'
             if ((voro_prop(ind,2)<=-width).or.(voro_prop(ind,2)>=width)) then
                 out=0
             endif
+            !if (out==1) write(*,*)ind
 
 
-!         elseif (u<0.8) then !Birth of an isotropic cell -------------------------------------
-!             birth = .true.
-!             PrB = PrB + 1
-!             npt_prop = npt + 1
-!             if (npt_prop>malayv) then  !MODIF 
-!                 out=0
-!             else
-!                 voro_prop(npt_prop,1) = d_min+ran3(ra)*(d_max-d_min)
-!                 call whichcell_d(voro_prop(npt_prop,1),voro,npt,ind)!
-! 
-!                 voro_prop(npt_prop,2) = voro(ind,2)+gasdev(ra)*sigmav ! sigmav: special width for new layers
-!                 !voro_prop(npt_prop,2) = -width+2*width*ran3(ra) ! use completely random new value
-!                 voro_prop(npt_prop,3) = -1
-!                 !voro_prop(npt_prop,4) = voro(ind,4)+gasdev(ra)*p_vp 
-!                 voro_prop(npt_prop,4) = vpvsv_min+(vpvsv_max-vpvsv_min)*ran3(ra)
-!                 isoflag_prop(npt_prop) = .true. 
-!                 
-!                 logprob_vsv=log(1/(sigmav*sqrt(2*pi)))-((voro(ind,2)-voro_prop(npt_prop,2))**2)/(2*sigmav**2) ! correct acceptance rates because transdimensional
-!                 !logprob_vp=log(1/(p_vp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(npt_prop,4))**2)/(2*p_vp**2)
-!                 
-!                 !Check bounds                    
-!                 if ((voro_prop(npt_prop,2)<=-width).or.(voro_prop(npt_prop,2)>=width)) then
-!                     out=0
-!                 end if
-!                 if ((voro_prop(npt_prop,4)<=vpvsv_min).or.(voro_prop(npt_prop,4)>=vpvsv_max)) then
-!                     out=0
-!                 end if
-!             endif
-!         elseif (u<1.) then !death an isotropic cell !---------------------------------------    !
-! 
-!             death = .true.
-!             PrD = PrD + 1
-!             if(npt_iso==0) then
-!                 out=0
-!             else
-!             
-!                 ind2 = ceiling(ran3(ra)*(npt_iso)) 
-!                 if (ind2==0) ind2=1
-! 
-!                 j=0
-!                 do ii=1,npt
-!                     if (isoflag(ii).eqv..true.) j=j+1
-!                     if (j==ind2) then
-!                         ind=ii
-!                         exit
-!                     endif
-!                 enddo
-!                 if (voro(ind,3).NE.-1) stop "1092" 
-!             endif
-! 
-!             npt_prop=npt-1
-!             
-!             if ((npt_prop<milay)) then!.or.(ind==1)) then
-!                 out=0
-!             else
-!                 voro_prop(ind,:)=voro(npt,:)
-!                 isoflag_prop(ind)=isoflag(npt)
-!             
-!                 call whichcell_d(voro(ind,1),voro_prop,npt_prop,ind2)
-!                 logprob_vsv=log(1/(sigmav*sqrt(2*pi)))-((voro(ind,2)-voro_prop(ind2,2))**2)/(2*sigmav**2) ! same as for birth
-!                 !logprob_vp=log(1/(p_vp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(ind2,4))**2)/(2*p_vp**2)
-!                 
-!             endif
-!         elseif (u<0.9) then !Birth an anisotropic layer----------------------------------------
-!             birtha = .true.
-!             PrBa = PrBa + 1    
-!             if (npt_iso==0) then
-!                 out=0
-!             else
-!                 ! Choose randomly an isotropic cell among the npt_iso possibilities
-!                 ind2 = ceiling(ran3(ra)*(npt_iso))
-!                 if (ind2==0) ind2=1
-!                 j=0
-!                 do ii=1,npt
-!                     if (isoflag(ii).eqv..true.) j=j+1
-!                     if (j==ind2) then
-!                         ind=ii
-!                         exit
-!                     endif
-!                 enddo
-!                 voro_prop(ind,3) =  xi_min+(xi_max-xi_min)*ran3(ra) 
-!                 if (voro(ind,3).NE.-1) stop "1130"
-!                 if ((voro_prop(ind,3)<=xi_min).or.(voro_prop(ind,3)>=xi_max)) then
-!                     write(*,*)'anisotropy out of bounds'
-!                     out=0
-!                 endif
-!                 isoflag_prop(ind)=.false.
-!             endif
-!         
-!         !else
-!         elseif (u<1.1) then !death of an anisotropic layer!---------------------------------------    
-!             deatha = .true.
-!             PrDa = PrDa + 1
-!             if (npt_ani==0) then
-!                 out=0
-!             else
-!                 ! Choose randomly an anisotropic cell among the npt_ani possibilities
-!                 ind2 = ceiling(ran3(ra)*(npt_ani))
-!                 if (ind2==0) ind2=1
-!                 j=0
-!                 do ii=1,npt
-!                     if (isoflag(ii).eqv..false.) j=j+1
-!                     if (j==ind2) then
-!                         ind=ii
-!                         exit
-!                     endif
-!                 enddo
-!                 voro_prop(ind,3)=-1
-!                 isoflag_prop(ind)=.true.
-!             endif        
+        elseif (u<0.7) then !Birth of an isotropic cell -------------------------------------
+            birth = .true.
+            PrB = PrB + 1
+            npt_prop = npt + 1
+            if (npt_prop>malayv) then  !MODIF 
+                out=0
+            else
+                voro_prop(npt_prop,1) = d_min+ran3(ra)*(d_max-d_min)
+                call whichcell_d(voro_prop(npt_prop,1),voro,npt,ind)!
+
+                voro_prop(npt_prop,2) = voro(ind,2)+gasdev(ra)*sigmav ! sigmav: special width for new layers
+                !voro_prop(npt_prop,2) = -width+2*width*ran3(ra) ! use completely random new value
+                voro_prop(npt_prop,3) = -1
+                !voro_prop(npt_prop,4) = voro(ind,4)+gasdev(ra)*p_vp 
+                voro_prop(npt_prop,4) = vpvsv_min+(vpvsv_max-vpvsv_min)*ran3(ra)
+                isoflag_prop(npt_prop) = .true. 
+                
+                logprob_vsv=log(1/(sigmav*sqrt(2*pi)))-((voro(ind,2)-voro_prop(npt_prop,2))**2)/(2*sigmav**2) ! correct acceptance rates because transdimensional
+                !logprob_vp=log(1/(p_vp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(npt_prop,4))**2)/(2*p_vp**2)
+                
+                !Check bounds                    
+                if ((voro_prop(npt_prop,2)<=-width).or.(voro_prop(npt_prop,2)>=width)) then
+                    out=0
+                end if
+                if ((voro_prop(npt_prop,4)<=vpvsv_min).or.(voro_prop(npt_prop,4)>=vpvsv_max)) then
+                    out=0
+                end if
+            endif
+        elseif (u<0.8) then !death an isotropic cell !---------------------------------------    !
+
+            death = .true.
+            PrD = PrD + 1
+            if(npt_iso==0) then
+                out=0
+            else
+            
+                ind2 = ceiling(ran3(ra)*(npt_iso)) 
+                if (ind2==0) ind2=1
+
+                j=0
+                do ii=1,npt
+                    if (isoflag(ii).eqv..true.) j=j+1
+                    if (j==ind2) then
+                        ind=ii
+                        exit
+                    endif
+                enddo
+                if (voro(ind,3).NE.-1) stop "1092" 
+            endif
+
+            npt_prop=npt-1
+            
+            if ((npt_prop<milay)) then!.or.(ind==1)) then
+                out=0
+            else
+                voro_prop(ind,:)=voro(npt,:)
+                isoflag_prop(ind)=isoflag(npt)
+            
+                call whichcell_d(voro(ind,1),voro_prop,npt_prop,ind2)
+                logprob_vsv=log(1/(sigmav*sqrt(2*pi)))-((voro(ind,2)-voro_prop(ind2,2))**2)/(2*sigmav**2) ! same as for birth
+                !logprob_vp=log(1/(p_vp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(ind2,4))**2)/(2*p_vp**2)
+                
+            endif
+        elseif (u<0.9) then !Birth an anisotropic layer----------------------------------------
+            birtha = .true.
+            PrBa = PrBa + 1    
+            if (npt_iso==0) then
+                out=0
+            else
+                ! Choose randomly an isotropic cell among the npt_iso possibilities
+                ind2 = ceiling(ran3(ra)*(npt_iso))
+                if (ind2==0) ind2=1
+                j=0
+                do ii=1,npt
+                    if (isoflag(ii).eqv..true.) j=j+1
+                    if (j==ind2) then
+                        ind=ii
+                        exit
+                    endif
+                enddo
+                voro_prop(ind,3) =  xi_min+(xi_max-xi_min)*ran3(ra) 
+                if (voro(ind,3).NE.-1) stop "1130"
+                if ((voro_prop(ind,3)<=xi_min).or.(voro_prop(ind,3)>=xi_max)) then
+                    write(*,*)'anisotropy out of bounds'
+                    out=0
+                endif
+                isoflag_prop(ind)=.false.
+            endif
+        
+        !else
+        elseif (u<1.) then !death of an anisotropic layer!---------------------------------------    
+            deatha = .true.
+            PrDa = PrDa + 1
+            if (npt_ani==0) then
+                out=0
+            else
+                ! Choose randomly an anisotropic cell among the npt_ani possibilities
+                ind2 = ceiling(ran3(ra)*(npt_ani))
+                if (ind2==0) ind2=1
+                j=0
+                do ii=1,npt
+                    if (isoflag(ii).eqv..false.) j=j+1
+                    if (j==ind2) then
+                        ind=ii
+                        exit
+                    endif
+                enddo
+                voro_prop(ind,3)=-1
+                isoflag_prop(ind)=.true.
+            endif        
         else
             out=0
             
@@ -844,6 +943,9 @@ include 'data_joint.h'
                     nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
                 if (error_flag) then 
                     out=0
+                    
+                    write(*,*)move,noisd_R,value
+                    
                     goto 1142
                 endif
                 
@@ -963,7 +1065,15 @@ include 'data_joint.h'
         !***********************************************************************************
         !   If we accept the proposed model, update the status of the Markov Chain
         !***********************************************************************************
+!         if (ind<3) then
+!         write(*,*)accept,ind,move,value,noisd_R
+!         endif
+        
         if (accept) then 
+            
+!             if (ind<3) then
+!             write(*,*)ind,move,value,noisd_R
+!             endif
             isoflag=isoflag_prop
             voro=voro_prop
             like=like_prop
@@ -1026,12 +1136,12 @@ include 'data_joint.h'
                 
                 
                 
-                do i=1,ndatad_R
-                    liked_R_prop=liked_R_prop+(d_obsdCR(i)-d_cR_prop(i))**2/(2*(Ad_R_prop*d_obsdCRe(i))**2) ! prendre en compte erreurs mesurées
-                end do
-                do i=1,ndatad_L
-                    liked_L_prop=liked_L_prop+(d_obsdCL(i)-d_cL_prop(i))**2/(2*(Ad_L_prop*d_obsdCLe(i))**2) ! prendre en compte erreurs mesurées
-                end do
+!                 do i=1,ndatad_R
+!                     liked_R_prop=liked_R_prop+(d_obsdCR(i)-d_cR_prop(i))**2/(2*(Ad_R_prop*d_obsdCRe(i))**2) ! prendre en compte erreurs mesurées
+!                 end do
+!                 do i=1,ndatad_L
+!                     liked_L_prop=liked_L_prop+(d_obsdCL(i)-d_cL_prop(i))**2/(2*(Ad_L_prop*d_obsdCLe(i))**2) ! prendre en compte erreurs mesurées
+!                 end do
                 
                 
                 
@@ -1080,17 +1190,26 @@ include 'data_joint.h'
                 
                 alpharef=exp(logalpharef)
                 th = th + alpharef
+                th_wide = th_wide + 1 
                 histo(npt)=histo(npt)+alpharef !histogram of number of layers
+                histo_wide(npt)=histo_wide(npt)+1
                 
                 alpha=exp(logalpha)
-                alphasum=alphasum+exp(logalpha)
-                histo_alt(npt,:)=histo_alt(npt,:)+exp(logalpha)
+                alphasum=alphasum+alpha
+                histo_alt(npt,:)=histo_alt(npt,:)+alpha
                 
                 ! average dispersion curve and variance
                 d_cRmoy=d_cRmoy+d_cR*alpharef
                 d_cLmoy=d_cLmoy+d_cL*alpharef
                 d_cRdelta=d_cRdelta+(d_cR**2)*alpharef
                 d_cLdelta=d_cLdelta+(d_cL**2)*alpharef
+                
+                do idis=1,numdis
+                    d_cRmoy_alt(:,idis)=d_cRmoy_alt(:,idis)+d_cR*alpha(idis)
+                    d_cLmoy_alt(:,idis)=d_cLmoy_alt(:,idis)+d_cL*alpha(idis)
+                    d_cRdelta_alt(:,idis)=d_cRdelta_alt(:,idis)+(d_cR**2)*alpha(idis)
+                    d_cLdelta_alt(:,idis)=d_cLdelta_alt(:,idis)+(d_cL**2)*alpha(idis)
+                enddo
                 
 !                 write(*,*)'logcratio',logcratio
 !                 write(*,*)'like_alt',like_alt
@@ -1106,8 +1225,8 @@ include 'data_joint.h'
                 
                 do idis=1,numdis
                     i_al=ceiling((logalpha(idis)-logalpha_min)/(logalpha_max-logalpha_min)*num_logalpha)
-                    if (i_al<logalpha_min) i_al=1
-                    if (i_al>logalpha_max) i_al=num_logalpha
+                    if (logalpha(idis)<logalpha_min) i_al=1
+                    if (logalpha(idis)>logalpha_max) i_al=num_logalpha
                     logalhist(i_al,idis)=logalhist(i_al,idis)+1
                 enddo
                 
@@ -1121,11 +1240,15 @@ include 'data_joint.h'
                         j=j+1
                     end do
                     avvs(i)=avvs(i)+interp(r(j-1),r(j),vsv(j-1),vsv(j),d)*alpharef
+                    avvs_wide(i)=avvs_wide(i)+interp(r(j-1),r(j),vsv(j-1),vsv(j),d)
                     avxi(i)=avxi(i)+interp(r(j-1),r(j),xi(j-1),xi(j),d)*alpharef
+                    avxi_wide(i)=avxi_wide(i)+interp(r(j-1),r(j),xi(j-1),xi(j),d)
                     avvp(i)=avvp(i)+interp(r(j-1),r(j),vpvsv_data(j-1),vpvsv_data(j),d)*alpharef
+                    avvp_wide(i)=avvp_wide(i)+interp(r(j-1),r(j),vpvsv_data(j-1),vpvsv_data(j),d)
                     
                     if (abs(interp(r(j-1),r(j),xi(j-1),xi(j),d)-1.)>0.01) then
                         probani(i)=probani(i)+alpharef
+                        probani_wide(i)=probani_wide(i)+1
                     endif
                     
                     avvs_alt(i,:)=avvs_alt(i,:)+interp(r(j-1),r(j),vsv(j-1),vsv(j),d)*alpha
@@ -1141,7 +1264,6 @@ include 'data_joint.h'
                 
                 ! Write Posterior matrix!-----------------------------------------------------------------
                 j=1
-                
                 do i=disd,1,-1
                     d=rearth-((i-1)*prof/real(disd-1))*1000.
                     
@@ -1190,35 +1312,50 @@ include 'data_joint.h'
                         
                         stop "xi>disv"
                     endif
-
+                    
                     postvs(i,ind_vsv)=postvs(i,ind_vsv)+alpharef
+                    postvs_wide(i,ind_vsv)=postvs_wide(i,ind_vsv)+1
                     postvs_alt(i,ind_vsv,:)=postvs_alt(i,ind_vsv,:)+alpha
                     
 
                     if (ind_xi>0) then 
                         postxi(i,ind_xi)=postxi(i,ind_xi)+alpharef  
+                        postxi_wide(i,ind_xi)=postxi_wide(i,ind_xi)+1  
                         postxi_alt(i,ind_xi,:)=postxi_alt(i,ind_xi,:)+alpha
                     endif  
                     if (ind_vp>0) then 
                         postvp(i,ind_vp)=postvp(i,ind_vp)+alpharef
+                        postvp_wide(i,ind_vp)=postvp_wide(i,ind_vp)+1
                         postvp_alt(i,ind_vp,:)=postvp_alt(i,ind_vp,:)+alpha
                     endif    
                 enddo
 
                 i=ceiling((Ad_R-Ad_R_min)*disA/(Ad_R_max-Ad_R_min)) !histogram of Ad_R
                 ML_Ad_R(i) = ML_Ad_R(i)+alpharef
+                ML_Ad_R_wide(i) = ML_Ad_R_wide(i)+1
+                ML_Ad_R_alt(i,:) = ML_Ad_R_alt(i,:)+alpha
         
                 i=ceiling((Ad_L-Ad_L_min)*disA/(Ad_L_max-Ad_L_min)) !histogram of Ad_L
                 ML_Ad_L(i) = ML_Ad_L(i)+alpharef
+                ML_Ad_L_wide(i) = ML_Ad_L_wide(i)+1
+                ML_Ad_L_alt(i,:) = ML_Ad_L_alt(i,:)+alpha
     
                 !Get distribution on changepoint locations.
                 
                 do i=2,npt
                     j=ceiling((voro(i,1))*disd/(prof))
-                    if (j.le.disd) histoch(j)=histoch(j)+alpharef
+                    if (j.le.disd) then
+                        histoch(j)=histoch(j)+alpharef
+                        histoch_wide(j)=histoch_wide(j)+1
+                        histoch_alt(j,:)=histoch_alt(j,:)+alpha
+                    endif
                 enddo    
                 
+                
+                
                 TRA(npt,npt_ani+1)=TRA(npt,npt_ani+1)+alpharef
+                TRA_wide(npt,npt_ani+1)=TRA_wide(npt,npt_ani+1)+1
+                TRA_alt(npt,npt_ani+1,:)=TRA_alt(npt,npt_ani+1,:)+alpha
                 if(npt_ani>npt) stop "npt_ani>npt"
                 if(npt>malayv) stop "npt>malay" ! MODIF 
                 if(npt_ani>malayv) stop "npt_ani>malay" ! MODIF
@@ -1230,6 +1367,8 @@ include 'data_joint.h'
             convDa(ount)=100*AcDa/PrDa
             convD(ount)=100*AcD/PrD
             convvp(ount)=100*Ac_vp/Pr_vp
+            convvs1(ount)=100*Acv(1)/Prv(1)
+            convvs2(ount)=100*Acv(2)/Prv(2)
             convxi(ount)=100*Acxi/Prxi
             convd_R(ount)=lsd_R
             convd_L(ount)=lsd_L
@@ -1250,7 +1389,7 @@ include 'data_joint.h'
             !**********************************************************************
 
         endif
-        IF ((mod(ount,display).EQ.0)) then!.and.(mod(ran,24).EQ.0)) THEN
+        IF ((mod(ount,display).EQ.0).and.(mod(ran,50).EQ.0)) THEN
 
             write(*,*)'processor number',ran+1,'/',nbproc
             write(*,*)'sample:',ount,'/',burn_in+nsample
@@ -1304,6 +1443,16 @@ include 'data_joint.h'
         d_cRdelta=d_cRdelta/th
         d_cLdelta=d_cLdelta/th
         
+        avvs_wide=avvs_wide/th_wide
+        avvp_wide=avvp_wide/th_wide
+        avxi_wide=avxi_wide/th_wide
+        probani_wide=100*probani_wide/th_wide
+        
+        d_cRmoy_wide=d_cRmoy_wide/th_wide
+        d_cLmoy_wide=d_cLmoy_wide/th_wide
+        d_cRdelta_wide=d_cRdelta_wide/th_wide
+        d_cLdelta_wide=d_cLdelta_wide/th_wide
+        
         inorout(ran+1)=1
         k=k+1
         do idis=1,numdis
@@ -1311,6 +1460,11 @@ include 'data_joint.h'
             avvp_alt(:,idis)=avvp_alt(:,idis)/alphasum(idis)
             avxi_alt(:,idis)=avxi_alt(:,idis)/alphasum(idis)
             probani_alt(:,idis)=100*probani_alt(:,idis)/alphasum(idis)
+            
+            d_cRmoy_alt(:,idis)=d_cRmoy_alt(:,idis)/alphasum(idis)
+            d_cLmoy_alt(:,idis)=d_cLmoy_alt(:,idis)/alphasum(idis)
+            d_cRdelta_alt(:,idis)=d_cRdelta_alt(:,idis)/alphasum(idis)
+            d_cLdelta_alt(:,idis)=d_cLdelta_alt(:,idis)/alphasum(idis)
         enddo
     else
         write(*,*)
@@ -1356,11 +1510,12 @@ include 'data_joint.h'
     !write(*,*)ran,members(1:9)
     call MPI_Comm_create(MPI_COMM_WORLD, good_group, MPI_COMM_small, ierror)
     !IF (ran==0) write(*,*)'2'
+    
+    
 
     do i=1,disd
         if (histochs(i)<0) write(*,*)'haaaaaaaaaaaaaaaaaaaaaaaa'
     enddo
-
     !-!
     if (flag==1) then
         call MPI_REDUCE(convBa,convBas,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
@@ -1368,10 +1523,18 @@ include 'data_joint.h'
         call MPI_REDUCE(convDa,convDas,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(convD,convDs,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(convvp,convvps,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(convvs1,convvs1s,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(convvs2,convvs2s,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(convxi,convxis,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(histoch,histochs,disd,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(histoch_alt,histoch_alts,disd*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(histoch_wide,histoch_wides,disd,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(ML_Ad_R,ML_Ad_Rs,disA,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(ML_Ad_L,ML_Ad_Ls,disA,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(ML_Ad_R_alt,ML_Ad_R_alts,disA*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(ML_Ad_L_alt,ML_Ad_L_alts,disA*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(ML_Ad_R_wide,ML_Ad_R_wides,disA,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(ML_Ad_L_wide,ML_Ad_L_wides,disA,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(avvs,avvss,disd,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(avvp,avvps,disd,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(avxi,avxis,disd,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
@@ -1383,7 +1546,11 @@ include 'data_joint.h'
         call MPI_REDUCE(convd_R,convd_Rs,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(convd_L,convd_Ls,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(histo,histos,malay,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(histo_alt,histo_alts,malay*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(histo_wide,histo_wides,malay,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(TRA,TRAs,malay*(malay+1),MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(TRA_alt,TRA_alts,malay*(malay+1)*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(TRA_wide,TRA_wides,malay*(malay+1),MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(convAd_R,convAd_Rs,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(convAd_L,convAd_Ls,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         ! 
@@ -1392,25 +1559,54 @@ include 'data_joint.h'
         call MPI_REDUCE(d_cRdelta,d_cRdeltas,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(d_cLdelta,d_cLdeltas,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         
+        call MPI_REDUCE(d_cRmoy_alt,d_cRmoy_alts,ndatadmax*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(d_cLmoy_alt,d_cLmoy_alts,ndatadmax*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(d_cRdelta_alt,d_cRdelta_alts,ndatadmax*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(d_cLdelta_alt,d_cLdelta_alts,ndatadmax*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        
+        call MPI_REDUCE(d_cRmoy_wide,d_cRmoy_wides,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(d_cLmoy_wide,d_cLmoy_wides,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(d_cRdelta_wide,d_cRdelta_wides,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(d_cLdelta_wide,d_cLdelta_wides,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        
         call MPI_REDUCE(avvs_alt,avvss_alt,disd*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(avvp_alt,avvps_alt,disd*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(avxi_alt,avxis_alt,disd*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-        call MPI_REDUCE(probani_alt,probanis_alt*numdis_max,disd,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-        call MPI_REDUCE(histo_alt,histos_alt,malay*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(probani_alt,probanis_alt,disd*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(postvs_alt,postvss_alt,disd*disv*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(postxi_alt,postxis_alt,disd*disv*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(postvp_alt,postvps_alt,disd*disv*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(logalhist,logalhists,num_logalpha*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(logalpharefhist,logalpharefhists,num_logalpha,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        
+        call MPI_REDUCE(avvs_wide,avvss_wide,disd,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(avvp_wide,avvps_wide,disd,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(avxi_wide,avxis_wide,disd,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(probani_wide,probanis_wide,disd,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(postvs_wide,postvss_wide,disd*disv,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(postxi_wide,postxis_wide,disd*disv,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(postvp_wide,postvps_wide,disd*disv,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
 
         do i=1,disd
             if (histochs(i)<0) write(*,*)'hiiiiiiiiiiiiiiiii'
         enddo
+        
+        write(*,*)'here'
 
         d_cRmoys=d_cRmoys/j
         d_cLmoys=d_cLmoys/j
         d_cRdeltas=sqrt(d_cRdeltas/j-d_cRmoys**2)
         d_cLdeltas=sqrt(d_cLdeltas/j-d_cLmoys**2)
+        
+        d_cRmoy_alts=d_cRmoy_alts/j
+        d_cLmoy_alts=d_cLmoy_alts/j
+        d_cRdelta_alts=sqrt(d_cRdelta_alts/j-d_cRmoy_alts**2)
+        d_cLdelta_alts=sqrt(d_cLdelta_alts/j-d_cLmoy_alts**2)
+        
+        d_cRmoy_wides=d_cRmoy_wides/j
+        d_cLmoy_wides=d_cLmoy_wides/j
+        d_cRdelta_wides=sqrt(d_cRdelta_wides/j-d_cRmoy_wides**2)
+        d_cLdelta_wides=sqrt(d_cLdelta_wides/j-d_cLmoy_wides**2)
         
         convPs=convPs/j
         convBs=convBs/j
@@ -1418,6 +1614,8 @@ include 'data_joint.h'
         convDs=convDs/j
         convDas=convDas/j
         convvps=convvps/j
+        convvs1s=convvs1s/j
+        convvs2s=convvs2s/j
         convxis=convxis/j
  
         probanis=probanis/j
@@ -1434,20 +1632,22 @@ include 'data_joint.h'
         convAd_Ls=convAd_Ls/j
         ncells=ncells/j
         
-        avvss_alt=avvss_alt/j
-        avvps_alt=avvps_alt/j
-        avxis_alt=avxis_alt/j
+        avvss_wide=avvss_wide/j
+        avvps_wide=avvps_wide/j
+        avxis_wide=avxis_wide/j
+        
+        avvss_wide=avvss_wide/j
+        avvps_wide=avvps_wide/j
+        avxis_wide=avxis_wide/j
 
     endif
-
+    
     !***********************************************************************
 
     !                      Write the results
 
     !***********************************************************************
 
-    write(*,*)'just before writing'
-    write(*,*)ran,members(1)
     IF (ran==members(1)) THEN
         write(*,*)'writing'
         write(*,*)dirname//'/Change_points.out'
@@ -1467,11 +1667,49 @@ include 'data_joint.h'
             enddo
         enddo
         close(95)
+        
+        open(95,file=dirname//'/Tradeoff_wide.out',status='replace')
+        write(95,*)malay
+        do i=1,malay
+            do j=1,malay+1
+      
+                write(95,*)TRA_wides(i,j)
+            enddo
+        enddo
+        close(95)
+        
+        open(95,file=dirname//'/Tradeoff_alt.out',status='replace')
+        write(95,*)malay,numdis
+        do i=1,malay
+            do j=1,malay+1
+      
+                write(95,*)TRA_alts(i,j,:numdis)
+            enddo
+        enddo
+        close(95)
 
         open(56,file=dirname//'/Average.out',status='replace')
         do i=1,disd
             d=(i-1)*prof/real(disd-1)
             write(56,*)d,avvss(i),avxis(i),avvps(i),probanis(i)
+        enddo
+        close(56)
+        
+        open(56,file=dirname//'/Average_wide.out',status='replace')
+        do i=1,disd
+            d=(i-1)*prof/real(disd-1)
+            write(56,*)d,avvss_wide(i),avxis_wide(i),avvps_wide(i),probanis_wide(i)
+        enddo
+        close(56)
+        
+        open(56,file=dirname//'/Average_alt.out',status='replace')
+        write(56,*)numdis
+        do i=1,disd
+            d=(i-1)*prof/real(disd-1)
+            do idis=1,numdis
+                write(56,*)d,avvss_alt(i,idis),avxis_alt(i,idis),&
+                avvps_alt(i,idis),probanis_alt(i,idis)
+            enddo
         enddo
         close(56)
 
@@ -1490,6 +1728,40 @@ include 'data_joint.h'
             write(47,*)d,ML_Ad_Ls(i)
         enddo
         close(47)
+        
+        open(46,file=dirname//'/Sigmad_R_alt.out',status='replace')
+        write(46,*)numdis
+        write(46,*)Ad_R_min,Ad_R_max,disa
+        do i=1,disA
+            d=Ad_R_min+(i-0.5)*(Ad_R_max-Ad_R_min)/real(disA)
+            write(46,*)d,ML_Ad_R_alts(i,:numdis)
+        enddo
+        close(46)
+
+        open(47,file=dirname//'/Sigmad_L_alt.out',status='replace')
+        write(47,*)numdis
+        write(47,*)Ad_L_min,Ad_L_max,disa
+        do i=1,disA
+            d=Ad_L_min+(i-0.5)*(Ad_L_max-Ad_L_min)/real(disA)
+            write(47,*)d,ML_Ad_L_alts(i,:numdis)
+        enddo
+        close(47)
+        
+        open(46,file=dirname//'/Sigmad_R_wide.out',status='replace')
+        write(46,*)Ad_R_min,Ad_R_max,disa
+        do i=1,disA
+            d=Ad_R_min+(i-0.5)*(Ad_R_max-Ad_R_min)/real(disA)
+            write(46,*)d,ML_Ad_R_wides(i)
+        enddo
+        close(46)
+
+        open(47,file=dirname//'/Sigmad_L_wide.out',status='replace')
+        write(47,*)Ad_L_min,Ad_L_max,disa
+        do i=1,disA
+            d=Ad_L_min+(i-0.5)*(Ad_L_max-Ad_L_min)/real(disA)
+            write(47,*)d,ML_Ad_L_wides(i)
+        enddo
+        close(47)
 
         open(71,file=dirname//'/Dispersion_mean.out',status='replace')
         write(71,*)ndatad_R,ndatad_L
@@ -1498,6 +1770,16 @@ include 'data_joint.h'
         enddo
         do i=1,ndatad_L
             write(71,*)peri_L(i),n_L(i),d_cLmoys(i),d_cLdeltas(i)
+        enddo
+        close(71)
+        
+        open(71,file=dirname//'/Dispersion_mean_wide.out',status='replace')
+        write(71,*)ndatad_R,ndatad_L
+        do i=1,ndatad_R
+            write(71,*)peri_R(i),n_R(i),d_cRmoy_wides(i),d_cRdelta_wides(i)
+        enddo
+        do i=1,ndatad_L
+            write(71,*)peri_L(i),n_L(i),d_cLmoy_wides(i),d_cLdelta_wides(i)
         enddo
         close(71)
         
@@ -1510,6 +1792,32 @@ include 'data_joint.h'
             write(71,*)peri_L(i),n_L(i),d_obsdcL(i),d_obsdcLe(i)
         enddo
         close(71)
+        
+        open(71,file=dirname//'/Dispersion_mean_alt.out',status='replace')
+        write(71,*)numdis
+        write(71,*)ndatad_R,ndatad_L
+        do j=1,numdis
+            do i=1,ndatad_R
+                write(71,*)peri_R(i),n_R(i),d_cRmoy_alts(i,j),d_cRdelta_alts(i,j)
+            enddo
+            do i=1,ndatad_L
+                write(71,*)peri_L(i),n_L(i),d_cLmoy_alts(i,j),d_cLdelta_alts(i,j)
+            enddo
+        enddo
+        close(71)
+        
+        open(71,file=dirname//'/Dispersion_obs_alt.out',status='replace')
+        write(71,*)numdis
+        write(71,*)ndatad_R,ndatad_L
+        do j=1,numdis
+            do i=1,ndatad_R
+                write(71,*)peri_R(i),n_R(i),d_obsdcR_alt(i,j),d_obsdcRe_alt(i,j)
+            enddo
+            do i=1,ndatad_L
+                write(71,*)peri_L(i),n_L(i),d_obsdcL_alt(i,j),d_obsdcLe_alt(i,j)
+            enddo
+        enddo
+        close(71)
 
         open(71,file=dirname//'/Posterior.out',status='replace')
         write(71,*)prof,disd,d_max
@@ -1517,6 +1825,31 @@ include 'data_joint.h'
         do i=1,disd
             do j=1,disv
                 write(71,*)postvss(i,j),postxis(i,j),postvps(i,j)
+            enddo
+        enddo
+        close(71)
+        
+        open(71,file=dirname//'/Posterior_wide.out',status='replace')
+        write(71,*)prof,disd,d_max
+        write(71,*)vsref_min,vsref_max,disv,width,xi_min,xi_max,vpvsv_min,vpvsv_max
+        do i=1,disd
+            do j=1,disv
+                write(71,*)postvs_wides(i,j),postxi_wides(i,j),postvp_wides(i,j)
+            enddo
+        enddo
+        close(71)
+        
+        open(71,file=dirname//'/Posterior_alt.out',status='replace')
+        write(71,*)numdis
+        write(71,*)prof,disd,d_max
+        write(71,*)vsref_min,vsref_max,disv,width,xi_min,xi_max,vpvsv_min,&
+        vpvsv_max
+        do i=1,disd
+            do j=1,disv
+                do idis=1,numdis
+                    write(71,*)postvss_alt(i,j,idis),postxis_alt(i,j,idis),&
+                    postvps_alt(i,j,idis)
+                enddo
             enddo
         enddo
         close(71)
@@ -1555,6 +1888,19 @@ include 'data_joint.h'
             write(45,*)histos(i)
         enddo
         close(45)
+        
+        open(45,file=dirname//'/NB_layers_wide.out',status='replace')
+        do i=1,malay
+            write(45,*)histowides(i)
+        enddo
+        close(45)
+        
+        open(45,file=dirname//'/NB_layers_alt.out',status='replace')
+        write(45,*)numdis
+        do i=1,malay
+            write(45,*)histo_alts(i,:numdis)
+        enddo
+        close(45)
 
         open(54,file=dirname//'/Convergence_Birth.out',status='replace')
         write(54,*)burn_in,nsample,burn_in,nsample
@@ -1577,6 +1923,20 @@ include 'data_joint.h'
         enddo
         close(54)
         
+        open(54,file=dirname//'/Convergence_vs1.out',status='replace')
+        write(54,*)burn_in,nsample,burn_in,nsample
+        do i=1,nsample+burn_in
+            write(54,*)convvs1(i),convvs1s(i)
+        enddo
+        close(54)
+        
+        open(54,file=dirname//'/Convergence_vs2.out',status='replace')
+        write(54,*)burn_in,nsample,burn_in,nsample
+        do i=1,nsample+burn_in
+            write(54,*)convvs2(i),convvs2s(i)
+        enddo
+        close(54)
+        
         open(54,file=dirname//'/Convergence_xi.out',status='replace')
         write(54,*)burn_in,nsample,burn_in,nsample
         do i=1,nsample+burn_in
@@ -1584,32 +1944,6 @@ include 'data_joint.h'
         enddo
         close(54)
         
-        open(56,file=dirname//'/Average_alt.out',status='replace')
-        write(56,*)numdis
-        do i=1,disd
-            d=(i-1)*prof/real(disd-1)
-            do idis=1,numdis
-                write(56,*)d,avvss_alt(i,idis),avxis_alt(i,idis),&
-                avvps_alt(i,idis),probanis_alt(i,idis)
-            enddo
-        enddo
-        close(56)
-        
-        open(71,file=dirname//'/Posterior_alt.out',status='replace')
-        write(71,*)numdis
-        write(71,*)prof,disd,d_max
-        write(71,*)vsref_min,vsref_max,disv,width,xi_min,xi_max,vpvsv_min,&
-        vpvsv_max
-        do i=1,disd
-            do j=1,disv
-                do idis=1,numdis
-                    write(71,*)postvss_alt(i,j,idis),postxis_alt(i,j,idis),&
-                    postvps_alt(i,j,idis)
-                enddo
-            enddo
-        enddo
-        close(71)
-
         open(56,file=dirname//'/alpha_hist.out',status='replace')
         write(56,*)numdis
         write(56,*)num_logalpha,logalpha_min,logalpha_max

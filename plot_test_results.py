@@ -18,12 +18,12 @@ print('Arguments:      ',sys.argv)
 print('Options [1] :     RJ_MCMC_Tests/XYZ_test/OUT_TEST')
 # python plot_test_results.py ./OUT_TEST2
 
-num_args=len(sys.argv)
-if num_args < 2:
-    print('Number of arguments (' + str(num_args) +') too low... exit')
-    exit('exiting....')
+#num_args=len(sys.argv)
+#if num_args < 2:
+#    print('Number of arguments (' + str(num_args) +') too low... exit')
+#    exit('exiting....')
     
-directory = str(sys.argv[1])
+directory = 'OUT_REF'#str(sys.argv[1])
 print('Plotting results for: ' +str(directory))
 
 
@@ -59,8 +59,8 @@ if Layer_Hist:
     plt.ylabel('Frequency')
     
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Layer_hist.pdf')
-    plt.close()
+    #plt.savefig(directory+'/PLOTS/'+'Layer_hist.pdf')
+    #plt.close()
 
 
 ########## matrix containing number of layers and number of anisotropic layers
@@ -92,8 +92,8 @@ if Layers_Aniso_Tr:
     plt.colorbar()
     plt.plot([0, nlay], [0, nlay], '--r', linewidth=1)
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Layers_Aniso_Tr.pdf')
-    plt.close()
+    #plt.savefig(directory+'/PLOTS/'+'Layers_Aniso_Tr.pdf')
+    #plt.close()
 
 
 ############ Posterior #######################
@@ -160,8 +160,8 @@ if Posterior:
     ax0.set_ylabel('Depth (km)',fontsize=10)
     ax2.set_xlabel(r'Vp, (km/s)',fontsize=10)
     ax2.set_title('P-wave velocity')
-    ax1.pcolormesh(xis,depths,xid,cmap='viridis')
-    ax0.pcolormesh(vsvs,depths,vsvd,cmap='viridis')
+    ax1.pcolormesh(xis,depths,xid,cmap='magma_r')
+    ax0.pcolormesh(vsvs,depths,vsvd,cmap='magma_r')
 
     # true model overlaid on the posterior (only for synthetic tests)
     file=open(directory+'/'+'true_model.out','r')
@@ -190,7 +190,7 @@ if Posterior:
     except:
         pass
 
-    ax2.pcolormesh(vps,depths,vpd,cmap='viridis')
+    ax2.pcolormesh(vps,depths,vpd,cmap='magma_r')
     plt.setp(ax2.get_yticklabels(), visible=False)
 
 
@@ -241,8 +241,8 @@ if Posterior:
     fig.suptitle('Posterior and Averages')
 
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Posterior.pdf')
-    plt.close()
+    #plt.savefig(directory+'/PLOTS/'+'Posterior.pdf')
+    #plt.close()
 
 
 #################### histogram of rayleigh uncertainty parameter
@@ -297,8 +297,8 @@ if Sigmad:
     plt.ylabel('Frequency')
     plt.plot(d,sigmad_L)
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Sigmad_L.pdf')
-    plt.close()
+    #plt.savefig(directory+'/PLOTS/'+'Sigmad_L.pdf')
+    #plt.close()
 
 #################################### CONVERGENCE #################################
 
@@ -334,8 +334,8 @@ if Convergence:
     plt.ylabel('Misfit')
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_misfit.pdf')
-    plt.close()
+    #plt.savefig(directory+'/PLOTS/'+'Convergence_misfit.pdf')
+    #plt.close()
     
     ############### number of layers over time, for one core and average over all cores ###############
     file=open(directory+'/'+'Convergence_nb_layers.out','r')
@@ -361,8 +361,8 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_layers.pdf')
-    plt.close()
+    #plt.savefig(directory+'/PLOTS/'+'Convergence_layers.pdf')
+    #plt.close()
 
 
     ################ rayleigh uncertainty parameter over time, for one core and average over all cores ###############
@@ -389,8 +389,8 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_sigma_R.pdf')
-    plt.close()
+    #plt.savefig(directory+'/PLOTS/'+'Convergence_sigma_R.pdf')
+    #plt.close()
 
     ################ love uncertainty parameter over time, for one core and average over all cores ###############
     file=open(directory+'/'+'Convergence_sigma_L.out','r')
@@ -416,8 +416,8 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_sigma_L.pdf')
-    plt.close()
+    #plt.savefig(directory+'/PLOTS/'+'Convergence_sigma_L.pdf')
+    #plt.close()
 
     ################ acceptance rates for birth of isotropic and anisotropic layers over time, for one core and average over all cores ###############
     file=open(directory+'/'+'Convergence_Birth.out','r')
@@ -449,8 +449,8 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_Birth.pdf')
-    plt.close()
+    #plt.savefig(directory+'/PLOTS/'+'Convergence_Birth.pdf')
+    #plt.close()
 
     ################ acceptance rates for death of isotropic and anisotropic layers over time, for one core and average over all cores ###############
     file=open(directory+'/'+'Convergence_Death.out','r')
@@ -482,8 +482,8 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_Death.pdf')
-    plt.close()
+    #plt.savefig(directory+'/PLOTS/'+'Convergence_Death.pdf')
+    #plt.close()
 
     ################ acceptance rates for change in anisotropy over time, for one core and average over all cores ###############
     file=open(directory+'/'+'Convergence_xi.out','r')
@@ -509,8 +509,8 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_xi.pdf')
-    plt.close()
+    #plt.savefig(directory+'/PLOTS/'+'Convergence_xi.pdf')
+    #plt.close()
 
     ################ acceptance rates for change in vp/vsv over time, for one core and average over all cores ###############
     file=open(directory+'/'+'Convergence_vp.out','r')
@@ -536,8 +536,62 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_vp.pdf')
-    plt.close()
+    #plt.savefig(directory+'/PLOTS/'+'Convergence_vp.pdf')
+    #plt.close()
+    
+    ################ acceptance rates for change in vsv (upper half) over time, for one core and average over all cores ###############
+    file=open(directory+'/'+'Convergence_vs1.out','r')
+    lines=file.readlines()
+    file.close()
+
+    burn_in=int(lines[0].split()[0])
+    nsample=int(lines[0].split()[1])
+
+    convsv1_one=[]
+    convsv1=[]
+    for line in lines[1:]:
+        data=line.split()
+        convsv1_one.append(float(data[0]))
+        convsv1.append(float(data[1]))
+
+    plt.figure('convergence_vs1')
+    plt.title('Vsv Change Rate Convergence, upper half')
+    plt.plot(convsv1_one[burn_in:],label='vsv change upper half, one core')
+    plt.plot(convsv1[burn_in:],label='vsv change upper half, all cores')
+    plt.xlabel('Iteration number')
+    plt.ylabel('XXX')
+    plt.xlim([0,nsample])
+    plt.legend()
+    # plt.show()
+    #plt.savefig(directory+'/PLOTS/'+'Convergence_vp.pdf')
+    #plt.close()
+    
+    ################ acceptance rates for change in vsv (lower half) over time, for one core and average over all cores ###############
+    file=open(directory+'/'+'Convergence_vs2.out','r')
+    lines=file.readlines()
+    file.close()
+
+    burn_in=int(lines[0].split()[0])
+    nsample=int(lines[0].split()[1])
+
+    convsv2_one=[]
+    convsv2=[]
+    for line in lines[1:]:
+        data=line.split()
+        convsv2_one.append(float(data[0]))
+        convsv2.append(float(data[1]))
+
+    plt.figure('convergence_vs2')
+    plt.title('Vsv Change Rate Convergence, lower half')
+    plt.plot(convsv2_one[burn_in:],label='vsv change lower half, one core')
+    plt.plot(convsv2[burn_in:],label='vsv change lower half, all cores')
+    plt.xlabel('Iteration number')
+    plt.ylabel('XXX')
+    plt.xlim([0,nsample])
+    plt.legend()
+    # plt.show()
+    #plt.savefig(directory+'/PLOTS/'+'Convergence_vp.pdf')
+    #plt.close()
 
 ################################# Average dispersion curves ################################################
 if Dispersion:
@@ -636,5 +690,7 @@ if Dispersion:
     plt.xlim([np.min(period_R+period_L),np.max(period_R+period_L)])
 
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Dispersion.pdf')
+    #plt.savefig(directory+'/PLOTS/'+'Dispersion.pdf')
     # plt.close()
+
+plt.show()

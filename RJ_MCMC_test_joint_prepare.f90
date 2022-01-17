@@ -24,7 +24,8 @@ include 'data_joint.h'
     real , EXTERNAL    ::    gasdev,ran3,interp
     real log, sqrt
 
-    integer i,ii,sample,ind,th,ount,k ! various indices
+    integer i,ii,sample,ind,ount,k ! various indices
+    integer th
     logical ier, error_flag ! error flags for dispersion curves and minos_bran
     integer npt,npt_prop,npt_iso,npt_ani ! numbers of points, isotropic, anisotropic
     logical accept,tes,birth,birtha,death,deatha,move,value,noisd_R,noisd_L,ani,change_vp !which parameter did we change?
@@ -70,7 +71,6 @@ include 'data_joint.h'
     real c_ph(nmodes_max),period(nmodes_max),raylquo(nmodes_max),tref ! more outputs, rayquo: error measurement, should be of the order of eps
     real wmin_R,wmax_R,wmin_L,wmax_L ! more inputs for forward modelling
     real wmin_R_tmp,wmax_R_tmp,wmin_L_tmp,wmax_L_tmp ! more inputs for forward modelling
-    integer recalculated !counts the number of times we need to improve eps
     
     integer idis, numdis,i_al ! additional stuff for joint inversion
     real like_alt,like_alt_L,like_alt_R
@@ -96,6 +96,13 @@ include 'data_joint.h'
     
     character filebycore*15
     integer outputfile
+    
+    ! to save the current state
+    real best_current_Ad_R,best_current_Ad_L,best_current_pxi,best_current_p_vp
+    real best_current_pAd_R,best_current_pAd_L,best_current_pv1,best_current_pv2
+    real best_current_pd1,best_current_pd2,best_current_sigmav
+    integer best_current_npt
+    real best_current_voro(malay,4)
 
     ! todo: implement a test with raylquo
 1000 format(I4)
@@ -190,12 +197,12 @@ include 'data_joint.h'
         
         ndatad_L=0
         j=0
-!         do i=200,40,-10
-!             j=j+1
-!             peri_L(j)=real(i)
-!             d_obsdcLe(j)=0.01
-!             n_L(j)=0
-!         end do
+        do i=200,40,-10
+            j=j+1
+            peri_L(j)=real(i)
+            d_obsdcLe(j)=0.01
+            n_L(j)=0
+        end do
 !         do i=200,50,-10
 !             j=j+1
 !             peri_L(j)=real(i)
@@ -220,11 +227,11 @@ include 'data_joint.h'
 !             d_obsdcLe(j)=0.01
 !             n_L(j)=4
 !         end do
-!         ndatad_L=j
-!         wmin_L=1000./(maxval(peri_L(:ndatad_L))+10)
-!         wmax_L=1000./(minval(peri_L(:ndatad_L))-2)
-!         nmin_L=minval(n_L(:ndatad_L))
-!         nmax_L=maxval(n_L(:ndatad_L))
+        ndatad_L=j
+        wmin_L=1000./(maxval(peri_L(:ndatad_L))+10)
+        wmax_L=1000./(minval(peri_L(:ndatad_L))-2)
+        nmin_L=minval(n_L(:ndatad_L))
+        nmax_L=maxval(n_L(:ndatad_L))
         
         tref=sum(peri_R(:ndatad_R))/ndatad_R ! average period for minos
         !tref=sum(peri_L(:ndatad_L))/ndatad_L
@@ -232,8 +239,12 @@ include 'data_joint.h'
         ! create synthetic model
         npt=0
         
-        do i=1,10
-            voro(i,1)=66*i !depth of interface
+        voro(1,1)=1 !depth of interface
+        voro(1,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
+        voro(1,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
+        voro(1,4)=0!0.3-0.5/33.*i !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in
+        do i=2,11
+            voro(i,1)=30*(i-1) !depth of interface
             voro(i,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
             voro(i,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
             voro(i,4)=0!0.3-0.5/33.*i !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in params.h
@@ -309,16 +320,20 @@ include 'data_joint.h'
         ! create synthetic model
         npt=0
         
-        do i=1,10
-            voro(i,1)=66*i !depth of interface
+        voro(1,1)=1 !depth of interface
+        voro(1,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
+        voro(1,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
+        voro(1,4)=0!0.3-0.5/33.*i !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in
+        do i=2,11
+            voro(i,1)=30*(i-1) !depth of interface
             voro(i,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
             voro(i,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
             voro(i,4)=0!0.3-0.5/33.*i !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in params.h
             npt=npt+1
         end do
         
-        do i=10,20
-            voro(i,2)=voro(i,2)+0.05
+        do i=5,10
+            voro(i,2)=voro(i,2)+0.005
         enddo
 !         voro(10,4)=0.3
 !         voro(11,4)=0.3
@@ -387,16 +402,20 @@ include 'data_joint.h'
         ! create synthetic model
         npt=0
         
-        do i=1,10
-            voro(i,1)=66*i !depth of interface
+        voro(1,1)=1 !depth of interface
+        voro(1,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
+        voro(1,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
+        voro(1,4)=0!0.3-0.5/33.*i !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in
+        do i=2,11
+            voro(i,1)=30*(i-1) !depth of interface
             voro(i,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
             voro(i,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
             voro(i,4)=0!0.3-0.5/33.*i !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in params.h
             npt=npt+1
         end do
         
-        do i=10,20
-            voro(i,2)=voro(i,2)-0.05
+        do i=5,10
+            voro(i,2)=voro(i,2)-0.005
         enddo
 !         voro(10,4)=0.3
 !         voro(11,4)=0.3
@@ -554,6 +573,714 @@ include 'data_joint.h'
     alphahist=0
     
     
+    pxi = 0.4             ! proposal for change in xi
+    p_vp = 0.1           ! proposal for change in vp/vsv
+    pd1 = 10!0.2         ! proposal on change in position  
+    pv1 = 0.1!0.04     ! proposal on velocity
+    pd2 = 10!0.25        ! proposal on change in position 
+    pv2 = 0.1!0.04     ! proposal on velocity
+    pAd_R = 0.5        ! proposal for change in R noise
+    pAd_L = 0.5        ! proposal for change in L noise
+    sigmav=0.15         ! proposal for vsv when creating a new layer
+  
+    
+  
+    ra=rank !seed for RNG
+    ran=rank
+    inorout=0
+    inorouts=0
+    
+    ier=.false.
+    
+    
+    ! to do: branch out on different cores
+    
+    ! Initilalise sigma (noise parameter)
+    Ad_R = Ad_R_max-pAd_R! Ad_min+ran3(ra)*(Ad_R_max-Ad_min)
+    Ad_L = Ad_L_max-pAd_L
+
+    
+
+    j=0
+    tes=.false.
+    do while(.not.tes)
+150      tes=.true.
+        
+        ! create a starting model randomly
+        npt = milay+ran3(ra)*(malay-milay)!(12-milay)!(maxlay-minlay)
+        !npt=11
+        if ((npt>malay).or.(npt<milay)) goto 150
+        j=j+1
+        do i=1,npt
+
+            voro(i,1)= d_min+ran3(ra)*(d_max-d_min) 
+            voro(i,2)= (-width+2*width*ran3(ra))
+             if (ran3(ra)<0.5) then
+                 voro(i,3)= xi_min+(xi_max-xi_min)*ran3(ra)
+             else
+                 voro(i,3)= -1
+             endif
+            !voro(i,3)=-1
+            voro(i,4)= vpvsv_min+(vpvsv_max-vpvsv_min)*ran3(ra)
+        enddo
+
+        if (ndatad_R>0) then
+            nmodes=0
+            call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+                r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+            jcom=3 !rayleigh waves
+            call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
+                qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_R,wmax_R,nmin_R,nmax_R,&
+                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
+            if (error_flag) then
+                tes=.false.
+                write(*,*)"Minos_bran FAILED for RAYLEIGH 003"
+            end if
+            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,ndatad_R,ier)
+            if (ier) tes=.false.
+        endif
+        
+        if (ndatad_L>0) then
+            nmodes=0
+            call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+                r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+            jcom=2 !love waves
+            call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
+                qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_L,wmax_L,nmin_L,nmax_L,&
+                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
+            if (error_flag) then
+                tes=.false.
+            endif
+            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,ndatad_L,ier)
+            
+            if (ier) tes=.false.
+        endif
+        
+        if (j>250) stop "CAN'T INITIALIZE MODEL" ! if it doesn't work after 250 tries, give up
+
+    enddo
+
+    
+    ! isoflag says if a layer is isotropic
+    do i=1,npt
+        if (voro(i,3)==-1) then
+            isoflag(i)=.true.
+        else
+            isoflag(i)=.false.
+        endif
+    enddo
+    
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! Check and double-check
+    
+    !***********************************************************
+
+    !                 Get initial likelihood
+
+    !***********************************************************
+
+    lsd_R=0
+    lsd_L=0
+    liked_R=0
+    liked_L=0
+    
+    do i=1,ndatad_R ! calculate misfit -> log-likelihood of initial model
+        lsd_R=lsd_R+(d_obsdCR(i)-d_cR(i))**2
+        liked_R=liked_R+(d_obsdCR(i)-d_cR(i))**2/(2*(Ad_R*d_obsdCRe(i))**2) ! gaussian errors
+    enddo
+    do i=1,ndatad_L
+        lsd_L=lsd_L+(d_obsdCL(i)-d_cL(i))**2
+        liked_L=liked_L+(d_obsdCL(i)-d_cL(i))**2/(2*(Ad_L*d_obsdCLe(i))**2) 
+    enddo
+    lsd_R_min=lsd_R
+    lsd_L_min=lsd_L
+    likemax=lsd_R+lsd_L
+    
+    like= (liked_R + liked_L)
+    like_w=like/widening_prop
+    
+    if (ran==1) write(*,*)widening_prop
+    if (ran==1) write(*,*)like,like_w
+    
+    
+    sample=0
+    th=0
+    ount=0
+    PrP=0
+    PrV=0
+    PrB=0
+    PrD=0
+    PrBa=0
+    PrDa=0
+    AcP=0
+    AcV=0
+    AcB=0
+    AcD=0
+    AcBa=0
+    AcDa=0
+    Acnd_R=0
+    Prnd_R=0
+    Prxi=0
+    Acxi=0
+    Pr_vp=0
+    Ac_vp=0
+    Prnd_L=0
+    Acnd_L=0
+
+    sigmav_old=0
+    Ar_birth_old=0   
+    
+    
+
+    do while (ount<burn_in) ! Burn-in
+        ount=ount+1
+        malayv=malay
+        if (mod(ount,every)==0) then ! check regularly if acceptance rates are in an acceptable range, else change proposal width
+        
+            if ((Ac_vp/(Pr_vp+1))>0.54) p_vp=p_vp*(1+perturb)! if not increase width of proposition density
+            if ((Ac_vp/(Pr_vp+1))<0.34) p_vp=p_vp*(1-perturb)! or decrease it
+            if ((Acxi/(Prxi+1))>0.54) pxi=pxi*(1+perturb)
+            if ((Acxi/(Prxi+1))<0.34) pxi=pxi*(1-perturb)
+            if ((Acnd_R/(Prnd_R+1))>0.54) pAd_R=pAd_R*(1+perturb) ! for rayleigh waves
+            if ((Acnd_R/(Prnd_R+1))<0.34) pAd_R=pAd_R*(1-perturb)
+            if ((Acnd_L/(Prnd_L+1))>0.54) pAd_L=pAd_L*(1+perturb) ! for love waves
+            if ((Acnd_L/(Prnd_L+1))<0.34) pAd_L=pAd_L*(1-perturb)
+      
+            if ((Acv(1)/(Prv(1)+1))>0.54) pv1=pv1*(1+perturb) ! 2 layers for vsv
+            if ((Acv(1)/(Prv(1)+1))<0.34) pv1=pv1*(1-perturb)
+      
+            if ((Acv(2)/(Prv(2)+1))>0.54) pv2=pv2*(1+perturb) 
+            if ((Acv(2)/(Prv(2)+1))<0.34) pv2=pv2*(1-perturb)
+      
+            if ((Acp(1)/(Prp(1)+1))>0.54) pd1=pd1*(1+perturb) ! 2 layers for changing depth
+            if ((Acp(1)/(Prp(1)+1))<0.34) pd1=pd1*(1-perturb)
+       
+            if ((Acp(2)/(Prp(2)+1))>0.54) pd2=pd2*(1+perturb)
+            if ((Acp(2)/(Prp(2)+1))<0.34) pd2=pd2*(1-perturb)
+            
+            ! UPDATE SIGMAV
+            if ((abs((AcB/PrB)-Ar_birth_old)>2*abs((AcB/PrB)-(AcD/PrD))).and.&
+                (AcB.ne.0)) then !special treatement for adding/removing layers
+
+                if ((AcB/PrB)>Ar_birth_old) then! Going in the right direction
+                    if (sigmav>sigmav_old) then !Going up
+                        sigmav_new=sigmav*(1+perturb)
+                    else !Going down
+                        sigmav_new=sigmav*(1-perturb)
+                    endif
+                else ! Going in the wrong direction
+                    if (sigmav>sigmav_old) then !Going up
+                        sigmav_new=sigmav*(1-perturb)
+                    else
+                        sigmav_new=sigmav*(1+perturb)
+                    endif
+                endif
+                !write(*,*)sigmav_new
+                !write(*,*)
+                sigmav_old=sigmav
+                sigmav=sigmav_new
+                Ar_birth_old=AcB/PrB
+                PrB=0
+                PrD=0
+                AcB=0
+                AcD=0
+            endif
+            
+            !-----------------------------------------------
+
+            PrP=0
+            PrV=0
+            PrBa=0
+            PrDa=0
+            AcP=0
+            AcV=0
+            AcBa=0
+            AcDa=0
+            Acnd_R=0
+            Prnd_R=0
+            Acxi=0
+            Prxi=0
+            Ac_vp=0
+            Pr_vp=0
+            Prnd_L=0
+            Acnd_L=0
+        endif
+    
+        isoflag_prop = isoflag
+        voro_prop=voro
+        like_prop =like
+        liked_R_prop=liked_R
+        liked_L_prop=liked_L
+        
+    
+        npt_prop = npt        
+    
+        lsd_R_prop = lsd_R
+        lsd_L_prop =lsd_L
+        Ad_R_prop = Ad_R
+        Ad_L_prop = Ad_L
+        
+
+        u=ran3(ra)
+        ind=1
+        out=1 ! indicates if change is acceptable, i. e. not out of bounds etc.
+        move=.false.
+        value=.false.
+        birth=.false.
+        birtha=.false.
+        deatha=.false.
+        death=.false.
+        noisd_R=.false.
+        noisd_L=.false.
+        logprob_vsv=0
+        logprob_vp=0
+        ani=.false.
+        change_vp=.false.
+        
+
+        npt_ani=0
+        npt_iso=0
+        
+        do i=1,npt
+            if (isoflag(i).eqv..true.) npt_iso=npt_iso+1
+            if (isoflag(i).eqv..false.) npt_ani=npt_ani+1
+        enddo
+        if ((npt_iso+npt_ani).ne.npt) stop "Error here"
+
+        !*************************************************************
+
+        !                   Propose a new model
+
+        !*************************************************************
+        if (u<0) then
+            continue
+        
+        elseif (u<0.1) then !change xi--------------------------------------------
+            if (npt_ani.ne.0) then
+                ani=.true.
+                ! Choose randomly an anisotropic cell among the npt_ani possibilities
+                ind2 = ceiling(ran3(ra)*(npt_ani))
+                if (ind2==0) ind2=1 !number of the anisotropic cell
+                    
+                j=0
+                do ii=1,npt
+                    if (isoflag(ii).eqv..false.) j=j+1
+                    if (j==ind2) then
+                        ind=ii ! number of the cell in voro
+                        exit
+                    endif
+                enddo
+                
+                Prxi=Prxi+1 !increase counter to calculate acceptance rates
+                if (ind>npt) stop "684"
+                if (voro(ind,3)==-1) stop "874"
+                voro_prop(ind,3)=voro(ind,3)+gasdev(ra)*pxi
+                if (isoflag(ind).eqv..true.) stop "isoflag1"
+                
+                !Check if oustide bounds of prior
+                if ((voro_prop(ind,3)<=xi_min).or.(voro_prop(ind,3)>=xi_max)) then
+                    out=0
+                endif
+            endif
+        elseif (u<0.2) then !change vp --------------------------------------------
+            change_vp=.true.
+                
+            ! Choose a random cell
+            ind=ceiling(ran3(ra)*npt)
+            if (ind==0) ind=1
+            
+            Pr_vp=Pr_vp+1
+            if (ind>npt) then
+                out=0
+            else
+                voro_prop(ind,4)=voro(ind,4)+gasdev(ra)*p_vp
+            
+                !Check if oustide bounds of prior
+                if ((voro_prop(ind,4)<=vpvsv_min).or.(voro_prop(ind,4)>=vpvsv_max)) out=0
+                
+            endif     
+        elseif (u<0.3) then !change position--------------------------------------------
+            move=.true.
+            ind=1+ceiling(ran3(ra)*(npt-1))
+            if (ind==1) ind=2
+ 
+            !if (ount.GT.burn_in) then 
+            if (voro(ind,1)<(d_max/2)) then
+                PrP(1)=PrP(1)+1
+            else
+                PrP(2)=PrP(2)+1
+            endif
+            !endif
+ 
+            if (voro(ind,1)<(d_max/2)) then
+                voro_prop(ind,1)=voro(ind,1)+gasdev(ra)*pd1
+            else
+                voro_prop(ind,1)=voro(ind,1)+gasdev(ra)*pd2
+            endif
+        
+            if ((voro_prop(ind,1)<=d_min).or.(voro_prop(ind,1)>=d_max)) then
+                out=0
+            endif
+            if ((voro_prop(ind,2)<=-width).or.(voro_prop(ind,2)>=width)) then
+                out=0
+            endif
+ 
+        elseif (u<0.4) then ! Change noise parameter for rayleigh waves
+            noisd_R=.true.
+            Prnd_R = Prnd_R + 1
+            Ad_R_prop = Ad_R+gasdev(ra)*pAd_R
+            !Check if oustide bounds of prior
+            if ((Ad_R_prop<=Ad_R_min).or.(Ad_R_prop>=Ad_R_max)) then
+                out=0
+            endif
+        elseif (u<0.5) then ! Change noise parameter for love waves
+            noisd_L=.true.
+            Prnd_L = Prnd_L + 1
+            Ad_L_prop = Ad_L+gasdev(ra)*pAd_L
+            !Check if oustide bounds of prior
+            if ((Ad_L_prop<=Ad_L_min).or.(Ad_L_prop>=Ad_L_max)) then
+                out=0
+            endif         
+        
+        elseif (u<.6) then ! change vsv-----------------------------------
+            
+            value=.true.
+            ind=ceiling(ran3(ra)*npt)
+            if (ind==0) ind=1
+            !if (ount.GT.burn_in) then 
+            !write(*,*)voro(ind,1),d_max/2
+            if (voro(ind,1)<(d_max/2)) then
+                PrV(1)=PrV(1)+1
+            else
+                PrV(2)=PrV(2)+1
+            endif
+            !endif
+            if (ind>npt) then
+                write(*,*)npt,ind
+                stop "763"
+            endif
+            if (voro(ind,1)<(d_max/2)) then
+                voro_prop(ind,2)=voro(ind,2)+gasdev(ra)*pv1
+            else
+                voro_prop(ind,2)=voro(ind,2)+gasdev(ra)*pv2
+            endif
+            !voro_prop(ind,2) = -width+2*width*ran3(ra)
+            
+            !Check if oustide bounds of prior
+            if ((voro_prop(ind,2)<=-width).or.(voro_prop(ind,2)>=width)) then
+                out=0
+            endif
+
+
+        elseif (u<0.7) then !Birth of an isotropic cell -------------------------------------
+            birth = .true.
+            PrB = PrB + 1
+            npt_prop = npt + 1
+            if (npt_prop>malayv) then  !MODIF 
+                out=0
+            else
+                voro_prop(npt_prop,1) = d_min+ran3(ra)*(d_max-d_min)
+                call whichcell_d(voro_prop(npt_prop,1),voro,npt,ind)!
+
+                voro_prop(npt_prop,2) = voro(ind,2)+gasdev(ra)*sigmav ! sigmav: special width for new layers
+                !voro_prop(npt_prop,2) = -width+2*width*ran3(ra) ! use completely random new value
+                voro_prop(npt_prop,3) = -1
+                !voro_prop(npt_prop,4) = voro(ind,4)+gasdev(ra)*p_vp 
+                voro_prop(npt_prop,4) = vpvsv_min+(vpvsv_max-vpvsv_min)*ran3(ra)
+                isoflag_prop(npt_prop) = .true. 
+                
+                logprob_vsv=log(1/(sigmav*sqrt(2*pi)))-((voro(ind,2)-voro_prop(npt_prop,2))**2)/(2*sigmav**2) ! correct acceptance rates because transdimensional
+                !logprob_vp=log(1/(p_vp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(npt_prop,4))**2)/(2*p_vp**2)
+                
+                !Check bounds                    
+                if ((voro_prop(npt_prop,2)<=-width).or.(voro_prop(npt_prop,2)>=width)) then
+                    out=0
+                end if
+                if ((voro_prop(npt_prop,4)<=vpvsv_min).or.(voro_prop(npt_prop,4)>=vpvsv_max)) then
+                    out=0
+                end if
+            endif
+        elseif (u<0.8) then !death an isotropic cell !---------------------------------------    !
+
+            death = .true.
+            PrD = PrD + 1
+            if(npt_iso==0) then
+                out=0
+            else
+            
+                ind2 = ceiling(ran3(ra)*(npt_iso)) 
+                if (ind2==0) ind2=1
+
+                j=0
+                do ii=1,npt
+                    if (isoflag(ii).eqv..true.) j=j+1
+                    if (j==ind2) then
+                        ind=ii
+                        exit
+                    endif
+                enddo
+                if (voro(ind,3).NE.-1) stop "1092" 
+            endif
+
+            npt_prop=npt-1
+            
+            if ((npt_prop<milay)) then!.or.(ind==1)) then
+                out=0
+            else
+                voro_prop(ind,:)=voro(npt,:)
+                isoflag_prop(ind)=isoflag(npt)
+            
+                call whichcell_d(voro(ind,1),voro_prop,npt_prop,ind2)
+                logprob_vsv=log(1/(sigmav*sqrt(2*pi)))-((voro(ind,2)-voro_prop(ind2,2))**2)/(2*sigmav**2) ! same as for birth
+                !logprob_vp=log(1/(p_vp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(ind2,4))**2)/(2*p_vp**2)
+                
+            endif
+        elseif (u<0.9) then !Birth an anisotropic layer----------------------------------------
+            birtha = .true.
+            PrBa = PrBa + 1    
+            if (npt_iso==0) then
+                out=0
+            else
+                ! Choose randomly an isotropic cell among the npt_iso possibilities
+                ind2 = ceiling(ran3(ra)*(npt_iso))
+                if (ind2==0) ind2=1
+                j=0
+                do ii=1,npt
+                    if (isoflag(ii).eqv..true.) j=j+1
+                    if (j==ind2) then
+                        ind=ii
+                        exit
+                    endif
+                enddo
+                voro_prop(ind,3) =  xi_min+(xi_max-xi_min)*ran3(ra) 
+                if (voro(ind,3).NE.-1) stop "1130"
+                if ((voro_prop(ind,3)<=xi_min).or.(voro_prop(ind,3)>=xi_max)) then
+                    write(*,*)'anisotropy out of bounds'
+                    out=0
+                endif
+                isoflag_prop(ind)=.false.
+            endif
+        
+        !else
+        elseif (u<1.1) then !death of an anisotropic layer!---------------------------------------    
+            deatha = .true.
+            PrDa = PrDa + 1
+            if (npt_ani==0) then
+                out=0
+            else
+                ! Choose randomly an anisotropic cell among the npt_ani possibilities
+                ind2 = ceiling(ran3(ra)*(npt_ani))
+                if (ind2==0) ind2=1
+                j=0
+                do ii=1,npt
+                    if (isoflag(ii).eqv..false.) j=j+1
+                    if (j==ind2) then
+                        ind=ii
+                        exit
+                    endif
+                enddo
+                voro_prop(ind,3)=-1
+                isoflag_prop(ind)=.true.
+            endif        
+        else
+            out=0
+            
+        endif
+        
+        !**************************************************************************
+
+        !         After  moving a cell, Get the misfit of the proposed model
+
+        !**************************************************************************
+        if (out==1) then ! maybe we don't need a forward calculation for changes in noise parameters
+
+            if (ndatad_R>0) then
+                call combine(model_ref,nptref,nic_ref,noc_ref,voro_prop,npt_prop,d_max,&
+                    r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+                jcom=3 !rayleigh waves
+                nmodes=0
+                call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
+                    qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_R,wmax_R,nmin_R,nmax_R,&
+                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
+                if (error_flag) then 
+                    out=0
+                    goto 142
+                endif
+                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR_prop,&
+                ndatad_R,ier)
+                if (ier) then 
+                    out=0
+                    goto 142
+                endif
+
+            endif
+            
+            if (ndatad_L>0) then
+                call combine(model_ref,nptref,nic_ref,noc_ref,voro_prop,npt_prop,d_max,&
+                    r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+                jcom=2 !love waves
+                nmodes=0
+                call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
+                    qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_L,wmax_L,nmin_L,nmax_L,&
+                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
+
+                if (error_flag) then 
+                    out=0
+                    goto 142
+                endif
+                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL_prop,&
+                ndatad_L,ier)
+                
+                if (ier) then 
+                    out=0
+                    goto 142
+                endif
+
+            endif
+            
+            lsd_R_prop=0
+            lsd_L_prop=0
+            liked_R_prop=0
+            liked_L_prop=0
+            do i=1,ndatad_R
+                lsd_R_prop=lsd_R_prop+(d_obsdCR(i)-d_cR_prop(i))**2
+                liked_R_prop=liked_R_prop+(d_obsdCR(i)-d_cR_prop(i))**2/(2*(Ad_R_prop*d_obsdCRe(i))**2) ! prendre en compte erreurs mesurées
+            end do
+            do i=1,ndatad_L
+                lsd_L_prop=lsd_L_prop+(d_obsdCL(i)-d_cL_prop(i))**2
+                liked_L_prop=liked_L_prop+(d_obsdCL(i)-d_cL_prop(i))**2/(2*(Ad_L_prop*d_obsdCLe(i))**2) ! prendre en compte erreurs mesurées
+            end do
+            
+        endif 
+        
+        like_prop=(liked_R_prop+liked_L_prop) !log-likelihood of the proposed model
+        like_prop_w=like_prop/widening_prop
+        
+   142 Accept = .false.
+        
+        ! now check if we accept the new model - different treatement depending on the change
+        if (birth) then!------------------------------------------------------------------
+    
+            if (log(ran3(ra))<log(out) + log(real(npt)+1)-log(real(npt_prop)+1) -&
+                log(2*width)-logprob_vsv&!-log(vpvsv_max-vpvsv_min)-logprob_vp&
+                -like_prop_w+like_w) then ! transdimensional case
+                accept=.true.
+                AcB=AcB+1
+            endif
+        
+        elseif (death) then!-------------------------------------------------------------
+        
+            if (log(ran3(ra))<log(out) + log(real(npt)+1)&
+                -log(real(npt_prop)+1) + &
+                log(2*width)+logprob_vsv&!+log(vpvsv_max-vpvsv_min)+logprob_vp&
+                -like_prop_w+like_w) then! transdimensional case
+                accept=.true.
+                AcD=AcD+1
+            endif
+        
+        elseif (noisd_R) then !@@@@@@@@@@@@@@@@@@@@@@@@@@@@ logrsig  @@@@@@@@@@@@
+            logrsig=ndatad_R*log(Ad_R/Ad_R_prop)/widening_prop ! ATTENTION avc ld 2
+            if (log(ran3(ra))<logrsig+log(out)-like_prop_w+like_w) then ! hierarchical case
+                accept=.true.
+                Acnd_R=Acnd_R+1
+            endif
+        elseif (noisd_L) then !@@@@@@@@@@@@@@@@@@@@@@@@@@@@ logrsig  @@@@@@@@@@@@
+            logrsig=ndatad_L*log(Ad_L/Ad_L_prop)/widening_prop ! ATTENTION avc ld 2
+            if (log(ran3(ra))<logrsig+log(out)-like_prop_w+like_w) then ! hierarchical case
+                accept=.true.
+                Acnd_L=Acnd_L+1
+            endif            
+        else !NO JUMP-------------------------------------------------------------------
+    
+            if (log(ran3(ra))<log(out)-like_prop_w+like_w)then
+                if (ind>malayv) stop  '1082'
+                accept=.true.
+                if (value) then
+                    if (voro(ind,1)<(d_max/2)) then
+                        AcV(1)=AcV(1)+1
+                    else
+                        AcV(2)=AcV(2)+1
+                    endif
+                elseif (move) then
+                    if (voro(ind,1)<(d_max/2)) then
+                        AcP(1)=AcP(1)+1
+                    else
+                        AcP(2)=AcP(2)+1
+                    endif
+                elseif(ani)then
+                    Acxi=Acxi+1
+                elseif(change_vp)then
+                    Ac_vp=Ac_vp+1        
+                endif                    
+                if (birtha) then
+                    Acba=Acba+1
+                elseif (deatha) then
+                    Acda=Acda+1        
+                endif
+            endif!accept
+        endif 
+        
+        !***********************************************************************************
+        !   If we accept the proposed model, update the status of the Markov Chain
+        !***********************************************************************************
+        if (accept) then 
+            isoflag=isoflag_prop
+            voro=voro_prop
+            like=like_prop
+            like_w=like_prop_w
+        
+            liked_L=liked_L_prop
+            liked_R=liked_R_prop
+            lsd_L=lsd_L_prop        
+            lsd_R=lsd_R_prop
+            npt=npt_prop
+            Ad_R=Ad_R_prop
+            Ad_L=Ad_L_prop
+            
+            d_cR=d_cR_prop
+            d_cL=d_cL_prop
+            
+    
+        endif
+
+        npt_ani=0
+        npt_iso=0
+    
+        do i=1,npt
+            if (isoflag(i).eqv..true.) npt_iso=npt_iso+1
+            if (isoflag(i).eqv..false.) npt_ani=npt_ani+1
+        enddo
+        if (npt_iso+npt_ani.ne.npt) stop "Error here"
+        
+        IF ((mod(ount,display).EQ.0).and.(mod(ran,50).EQ.0)) THEN
+
+            write(*,*)'processor number',ran+1,'/',nbproc
+            write(*,*)'widening step: preprocessing'
+            write(*,*)'sample:',ount,'/',burn_in
+            write(*,*)'number of cells:',npt
+            write(*,*)'Ad_R',Ad_R,'Ad_L',Ad_L
+            write(*,*)'Acceptance rates'
+            write(*,*)'AR_move',100*AcP(1)/PrP(1),100*AcP(2)/PrP(2)
+            write(*,*)'AR_value',100*AcV(1)/PrV(1),100*AcV(2)/PrV(2)
+
+            write(*,*)'AR_Birth',100*AcB/PrB,'AR_Death',100*AcD/PrD,'sigmav',sigmav
+            write(*,*)'AR_Birtha',100*AcBa/PrBa,'AR_Deatha',100*AcDa/PrDa
+            write(*,*)'AR_xi',100*Acxi/Prxi,'pxi',pxi
+            write(*,*)'AR__vp',100*Ac_vp/Pr_vp,'p_vp',p_vp
+            write(*,*)'AR_Ad_R',100*Acnd_R/Prnd_R,'pAd_R',pAd_R
+            write(*,*)'AR_Ad_L',100*Acnd_L/Prnd_L,'pAd_L',pAd_L
+            write(*,*)'npt_iso',npt_iso,'npt_ani',npt_ani
+            write(*,*)'widening',widening_prop
+            !write(*,*)Ar_birth_old,sigmav_old,sigmav
+            write(*,*)'-----------------------------------------'
+            write(*,*)
+            write(*,*)
+            
+            
+        END IF
+    end do !End burn-in
+    
     
     
     do i_w=1,n_w
@@ -567,15 +1294,6 @@ include 'data_joint.h'
         mean_prop=0
         mean_props=0
         
-        pxi = 0.4             ! proposal for change in xi
-        p_vp = 0.1           ! proposal for change in vp/vsv
-        pd1 = 10!0.2         ! proposal on change in position  
-        pv1 = 0.1!0.04     ! proposal on velocity
-        pd2 = 10!0.25        ! proposal on change in position 
-        pv2 = 0.1!0.04     ! proposal on velocity
-        pAd_R = 0.5        ! proposal for change in R noise
-        pAd_L = 0.5        ! proposal for change in L noise
-        sigmav=0.15         ! proposal for vsv when creating a new layer
       
         
       
@@ -587,73 +1305,37 @@ include 'data_joint.h'
         ier=.false.
         
         
-        ! to do: branch out on different cores
+        if (ndatad_R>0) then
+            nmodes=0
+            call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+                r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+            jcom=3 !rayleigh waves
+            call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
+                qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_R,wmax_R,nmin_R,nmax_R,&
+                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
+            if (error_flag) then
+                tes=.false.
+                write(*,*)"Minos_bran FAILED for RAYLEIGH 003"
+            end if
+            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,ndatad_R,ier)
+            if (ier) tes=.false.
+        endif
         
-        ! Initilalise sigma (noise parameter)
-        Ad_R = Ad_R_max-pAd_R! Ad_min+ran3(ra)*(Ad_R_max-Ad_min)
-        Ad_L = Ad_L_max-pAd_L
-    
-        
-    
-        j=0
-        tes=.false.
-        do while(.not.tes)
-    150      tes=.true.
-            
-            ! create a starting model randomly
-            !npt = milay+ran3(ra)*(malay-milay)!(12-milay)!(maxlay-minlay)
-            npt=10
-            if ((npt>malay).or.(npt<milay)) goto 150
-            j=j+1
-            do i=1,npt
-    
-                voro(i,1)= d_min+ran3(ra)*(d_max-d_min) 
-                voro(i,2)= (-width+2*width*ran3(ra))
-!                 if (ran3(ra)<0.5) then
-!                     voro(i,3)= xi_min+(xi_max-xi_min)*ran3(ra)
-!                 else
-!                     voro(i,3)= -1
-!                 endif
-                voro(i,3)=-1
-                voro(i,4)= 0!vpvsv_min+(vpvsv_max-vpvsv_min)*ran3(ra)
-            enddo
-    
-            if (ndatad_R>0) then
-                nmodes=0
-                call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-                    r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
-                jcom=3 !rayleigh waves
-                call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
-                    qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_R,wmax_R,nmin_R,nmax_R,&
-                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
-                if (error_flag) then
-                    tes=.false.
-                    write(*,*)"Minos_bran FAILED for RAYLEIGH 003"
-                end if
-                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,ndatad_R,ier)
-                if (ier) tes=.false.
+        if (ndatad_L>0) then
+            nmodes=0
+            call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+                r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+            jcom=2 !love waves
+            call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
+                qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_L,wmax_L,nmin_L,nmax_L,&
+                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
+            if (error_flag) then
+                tes=.false.
             endif
+            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,ndatad_L,ier)
             
-            if (ndatad_L>0) then
-                nmodes=0
-                call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-                    r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
-                jcom=2 !love waves
-                call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
-                    qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_L,wmax_L,nmin_L,nmax_L,&
-                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
-                if (error_flag) then
-                    tes=.false.
-                endif
-                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,ndatad_L,ier)
-                
-                if (ier) tes=.false.
-            endif
-            
-            if (j>250) stop "CAN'T INITIALIZE MODEL" ! if it doesn't work after 250 tries, give up
-    
-        enddo
-    
+            if (ier) tes=.false.
+        endif
         
         ! isoflag says if a layer is isotropic
         do i=1,npt
@@ -725,7 +1407,6 @@ include 'data_joint.h'
         sigmav_old=0
         Ar_birth_old=0   
         
-        recalculated=0
         
     
         do while (sample<nsample_widening) ! main loop, sample: number of sample post burn-in
@@ -851,50 +1532,50 @@ include 'data_joint.h'
             if (u<0) then
                 continue
             
-!             elseif (u<0.1) then !change xi--------------------------------------------
-!                 if (npt_ani.ne.0) then
-!                     ani=.true.
-!                     ! Choose randomly an anisotropic cell among the npt_ani possibilities
-!                     ind2 = ceiling(ran3(ra)*(npt_ani))
-!                     if (ind2==0) ind2=1 !number of the anisotropic cell
-!                         
-!                     j=0
-!                     do ii=1,npt
-!                         if (isoflag(ii).eqv..false.) j=j+1
-!                         if (j==ind2) then
-!                             ind=ii ! number of the cell in voro
-!                             exit
-!                         endif
-!                     enddo
-!                     
-!                     Prxi=Prxi+1 !increase counter to calculate acceptance rates
-!                     if (ind>npt) stop "684"
-!                     if (voro(ind,3)==-1) stop "874"
-!                     voro_prop(ind,3)=voro(ind,3)+gasdev(ra)*pxi
-!                     if (isoflag(ind).eqv..true.) stop "isoflag1"
-!                     
-!                     !Check if oustide bounds of prior
-!                     if ((voro_prop(ind,3)<=xi_min).or.(voro_prop(ind,3)>=xi_max)) then
-!                         out=0
-!                     endif
-!                 endif
-!             elseif (u<0.2) then !change vp --------------------------------------------
-!                 change_vp=.true.
-!                     
-!                 ! Choose a random cell
-!                 ind=ceiling(ran3(ra)*npt)
-!                 if (ind==0) ind=1
-!                 
-!                 Pr_vp=Pr_vp+1
-!                 if (ind>npt) then
-!                     out=0
-!                 else
-!                     voro_prop(ind,4)=voro(ind,4)+gasdev(ra)*p_vp
-!                 
-!                     !Check if oustide bounds of prior
-!                     if ((voro_prop(ind,4)<=vpvsv_min).or.(voro_prop(ind,4)>=vpvsv_max)) out=0
-!                     
-!                 endif     
+            elseif (u<0.1) then !change xi--------------------------------------------
+                if (npt_ani.ne.0) then
+                    ani=.true.
+                    ! Choose randomly an anisotropic cell among the npt_ani possibilities
+                    ind2 = ceiling(ran3(ra)*(npt_ani))
+                    if (ind2==0) ind2=1 !number of the anisotropic cell
+                        
+                    j=0
+                    do ii=1,npt
+                        if (isoflag(ii).eqv..false.) j=j+1
+                        if (j==ind2) then
+                            ind=ii ! number of the cell in voro
+                            exit
+                        endif
+                    enddo
+                    
+                    Prxi=Prxi+1 !increase counter to calculate acceptance rates
+                    if (ind>npt) stop "684"
+                    if (voro(ind,3)==-1) stop "874"
+                    voro_prop(ind,3)=voro(ind,3)+gasdev(ra)*pxi
+                    if (isoflag(ind).eqv..true.) stop "isoflag1"
+                    
+                    !Check if oustide bounds of prior
+                    if ((voro_prop(ind,3)<=xi_min).or.(voro_prop(ind,3)>=xi_max)) then
+                        out=0
+                    endif
+                endif
+            elseif (u<0.2) then !change vp --------------------------------------------
+                change_vp=.true.
+                    
+                ! Choose a random cell
+                ind=ceiling(ran3(ra)*npt)
+                if (ind==0) ind=1
+                
+                Pr_vp=Pr_vp+1
+                if (ind>npt) then
+                    out=0
+                else
+                    voro_prop(ind,4)=voro(ind,4)+gasdev(ra)*p_vp
+                
+                    !Check if oustide bounds of prior
+                    if ((voro_prop(ind,4)<=vpvsv_min).or.(voro_prop(ind,4)>=vpvsv_max)) out=0
+                    
+                endif     
             elseif (u<0.3) then !change position--------------------------------------------
                 move=.true.
                 ind=1+ceiling(ran3(ra)*(npt-1))
@@ -968,116 +1649,116 @@ include 'data_joint.h'
                 endif
     
     
-!             elseif (u<0.8) then !Birth of an isotropic cell -------------------------------------
-!                 birth = .true.
-!                 PrB = PrB + 1
-!                 npt_prop = npt + 1
-!                 if (npt_prop>malayv) then  !MODIF 
-!                     out=0
-!                 else
-!                     voro_prop(npt_prop,1) = d_min+ran3(ra)*(d_max-d_min)
-!                     call whichcell_d(voro_prop(npt_prop,1),voro,npt,ind)!
-!     
-!                     voro_prop(npt_prop,2) = voro(ind,2)+gasdev(ra)*sigmav ! sigmav: special width for new layers
-!                     !voro_prop(npt_prop,2) = -width+2*width*ran3(ra) ! use completely random new value
-!                     voro_prop(npt_prop,3) = -1
-!                     !voro_prop(npt_prop,4) = voro(ind,4)+gasdev(ra)*p_vp 
-!                     voro_prop(npt_prop,4) = vpvsv_min+(vpvsv_max-vpvsv_min)*ran3(ra)
-!                     isoflag_prop(npt_prop) = .true. 
-!                     
-!                     logprob_vsv=log(1/(sigmav*sqrt(2*pi)))-((voro(ind,2)-voro_prop(npt_prop,2))**2)/(2*sigmav**2) ! correct acceptance rates because transdimensional
-!                     !logprob_vp=log(1/(p_vp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(npt_prop,4))**2)/(2*p_vp**2)
-!                     
-!                     !Check bounds                    
-!                     if ((voro_prop(npt_prop,2)<=-width).or.(voro_prop(npt_prop,2)>=width)) then
-!                         out=0
-!                     end if
-!                     if ((voro_prop(npt_prop,4)<=vpvsv_min).or.(voro_prop(npt_prop,4)>=vpvsv_max)) then
-!                         out=0
-!                     end if
-!                 endif
-!             elseif (u<1.) then !death an isotropic cell !---------------------------------------    !
-!     
-!                 death = .true.
-!                 PrD = PrD + 1
-!                 if(npt_iso==0) then
-!                     out=0
-!                 else
-!                 
-!                     ind2 = ceiling(ran3(ra)*(npt_iso)) 
-!                     if (ind2==0) ind2=1
-!     
-!                     j=0
-!                     do ii=1,npt
-!                         if (isoflag(ii).eqv..true.) j=j+1
-!                         if (j==ind2) then
-!                             ind=ii
-!                             exit
-!                         endif
-!                     enddo
-!                     if (voro(ind,3).NE.-1) stop "1092" 
-!                 endif
-!     
-!                 npt_prop=npt-1
-!                 
-!                 if ((npt_prop<milay)) then!.or.(ind==1)) then
-!                     out=0
-!                 else
-!                     voro_prop(ind,:)=voro(npt,:)
-!                     isoflag_prop(ind)=isoflag(npt)
-!                 
-!                     call whichcell_d(voro(ind,1),voro_prop,npt_prop,ind2)
-!                     logprob_vsv=log(1/(sigmav*sqrt(2*pi)))-((voro(ind,2)-voro_prop(ind2,2))**2)/(2*sigmav**2) ! same as for birth
-!                     !logprob_vp=log(1/(p_vp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(ind2,4))**2)/(2*p_vp**2)
-!                     
-!                 endif
-!             elseif (u<0.9) then !Birth an anisotropic layer----------------------------------------
-!                 birtha = .true.
-!                 PrBa = PrBa + 1    
-!                 if (npt_iso==0) then
-!                     out=0
-!                 else
-!                     ! Choose randomly an isotropic cell among the npt_iso possibilities
-!                     ind2 = ceiling(ran3(ra)*(npt_iso))
-!                     if (ind2==0) ind2=1
-!                     j=0
-!                     do ii=1,npt
-!                         if (isoflag(ii).eqv..true.) j=j+1
-!                         if (j==ind2) then
-!                             ind=ii
-!                             exit
-!                         endif
-!                     enddo
-!                     voro_prop(ind,3) =  xi_min+(xi_max-xi_min)*ran3(ra) 
-!                     if (voro(ind,3).NE.-1) stop "1130"
-!                     if ((voro_prop(ind,3)<=xi_min).or.(voro_prop(ind,3)>=xi_max)) then
-!                         write(*,*)'anisotropy out of bounds'
-!                         out=0
-!                     endif
-!                     isoflag_prop(ind)=.false.
-!                 endif
-!             
-!             !else
-!             elseif (u<1.1) then !death of an anisotropic layer!---------------------------------------    
-!                 deatha = .true.
-!                 PrDa = PrDa + 1
-!                 if (npt_ani==0) then
-!                     out=0
-!                 else
-!                     ! Choose randomly an anisotropic cell among the npt_ani possibilities
-!                     ind2 = ceiling(ran3(ra)*(npt_ani))
-!                     if (ind2==0) ind2=1
-!                     j=0
-!                     do ii=1,npt
-!                         if (isoflag(ii).eqv..false.) j=j+1
-!                         if (j==ind2) then
-!                             ind=ii
-!                             exit
-!                         endif
-!                     enddo
-!                     voro_prop(ind,3)=-1
-!                     isoflag_prop(ind)=.true.
-!                 endif        
+            elseif (u<0.7) then !Birth of an isotropic cell -------------------------------------
+                birth = .true.
+                PrB = PrB + 1
+                npt_prop = npt + 1
+                if (npt_prop>malayv) then  !MODIF 
+                    out=0
+                else
+                    voro_prop(npt_prop,1) = d_min+ran3(ra)*(d_max-d_min)
+                    call whichcell_d(voro_prop(npt_prop,1),voro,npt,ind)!
+    
+                    voro_prop(npt_prop,2) = voro(ind,2)+gasdev(ra)*sigmav ! sigmav: special width for new layers
+                    !voro_prop(npt_prop,2) = -width+2*width*ran3(ra) ! use completely random new value
+                    voro_prop(npt_prop,3) = -1
+                    !voro_prop(npt_prop,4) = voro(ind,4)+gasdev(ra)*p_vp 
+                    voro_prop(npt_prop,4) = vpvsv_min+(vpvsv_max-vpvsv_min)*ran3(ra)
+                    isoflag_prop(npt_prop) = .true. 
+                    
+                    logprob_vsv=log(1/(sigmav*sqrt(2*pi)))-((voro(ind,2)-voro_prop(npt_prop,2))**2)/(2*sigmav**2) ! correct acceptance rates because transdimensional
+                    !logprob_vp=log(1/(p_vp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(npt_prop,4))**2)/(2*p_vp**2)
+                    
+                    !Check bounds                    
+                    if ((voro_prop(npt_prop,2)<=-width).or.(voro_prop(npt_prop,2)>=width)) then
+                        out=0
+                    end if
+                    if ((voro_prop(npt_prop,4)<=vpvsv_min).or.(voro_prop(npt_prop,4)>=vpvsv_max)) then
+                        out=0
+                    end if
+                endif
+            elseif (u<0.8) then !death an isotropic cell !---------------------------------------    !
+    
+                death = .true.
+                PrD = PrD + 1
+                if(npt_iso==0) then
+                    out=0
+                else
+                
+                    ind2 = ceiling(ran3(ra)*(npt_iso)) 
+                    if (ind2==0) ind2=1
+    
+                    j=0
+                    do ii=1,npt
+                        if (isoflag(ii).eqv..true.) j=j+1
+                        if (j==ind2) then
+                            ind=ii
+                            exit
+                        endif
+                    enddo
+                    if (voro(ind,3).NE.-1) stop "1092" 
+                endif
+    
+                npt_prop=npt-1
+                
+                if ((npt_prop<milay)) then!.or.(ind==1)) then
+                    out=0
+                else
+                    voro_prop(ind,:)=voro(npt,:)
+                    isoflag_prop(ind)=isoflag(npt)
+                
+                    call whichcell_d(voro(ind,1),voro_prop,npt_prop,ind2)
+                    logprob_vsv=log(1/(sigmav*sqrt(2*pi)))-((voro(ind,2)-voro_prop(ind2,2))**2)/(2*sigmav**2) ! same as for birth
+                    !logprob_vp=log(1/(p_vp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(ind2,4))**2)/(2*p_vp**2)
+                    
+                endif
+            elseif (u<0.9) then !Birth an anisotropic layer----------------------------------------
+                birtha = .true.
+                PrBa = PrBa + 1    
+                if (npt_iso==0) then
+                    out=0
+                else
+                    ! Choose randomly an isotropic cell among the npt_iso possibilities
+                    ind2 = ceiling(ran3(ra)*(npt_iso))
+                    if (ind2==0) ind2=1
+                    j=0
+                    do ii=1,npt
+                        if (isoflag(ii).eqv..true.) j=j+1
+                        if (j==ind2) then
+                            ind=ii
+                            exit
+                        endif
+                    enddo
+                    voro_prop(ind,3) =  xi_min+(xi_max-xi_min)*ran3(ra) 
+                    if (voro(ind,3).NE.-1) stop "1130"
+                    if ((voro_prop(ind,3)<=xi_min).or.(voro_prop(ind,3)>=xi_max)) then
+                        write(*,*)'anisotropy out of bounds'
+                        out=0
+                    endif
+                    isoflag_prop(ind)=.false.
+                endif
+            
+            !else
+            elseif (u<1.1) then !death of an anisotropic layer!---------------------------------------    
+                deatha = .true.
+                PrDa = PrDa + 1
+                if (npt_ani==0) then
+                    out=0
+                else
+                    ! Choose randomly an anisotropic cell among the npt_ani possibilities
+                    ind2 = ceiling(ran3(ra)*(npt_ani))
+                    if (ind2==0) ind2=1
+                    j=0
+                    do ii=1,npt
+                        if (isoflag(ii).eqv..false.) j=j+1
+                        if (j==ind2) then
+                            ind=ii
+                            exit
+                        endif
+                    enddo
+                    voro_prop(ind,3)=-1
+                    isoflag_prop(ind)=.true.
+                endif        
             else
                 out=0
                 
@@ -1100,7 +1781,7 @@ include 'data_joint.h'
                         nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
                     if (error_flag) then 
                         out=0
-                        goto 1142
+                        goto 11142
                     endif
                     call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR_prop,&
                     ndatad_R,ier)
@@ -1122,7 +1803,7 @@ include 'data_joint.h'
 
                     if (error_flag) then 
                         out=0
-                        goto 1142
+                        goto 11142
                     endif
                     call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL_prop,&
                     ndatad_L,ier)
@@ -1288,26 +1969,28 @@ include 'data_joint.h'
                 close(rank*100)
             ENDIF
     
-            IF (ount.GT.burn_in) THEN
+            IF (ount.GT.burn_in_widening) THEN
                 sample=sample+1
                 
-                IF (mod(ount,thin)==0) THEN
-                    
-                    do idis=1,numdis
-                        if (logalpha(idis)>alphamax_prop(idis)) then
-                            alphamax_prop(idis)=logalpha(idis)
-                        endif
-                    enddo
-                    
-                    if (logalpharef>alpharefmax_prop) then
-                        alpharefmax_prop=logalpharef
+                do idis=1,numdis
+                    if (logalpha(idis)>alphamax_prop(idis)) then
+                        alphamax_prop(idis)=logalpha(idis)
                     endif
+                enddo
+                
+                if (logalpharef>alpharefmax_prop) then
+                    alpharefmax_prop=logalpharef
+                endif
+                
+                IF (mod(ount,thin)==0) THEN
                     
                     mean_prop=mean_prop+logalpha
                     th = th + 1
                     
                     alpha=exp(logalpha)
                     alphasum=alphasum+exp(logalpha)
+                    
+                    
                     
                     alphaall(th,:)=logalpha
                     do idis=1,numdis
@@ -1324,7 +2007,7 @@ include 'data_joint.h'
 
                 write(*,*)'processor number',ran+1,'/',nbproc
                 write(*,*)'widening step:',i_w,'/',n_w
-                write(*,*)'sample:',ount,'/',burn_in+nsample_widening
+                write(*,*)'sample:',ount,'/',burn_in_widening+nsample_widening
                 write(*,*)'number of cells:',npt
                 write(*,*)'Ad_R',Ad_R,'Ad_L',Ad_L
                 write(*,*)'Acceptance rates'
@@ -1344,7 +2027,6 @@ include 'data_joint.h'
                 write(*,*)
                 write(*,*)
                 
-                recalculated=0
                 
             END IF
         end do !End Markov chain
@@ -1365,7 +2047,7 @@ include 'data_joint.h'
             call MPI_REDUCE(inorout,inorouts,21000,MPI_Integer,MPI_Sum,i-1,MPI_COMM_WORLD,ierror)
         enddo
 
-        write(*,*)'rank=',ran,'th=',th
+        !write(*,*)'rank=',ran,'th=',th
 
         j=0
         k=0
@@ -1399,7 +2081,10 @@ include 'data_joint.h'
             call MPI_REDUCE(alphamax_prop,alphamax_props,numdis_max,MPI_Real,MPI_MAX,0,MPI_COMM_small,ierror)
             call MPI_REDUCE(alpharefmax_prop,alpharefmax_props,1,MPI_Real,MPI_MAX,0,MPI_COMM_small,ierror)
             call MPI_REDUCE(mean_prop,mean_props,numdis_max,MPI_Real,MPI_sum,0,MPI_COMM_small,ierror)
-        
+            
+            
+            do idis=1,numdis
+            enddo
         
             IF (ran==0) THEN
                 do i=1,j
@@ -1412,8 +2097,9 @@ include 'data_joint.h'
                 call MPI_RECV(alphamax_props, numdis_max, MPI_Real, 0, 1, MPI_COMM_small, MPI_STATUS_IGNORE, ierror)
                 call MPI_SEND(alpharefmax_props, 1, MPI_Real, 0, 1, MPI_COMM_small, MPI_STATUS_IGNORE, ierror)
             endif
-            do i=1,th
-                do idis=1,numdis
+            do idis=1,numdis
+                
+                do i=1,th
                     i_al=ceiling((alphaall(i,idis)-alphamax_props(idis)-logalpha_min)/(logalpha_max-logalpha_min)*num_logalpha)
                     if (i_al<logalpha_min) i_al=1
                     if (i_al>logalpha_max) i_al=num_logalpha
@@ -1432,17 +2118,30 @@ include 'data_joint.h'
             
             mean_props=mean_props/j-alphamax_props
             meandiff_hist(i_w,:)=mean_props
-            if (sum(mean_props(:numdis)**2)<sum(mean_best(:numdis)**2)) then
+            if (minval(mean_props(:numdis))>minval(mean_best(:numdis))) then
                 mean_best=mean_props
                 widening=widening_prop
                 alphamax=alphamax_props
                 alpharefmax=alpharefmax_props
+                
+                best_current_Ad_R=Ad_R
+                best_current_Ad_L=Ad_L
+                best_current_pxi=pxi
+                best_current_p_vp=p_vp
+                best_current_pAd_R=pAd_R
+                best_current_pAd_L=pAd_L
+                best_current_pv1=pv1
+                best_current_pv2=pv2
+                best_current_pd1=pd1
+                best_current_pd2=pd2
+                best_current_sigmav=sigmav
+                best_current_npt=npt
+                best_current_voro=voro
+                
             endif
             IF (ran==members(1)) THEN
                 write(*,*)'New widening tested: '
                 write(*,*)i_w,widening_prop,widening,'best',mean_best(:numdis),'props',mean_props(:numdis)
-                write(*,*)'alphamax',alphamax_props
-                
                 write(*,*)'alphamax',alphamax_props
             endif
             widening_prop=widening_prop+widening_step
@@ -1452,6 +2151,27 @@ include 'data_joint.h'
     enddo
     
     write(*,*)'writing outputs of widening tests'
+    
+    
+    write(filenamemax,"('/last_model_',I3.3,'.inout')") rank    
+    write(*,*)filenamemax
+    open(65,file=dirname//filenamemax,status='replace')
+    write(65,*)best_current_Ad_R
+    write(65,*)best_current_Ad_L
+    write(65,*)best_current_pxi
+    write(65,*)best_current_p_vp
+    write(65,*)best_current_pAd_R
+    write(65,*)best_current_pAd_L
+    write(65,*)best_current_pv1
+    write(65,*)best_current_pv2
+    write(65,*)best_current_pd1
+    write(65,*)best_current_pd2
+    write(65,*)best_current_sigmav
+    write(65,*)best_current_npt
+    do i=1,best_current_npt
+        write(65,*)best_current_voro(i,:)
+    enddo
+    close(65)
     
     IF (ran==members(1)) THEN
 
@@ -1478,7 +2198,10 @@ include 'data_joint.h'
         do i=1,numdis
             write(65,*)alphamax(i)
         enddo
+        write(65,*)mean_best(:numdis)
         close(65)
+        
+        write(*,*)'final alphamax',alpharefmax,alphamax
     ENDIF
     
     CALL cpu_time(t2)
