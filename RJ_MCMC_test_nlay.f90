@@ -144,7 +144,7 @@ include 'params.h'
     ! Traces
     integer nptref,malayv ! number of points in reference model, number of layers in voro
     real convBs(nsample+burn_in),convB(nsample+burn_in),convPs(nsample+burn_in),convP(nsample+burn_in) ! birth rates, vp change rates
-    real convvs1(nsample+burn_in),convvs1s(nsample+burn_in),convvs2s(nsample+burn_in),convvs2s(nsample+burn_in)
+    real convvs1(nsample+burn_in),convvs1s(nsample+burn_in),convvs2(nsample+burn_in),convvs2s(nsample+burn_in)
     real convvp(nsample+burn_in),convvps(nsample+burn_in),convxis(nsample+burn_in),convxi(nsample+burn_in)
     real convBas(nsample+burn_in),convBa(nsample+burn_in) ! anisotropic birth rates
     real convDs(nsample+burn_in),convD(nsample+burn_in),convDas(nsample+burn_in),convDa(nsample+burn_in)

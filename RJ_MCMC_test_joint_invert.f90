@@ -65,7 +65,7 @@ include 'data_joint.h'
     integer nptref,malayv ! number of points in reference model, number of layers in voro
     real convBs(nsample+burn_in),convB(nsample+burn_in),convPs(nsample+burn_in),convP(nsample+burn_in) ! birth rates, vp change rates
     real convvp(nsample+burn_in),convvps(nsample+burn_in),convxis(nsample+burn_in),convxi(nsample+burn_in)
-    real convvs1(nsample+burn_in),convvs1s(nsample+burn_in),convvs2s(nsample+burn_in),convvs2s(nsample+burn_in)
+    real convvs1(nsample+burn_in),convvs1s(nsample+burn_in),convvs2(nsample+burn_in),convvs2s(nsample+burn_in)
     real convBas(nsample+burn_in),convBa(nsample+burn_in) ! anisotropic birth rates
     real convDs(nsample+burn_in),convD(nsample+burn_in),convDas(nsample+burn_in),convDa(nsample+burn_in)
 
@@ -126,7 +126,6 @@ include 'data_joint.h'
     real avxis_wide(disd),avvss_wide(disd),avvps_wide(disd)
     real postvp_wide(disd,disv),postvs_wide(disd,disv),postxi_wide(disd,disv)
     real postvp_wides(disd,disv),postvs_wides(disd,disv),postxi_wides(disd,disv) ! posteriors
-    real probani_wide(disd),probani_wides(disd) !anisotropy probabilities
     real d_cRmoy_wide(ndatadmax),d_cLmoy_wide(ndatadmax)
     real d_cRdelta_wide(ndatadmax),d_cLdelta_wide(ndatadmax) 
     real d_cRmoy_wides(ndatadmax),d_cLmoy_wides(ndatadmax)
@@ -1583,9 +1582,9 @@ include 'data_joint.h'
         call MPI_REDUCE(avvp_wide,avvps_wide,disd,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(avxi_wide,avxis_wide,disd,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(probani_wide,probanis_wide,disd,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-        call MPI_REDUCE(postvs_wide,postvss_wide,disd*disv,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-        call MPI_REDUCE(postxi_wide,postxis_wide,disd*disv,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-        call MPI_REDUCE(postvp_wide,postvps_wide,disd*disv,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(postvs_wide,postvs_wides,disd*disv,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(postxi_wide,postxi_wides,disd*disv,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(postvp_wide,postvp_wides,disd*disv,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
 
         do i=1,disd
             if (histochs(i)<0) write(*,*)'hiiiiiiiiiiiiiiiii'
@@ -1891,7 +1890,7 @@ include 'data_joint.h'
         
         open(45,file=dirname//'/NB_layers_wide.out',status='replace')
         do i=1,malay
-            write(45,*)histowides(i)
+            write(45,*)histo_wides(i)
         enddo
         close(45)
         
