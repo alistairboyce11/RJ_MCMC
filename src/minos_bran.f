@@ -156,8 +156,8 @@ c      real,intent(in):    r(Nmax),rho(Nmax),vpv(Nmax),vph(Nmax),vsv(Nmax),vsh(N
       common/eifx/vpv(mk),vph(mk),vsv(mk),vsh(mk),eta(mk),wrk(mk*10)
       common/rindx/nic,noc,nsl,nicp1,nocp1,nslp1,n
 c     ------ Al Edits ------ 
-      integer :: error_flag
-      error_flag = 0
+      logical :: error_flag
+      error_flag = .false.
 
       ifanis=ifanis2
       N=N2
@@ -193,7 +193,9 @@ c    +raylquo,wmin,wmax,lmin,lmax,nmin,nmax)
 c     ------ Al Edits ------ 
       call wtable(ifreq,nmodes_max,i_mode,n_mode,l_mode,c_ph,period,
      +raylquo,wmin,wmax,lmin,lmax,nmin,nmax,error_flag)
-
+c***  if (error_flag) then
+c***    print *,'minos_bran: POS: 001: error_flag:', error_flag
+c***  end if
       return
       end subroutine minos_bran
 
@@ -212,7 +214,7 @@ c*** makes up table of frequencies ***
       integer,dimension(nmodes_max),intent(out) :: n_mode,l_mode
       real,dimension(nmodes_max),intent(out) :: c_ph,period,raylquo
 c     ------ Al Edits ------ 
-      integer :: error_flag
+      logical :: error_flag
       common/bits/pi,rn,vn,wn,w,wsq,wray,qinv,cg,wgrav,tref,fct,eps,fl,
      +  fl1,fl2,fl3,sfl3,jcom,nord,l,kg,kount,knsw,ifanis,iback
       common/shanks/b(46),c(10),dx,step(8),stepf,maxo,in
@@ -220,7 +222,7 @@ c     ------ Al Edits ------
       dimension wt(2)
       data inss/5/
 c     ------ Al Edits ------ 
-      error_flag = 0
+      error_flag = .false.
 
       cmhz=pi/500.d0
       stepf=1.d0    
@@ -287,24 +289,24 @@ c***  print *, lmin, lmax, l !!! This is printing mode numbers set in RJ_MCMC.f
       sfl3=sqrt(fl3)
       we(1)=wt(1)
       we(2)=wt(2)
-c     print *,'wtable: POS: 001'
+c***  print *,'wtable: POS: 001'
 c***  if(wtry.ne.0.d0) print *,'wtable: POS: 008', wtry
       if(wtry.ne.0.d0) we(2)=wtry
       call detqn(we(1),ke(1),de(1),0)
-c     if(ke(1).gt.ndn) print *,'wtable: POS: 002'
+c***  if(ke(1).gt.ndn) print *,'wtable: POS: 002'
       if(ke(1).gt.ndn) goto 10
 c***  Al Check statement -- start --  
       if(we(2).lt.0) then
-c       print *,'wtable: CALL detqn: we(2).lt.0'
-c       print *, 'we(2),ke(2),de(2),0'
-c       print *, we(2),ke(2),de(2),0
+c***    print *,'wtable: CALL detqn: we(2).lt.0'
+c***    print *, 'we(2),ke(2),de(2),0'
+c***    print *, we(2),ke(2),de(2),0
 c       Comment next line        
 c       call detqn(we(2),ke(2),de(2),0)
-c       Uncomment next two lines.  specify error_flag further up somewhere.
-        error_flag = 1
+c       Uncomment next two lines.
+        error_flag = .true.
         return
       else
-        error_flag = 0
+        error_flag = .false.
         call detqn(we(2),ke(2),de(2),0)
       end if
 c     Al Check statement -- end --  
@@ -313,19 +315,20 @@ c     call detqn(we(2),ke(2),de(2),0)
       if(ke(2).lt.nup) then
          we(2)=wt(2)
          call detqn(we(2),ke(2),de(2),0)
-c        if(ke(2).lt.nup) print *,'wtable: POS: 003'
+c***    if(ke(2).lt.nup) print *,'wtable: POS: 003'
          if(ke(2).lt.nup) goto 50
       end if
-c     print *,'wtable: POS: 004'
+c***  print *,'wtable: POS: 004'
 c*** bracket this mode ***
       wx=0.5d0*(we(1)+we(2))
       ktry=0
-c  15 if(ke(1).eq.ndn.and.ke(2).eq.nup) print *,'wtable: POS: 005'
+c***  if(ke(1).eq.ndn.and.ke(2).eq.nup) print *,'wtable: POS: 005'
    15 if(ke(1).eq.ndn.and.ke(2).eq.nup) goto 40
       ktry=ktry+1
-c     if(ktry.gt.50) print *,'wtable: POS: 006'
+c***  if(ktry.gt.50) print *,'wtable: POS: 006'
       if(ktry.gt.50) goto 10
       call detqn(wx,kx,dx,0)
+c***  print *, 'kx = ',kx
       if(kx.le.ndn) then
         we(1)=wx
         ke(1)=kx
@@ -337,7 +340,7 @@ c     if(ktry.gt.50) print *,'wtable: POS: 006'
       end if
       wx=0.5d0*(we(1)+we(2))
       goto 15
-c     print *,'wtable: POS: 007'
+c*** print *,'wtable: POS: 007'
 
 c*** find roots ***
    40 knsw=0
@@ -345,14 +348,18 @@ c*** find roots ***
 c		added argument for number of times called (mhr)
 	  ncall = ncall + 1
       call rotspl(eps1,wt,ifreq,ncall,nmodes_max,i_mode,n_mode,l_mode,
-     &c_ph,period,raylquo)
+     &c_ph,period,raylquo,error_flag)
+      if (error_flag) then
+c***    print *,'wtable: POS: 008: error_flag:', error_flag
+        return
+      end if
    10 continue
    50 continue
       return
       end subroutine wtable
 
       subroutine rotspl(eps1,wt,ifreq,ncall,nmodes_max,i_mode,n_mode,
-     &l_mode,c_ph,period,raylquo)
+     &l_mode,c_ph,period,raylquo,error_flag)
 c*** find roots by spline interpolation ***
       implicit real*8(a-h,o-z)
       integer,intent(in) :: nmodes_max
@@ -364,9 +371,16 @@ c*** find roots by spline interpolation ***
       common/mtab/we(2),de(2),ke(2),wtry,bm
       dimension x(20),det(20),qx(3,20),wrk(60),wt(*),kchar(4)
       character*2 kchar
-      data tol/1.d-9/,itmax/15/,kchar/' s',' t',' s',' c'/
       
-            
+c     ------ Al Edits ------ 
+      integer :: count
+      logical :: error_flag
+      data tol/1.d-9/,itmax/15/,kchar/' s',' t',' s',' c'/
+c     ------ Al Edits ------ 
+      count = 1
+      error_flag = .false.
+
+c***  print *, "rotspl: POS: 001"
       if(de(1)*de(2).gt.0.d0) return
       nord=ke(2)
       if(l.eq.1) nord=nord+1
@@ -381,16 +395,20 @@ c*** find roots by spline interpolation ***
       b=x(1)-det(1)*grad
    15 t=dabs(b*eps1)
       if(dabs(b-c).lt.t) goto 65
+c***  print *, "rotspl: POS: 002: call detqn",b,knt,fb,0
       call detqn(b,knt,fb,0)
+c***  print *, "rotspl: POS: 003"
       ind=1
       do 20 m=2,ntry
       ind=ind+1
+c***  print *, "rotspl: POS: 004: b<x(m)", b, x(m)
    20 if(b.lt.x(m)) goto 25
    25 ntry=ntry+1
       j2=ntry
    30 j1=j2-1
       x(j2)=x(j1)
       det(j2)=det(j1)
+c***  print *, "rotspl: POS: 005: j1=ind", j1, ind
       if(j1.eq.ind) goto 35
       j2=j2-1
       goto 30
@@ -400,32 +418,52 @@ c*** find roots by spline interpolation ***
       do 40 m=2,ntry
       idn=idn+1
       iup=idn+1
+c***  print *, "rotspl: POS: 006"
    40 if(det(idn)*det(iup).le.0.d0) goto 45
    45 ind=iup
+c***  print *, "rotspl: POS: 007: dabs(det(idn)) < dabs(det(iup))"
       if(dabs(det(idn)).lt.dabs(det(iup))) ind=idn
       c=x(ind)
       if(ntry.ge.itmax) goto 60
+c***  print *, "rotspl: POS: 008: call dsplin"
       call dsplin(ntry,x,det,qx,wrk)
+c***  print *, "rotspl: POS: 009"
       del=-det(ind)/qx(1,ind)
    50 delx=-det(ind)/(qx(1,ind)+del*qx(2,ind))
+c***  print *, "rotspl: POS: 010: del", del
+c***  print *, "rotspl: POS: 011: tol, del*delx", tol, del*delx
+
       if(dabs(delx-del).lt.tol) goto 55
       if(del*delx.lt.0.d0) goto 60
       del=delx
+c***  print *, "rotspl: POS: 012: goto 50: count = ", count
+c***  print *, "- - - - - - - - - - - - - - - - - - - - - - - - -"
+      count = count + 1
+      if (count.gt.10000) then
+        error_flag = .true.
+        return
+      end if
       goto 50
    55 b=c+delx
+c***  print *, "rotspl: POS: 013"
       if(b.ge.x(idn).and.b.le.x(iup)) goto 15
    60 x(1)=x(idn)
+c***  print *, "rotspl: POS: 014"
       x(2)=x(iup)
       det(1)=det(idn)
       det(2)=det(iup)
+c***  print *, "rotspl: POS: 015"
       goto 10
+
 c*** write out frequencies ***
+c***  print *, "rotspl: POS: 016"
    65 call detqn(b,knt,fb,ifreq)
+c***  print *, "rotspl: POS: 017"
       tcom=2.d0*pi/b
       wmhz=1000.d0/tcom
       cvel=b*rn/(l+0.5)/1000.
       if(ifreq.eq.1) then
-c       print *, "rotspl: POS: 002"
+c***    print *, "rotspl: POS: 003"
         wdiff=(b-wray*wn)/b
         gcom=vn*cg/1000.d0
         qmod=0.d0
@@ -447,7 +485,7 @@ c  200   format(i5,a2,i5,6g16.7)
         raylquo(i_mode)=wdiff
         call modout(b,qmod,gcom,ncall)
       else
-c       print *, "rotspl: POS: 003"
+c***    print *, "rotspl: POS: 004"
         cg=5000./vn
 c*** we estimate group velocity using previous frequencies
         if(bm.ne.0.d0) cg=(b-bm)/wn
@@ -468,7 +506,7 @@ c        write(iout,200) nord,kchar(jcom),l,cvel,wmhz,tcom,gcom
         raylquo(i_mode)=0.
       end if
       wtry=b+2.d0*cg*wn
-c     print *, "rotspl: POS: 001", wtry, b, cg, wn
+c***  print *, "rotspl: POS: 005", wtry, b, cg, wn
       wt(1)=b
       bm=b
       return
@@ -690,16 +728,25 @@ c**** of the secular determinant as det and the count of zero crossings.
 c***  Al Check statement    
 c***  print *,'detqn:  POS: 001'
 c***  if(wdim.lt.0) then
+c***    print *, 'wdim -ve'
+c***    print *, 'wdim, knt, det, ifeif, wn, w'
+c***    print *, wdim,knt,det,ifeif,wn,w
+c***  else
+c***    print *, 'wdim +ve'
 c***    print *, 'wdim, knt, det, ifeif, wn, w'
 c***    print *, wdim,knt,det,ifeif,wn,w
 c***  end if
       if(tref.gt.0.d0) fct=2.d0*dlog(tref*wdim)/pi
+c***  print *, "jcom=",jcom
       goto (2,3,1,3),jcom
     1 if(wdim.le.wgrav) kg=1
+c***  print *,'detqn:  POS: 002: wdim,ls',wdim,ls
       nvefm=2+kg*3
       nvesm=5+kg*9
       call sdepth(wdim,ls)
+c***  print *,'detqn:  POS: 003: wdim,ls',wdim,ls
       if(ls.le.2) then
+c***    print *,'detqn:  POS: 004'
         r10=4.5d-4*(fl+.5d0)/wdim
         if(r10.lt.r(2)) then
           r(1)=r10
@@ -709,7 +756,8 @@ c***  end if
       end if
       if(ls.le.nic) then
 c*** propagate through inner core ***
-      call spsm(ls,nvesm,ass)
+c***    print *,'detqn:  POS: 005'
+        call spsm(ls,nvesm,ass)
         call sprpmn(ls,nic,ass,vf,nvesm,iexp)
         r(1)=0.d0
         g(1)=0.d0
@@ -717,6 +765,7 @@ c*** propagate through inner core ***
       end if
       if(ls.le.noc) then
 c*** propagate through outer core ***
+c***    print *,'detqn:  POS: 006'
         is=max(ls,nicp1)
         if(is.eq.ls) call fpsm(ls,nvefm,ass)
         call fprpmn(is,noc,ass,vf,nvefm,iexp)
@@ -725,14 +774,17 @@ c*** propagate through outer core ***
       is=max(ls,nocp1)
       if(is.eq.ls) call spsm(ls,nvesm,ass)
 c*** propagate through mantle ***
+c***  print *,'detqn:  POS: 007'
       call sprpmn(is,nsl,ass,vf,nvesm,iexp)
       if(nsl.eq.n) then
+c***    print *,'detqn:  POS: 008'
         dnorm=a(1,nsl)*a(1,nsl)
         do i=2,nvesm
           dnorm=dnorm+a(i,nsl)*a(i,nsl)
         enddo
         det=a(5,nsl)/sqrt(dnorm)
       else
+c***    print *,'detqn:  POS: 009'
         call sfbm(ass,kg,iback)
 c*** propagate through ocean ***
         call fprpmn(nslp1,n,ass,vf,nvefm,iexp)
@@ -743,6 +795,7 @@ c*** propagate through ocean ***
      +   a(4,n)**2+a(5,n)**2)
         end if
       end if
+c***  print *,'detqn:  POS: 010'
       if(ls.gt.noc) det=-det
       if(knsw.eq.1) then
         if(ls.gt.noc) kount=kount-2
@@ -751,6 +804,8 @@ c*** propagate through ocean ***
         if(irem.ne.0.and.det.gt.0.d0) kount=kount+1
         knt=kount
       end if
+c***  print *,'detqn:  POS: 011'
+c***  if(ifeif.eq.0) print *,'detqn:  POS: 012: returning'
       if(ifeif.eq.0) return
 c*** this does eigenfunction calculation for spheroidal modes ***
       iback=1
