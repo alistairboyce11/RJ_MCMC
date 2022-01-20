@@ -373,8 +373,9 @@ c*** find roots by spline interpolation ***
       character*2 kchar
       
 c     ------ Al Edits ------ 
-      integer :: count
+      integer :: count, count_max
       logical :: error_flag
+      parameter (count_max=2500000)
       data tol/1.d-9/,itmax/15/,kchar/' s',' t',' s',' c'/
 c     ------ Al Edits ------ 
       count = 1
@@ -439,7 +440,8 @@ c***  print *, "rotspl: POS: 011: tol, del*delx", tol, del*delx
 c***  print *, "rotspl: POS: 012: goto 50: count = ", count
 c***  print *, "- - - - - - - - - - - - - - - - - - - - - - - - -"
       count = count + 1
-      if (count.gt.10000) then
+      if (count.gt.count_max) then
+        print *, count
         error_flag = .true.
         return
       end if
