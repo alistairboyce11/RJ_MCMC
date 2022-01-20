@@ -1,4 +1,4 @@
-subroutine dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri,n,d_c,ndatad,ier,idis,imin_idis)
+subroutine dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri,n,d_c,rq,ndatad,ier,idis,imin_idis)
 
     implicit none
     include '../params.h'
@@ -7,7 +7,7 @@ subroutine dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri,n,
     real,dimension(nmodes_max),intent(in) :: period,c_ph,raylquo
     real,dimension(ndatadmax),intent(in) :: peri
     integer,dimension(ndatadmax),intent(in) :: n
-    real,dimension(ndatadmax),intent(out) :: d_c
+    real,dimension(ndatadmax),intent(out) :: d_c,rq
     integer :: j,i,imin,imin2
     real :: dmin,dmin_new
     logical,intent(out) :: ier,idis
@@ -34,11 +34,14 @@ subroutine dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri,n,
                 if (dmin_new>dmin) then
                     if (peri(j)<period(i-1)) then
                         d_c(j)=interp(period(i),period(i-1),c_ph(i),c_ph(i-1),peri(j))
+                        rq(j)=interp(period(i),period(i-1),raylquo(i),raylquo(i-1),peri(j))
                     else 
                         if ((i-2>0).and.(n(j)==n_mode(i-2))) then
                             d_c(j)=interp(period(i-2),period(i-1),c_ph(i-2),c_ph(i-1),peri(j))
+                            rq(j)=interp(period(i-2),period(i-1),raylquo(i-2),raylquo(i-1),peri(j))
                         else
                             d_c(j)=c_ph(i-1)
+                            rq(j)=raylquo(i-1)
                             if (dmin>maxdis) ier=.true.
                         endif
                     endif
@@ -48,12 +51,14 @@ subroutine dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri,n,
                 elseif (i==nmodes) then
                     if (peri(j)<period(i)) then
                         d_c(j)=c_ph(i)    
+                        rq(j)=raylquo(i)    
                         imin2=i
                         dmin=abs(peri(j)-period(i))
                         if (dmin>maxdis) ier=.true.
                         exit
                     else
                         d_c(j)=interp(period(i),period(i-1),c_ph(i),c_ph(i-1),peri(j))
+                        rq(j)=interp(period(i),period(i-1),raylquo(i),raylquo(i-1),peri(j))
                         imin2=i
                         exit
                     endif
@@ -63,8 +68,10 @@ subroutine dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri,n,
             elseif (n(j)<n_mode(i)) then
                 if ((i-2>0).and.(n(j)==n_mode(i-2)).and.(peri(j)>period(i-1))) then
                     d_c(j)=interp(period(i-2),period(i-1),c_ph(i-2),c_ph(i-1),peri(j))
+                    rq(j)=interp(period(i-2),period(i-1),raylquo(i-2),raylquo(i-1),peri(j))
                 else
                     d_c(j)=c_ph(i-1) 
+                    rq(j)=raylquo(i-1) 
                 endif                   
                 imin2=i
                 if (dmin>maxdis) ier=.true.
