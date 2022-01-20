@@ -197,7 +197,7 @@ include 'data_joint.h'
         
         ndatad_L=0
         j=0
-        do i=200,40,-10
+        do i=200,40,-5
             j=j+1
             peri_L(j)=real(i)
             d_obsdcLe(j)=0.01
@@ -299,11 +299,11 @@ include 'data_joint.h'
         !add errors
         
         do i=1,ndatad_R
-            d_obsdcR(i)=d_obsdcR(i)+gasdev(ra)*0.01
+            d_obsdcR(i)=d_obsdcR(i)+gasdev(ra)*0.1
         end do
         
         do i=1,ndatad_L
-            d_obsdcL(i)=d_obsdcL(i)+gasdev(ra)*0.01
+            d_obsdcL(i)=d_obsdcL(i)+gasdev(ra)*0.1
         end do
         
         ! write synthetic model into a file
@@ -332,9 +332,11 @@ include 'data_joint.h'
             npt=npt+1
         end do
         
-        do i=5,10
-            voro(i,2)=voro(i,2)+0.005
-        enddo
+        voro(5,2)=voro(5,2)+0.05
+        voro(6,2)=voro(6,2)-0.05
+!         do i=5,10
+!             voro(i,2)=voro(i,2)+0.05
+!         enddo
 !         voro(10,4)=0.3
 !         voro(11,4)=0.3
 !         voro(12,4)=0.3
@@ -383,11 +385,11 @@ include 'data_joint.h'
         !add errors
         
         do i=1,ndatad_R
-            d_obsdcR_alt(i,1)=d_obsdcR_alt(i,1)+gasdev(ra)*0.01
+            d_obsdcR_alt(i,1)=d_obsdcR_alt(i,1)+gasdev(ra)*0.1
         end do
         
         do i=1,ndatad_L
-            d_obsdcL_alt(i,1)=d_obsdcL_alt(i,1)+gasdev(ra)*0.01
+            d_obsdcL_alt(i,1)=d_obsdcL_alt(i,1)+gasdev(ra)*0.1
         end do
         
         open(65,file=dirname//'/true_model_1.out',status='replace')
@@ -414,9 +416,11 @@ include 'data_joint.h'
             npt=npt+1
         end do
         
-        do i=5,10
-            voro(i,2)=voro(i,2)-0.005
-        enddo
+        voro(5,2)=voro(5,2)-0.05
+        voro(6,2)=voro(6,2)+0.05
+!         do i=5,10
+!             voro(i,2)=voro(i,2)-0.05
+!         enddo
 !         voro(10,4)=0.3
 !         voro(11,4)=0.3
 !         voro(12,4)=0.3
@@ -465,11 +469,11 @@ include 'data_joint.h'
         !add errors
         
         do i=1,ndatad_R
-            d_obsdcR_alt(i,2)=d_obsdcR_alt(i,2)+gasdev(ra)*0.01
+            d_obsdcR_alt(i,2)=d_obsdcR_alt(i,2)+gasdev(ra)*0.1
         end do
         
         do i=1,ndatad_L
-            d_obsdcL_alt(i,2)=d_obsdcL_alt(i,2)+gasdev(ra)*0.01
+            d_obsdcL_alt(i,2)=d_obsdcL_alt(i,2)+gasdev(ra)*0.1
         end do
         
         numdis=2
@@ -785,6 +789,16 @@ include 'data_joint.h'
                 PrD=0
                 AcB=0
                 AcD=0
+            endif
+            
+            if ((Ac_vp/(Pr_vp+1))<0.01) then 
+                write(filenamemax,"('/stuck_',I3.3,'.out')") rank    
+                open(56,file=dirname//filenamemax,status='replace')
+                write(56,*) npt
+                do i=1,npt
+                    write(56,*)voromax(i,1),voromax(i,2),voromax(i,3),voromax(i,4)
+                enddo
+                close(56)
             endif
             
             !-----------------------------------------------
@@ -1253,7 +1267,7 @@ include 'data_joint.h'
         enddo
         if (npt_iso+npt_ani.ne.npt) stop "Error here"
         
-        IF ((mod(ount,display).EQ.0).and.(mod(ran,50).EQ.0)) THEN
+        IF ((mod(ount,display).EQ.0)) THEN
 
             write(*,*)'processor number',ran+1,'/',nbproc
             write(*,*)'widening step: preprocessing'
@@ -1461,6 +1475,16 @@ include 'data_joint.h'
                     PrD=0
                     AcB=0
                     AcD=0
+                endif
+                
+                if ((Ac_vp/(Pr_vp+1))<0.01) then 
+                    write(filenamemax,"('/stuck_',I3.3,'.out')") rank    
+                    open(56,file=dirname//filenamemax,status='replace')
+                    write(56,*) npt
+                    do i=1,npt
+                        write(56,*)voromax(i,1),voromax(i,2),voromax(i,3),voromax(i,4)
+                    enddo
+                    close(56)
                 endif
                 
                 !-----------------------------------------------
@@ -2003,7 +2027,7 @@ include 'data_joint.h'
                 endif
     
             endif
-            IF ((mod(ount,display).EQ.0).and.(mod(ran,50).EQ.0)) THEN
+            IF ((mod(ount,display).EQ.0).and.(mod(ran,10).EQ.0)) THEN
 
                 write(*,*)'processor number',ran+1,'/',nbproc
                 write(*,*)'widening step:',i_w,'/',n_w
@@ -2103,7 +2127,7 @@ include 'data_joint.h'
                     i_al=ceiling((alphaall(i,idis)-alphamax_props(idis)-logalpha_min)/(logalpha_max-logalpha_min)*num_logalpha)
                     if (i_al<logalpha_min) i_al=1
                     if (i_al>logalpha_max) i_al=num_logalpha
-                    alphahist(i,idis,i_w)=alphahist(i,idis,i_w)+1
+                    alphahist(i_al,idis,i_w)=alphahist(i_al,idis,i_w)+1
                 enddo
             enddo
             
