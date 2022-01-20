@@ -23,14 +23,14 @@ include 'params.h'
     !-----------------------------------------
 
 
-    character (len=*), parameter :: dirname = 'OUT_TEST' ! This is where output info files are saved and input data files are taken.
+    character (len=*), parameter :: dirname = 'OUT_FINDSTUCK' ! This is where output info files are saved and input data files are taken.
     character*8, parameter :: storename = 'STORFFC1'     ! This is where output models are saved
     integer, parameter :: burn_in = 90000 ! 9000! 55000 !Burn-in period
     integer, parameter :: nsample = 100000 ! 10000! 50000!Post burn-in
     integer, parameter :: thin = 50    !Thinning of the chain 
 
     integer, parameter :: Scratch = 1     ! 0: Start from Stored model 1: Start from scratch
-    integer, parameter :: store = 100    !Store models every "store" iteration. 
+    integer, parameter :: store = 1000    !Store models every "store" iteration. 
 
     ! Each chain is run for 'burn_in + nsample' steps in total. The first burn-in samples are discarded as burn-in steps, only after which the sampling algorithm is assumed to have converged. To eliminate dependent samples in the ensemble solution, every thin model visited in the second part is selected for the ensemble. The convergence of the algorithm is monitored with a number of indicators such as acceptance rates, and sampling efficiency is optimized by adjusting the variance of the Gaussian proposal functions 
 
@@ -153,7 +153,9 @@ include 'params.h'
 
     logical isoflag(malay),isoflag_prop(malay) ! is this layer isotropic?
     real d_cR(ndatadmax),d_cL(ndatadmax),d_cR_tmp(ndatadmax),d_cL_tmp(ndatadmax) ! phase velocity as simulated by forward modelling
+    real rq_R(ndatadmax),rq_L(ndatadmax) ! errors from modelling
     real d_cR_prop(ndatadmax),d_cL_prop(ndatadmax),d_cR_prop_tmp(ndatadmax),d_cL_prop_tmp(ndatadmax) ! phase velocity as simulated by forward modelling
+    real rq_R_prop(ndatadmax),rq_L_prop(ndatadmax)
     !for MPI
     integer ra,ran,rank, nbproc, ierror ,status(MPI_STATUS_SIZE),group_world,good_group,MPI_COMM_small,flag
     ! ierror: MPI-related error status, nbproc: MPI-related, number of processes, rank, group_world: MPI-related
@@ -305,42 +307,42 @@ include 'params.h'
         ndatad_R=0
         j=0
         ! careful: periods listed by decreasing period, increasing harmonic order
-        do i=360,40,-10 !synthetic periods, harmonics, uncertainties
+        do i=200,40,-5 !synthetic periods, harmonics, uncertainties
             j=j+1
             peri_R(j)=real(i)
             d_obsdcRe(j)=0.01
             n_R(j)=0
         end do
-        do i=240,40,-10
-            j=j+1
-            peri_R(j)=real(i)
-            d_obsdcRe(j)=0.01
-            n_R(j)=1
-        end do
-        do i=160,40,-10
-            j=j+1
-            peri_R(j)=real(i)
-            d_obsdcRe(j)=0.01
-            n_R(j)=2
-        end do
-        do i=90,40,-10
-            j=j+1
-            peri_R(j)=real(i)
-            d_obsdcRe(j)=0.01
-            n_R(j)=3
-        end do
-        do i=50,40,-5
-            j=j+1
-            peri_R(j)=real(i)
-            d_obsdcRe(j)=0.01
-            n_R(j)=4
-        end do
-        do i=50,40,-5
-            j=j+1
-            peri_R(j)=real(i)
-            d_obsdcRe(j)=0.01
-            n_R(j)=5
-        end do
+!         do i=240,40,-10
+!             j=j+1
+!             peri_R(j)=real(i)
+!             d_obsdcRe(j)=0.01
+!             n_R(j)=1
+!         end do
+!         do i=160,40,-10
+!             j=j+1
+!             peri_R(j)=real(i)
+!             d_obsdcRe(j)=0.01
+!             n_R(j)=2
+!         end do
+!         do i=90,40,-10
+!             j=j+1
+!             peri_R(j)=real(i)
+!             d_obsdcRe(j)=0.01
+!             n_R(j)=3
+!         end do
+!         do i=50,40,-5
+!             j=j+1
+!             peri_R(j)=real(i)
+!             d_obsdcRe(j)=0.01
+!             n_R(j)=4
+!         end do
+!         do i=50,40,-5
+!             j=j+1
+!             peri_R(j)=real(i)
+!             d_obsdcRe(j)=0.01
+!             n_R(j)=5
+!         end do
         ndatad_R=j
         wmin_R=1000./(maxval(peri_R(:ndatad_R))+20)
         wmax_R=1000./(minval(peri_R(:ndatad_R))-2)
@@ -349,42 +351,42 @@ include 'params.h'
         
         ndatad_L=0
         j=0
-        do i=360,40,-10
+        do i=200,40,-5
             j=j+1
             peri_L(j)=real(i)
             d_obsdcLe(j)=0.02
             n_L(j)=0
         end do
-        do i=240,40,-10
-            j=j+1
-            peri_L(j)=real(i)
-            d_obsdcLe(j)=0.02
-            n_L(j)=1
-        end do
-        do i=160,40,-10
-            j=j+1
-            peri_L(j)=real(i)
-            d_obsdcLe(j)=0.02
-            n_L(j)=2
-        end do
-        do i=90,40,-10
-            j=j+1
-            peri_L(j)=real(i)
-            d_obsdcLe(j)=0.02
-            n_L(j)=3
-        end do
-        do i=50,40,-5
-            j=j+1
-            peri_L(j)=real(i)
-            d_obsdcLe(j)=0.02
-            n_L(j)=4
-        end do
-        do i=50,40,-5
-            j=j+1
-            peri_L(j)=real(i)
-            d_obsdcLe(j)=0.02
-            n_L(j)=5
-        end do
+!         do i=240,40,-10
+!             j=j+1
+!             peri_L(j)=real(i)
+!             d_obsdcLe(j)=0.02
+!             n_L(j)=1
+!         end do
+!         do i=160,40,-10
+!             j=j+1
+!             peri_L(j)=real(i)
+!             d_obsdcLe(j)=0.02
+!             n_L(j)=2
+!         end do
+!         do i=90,40,-10
+!             j=j+1
+!             peri_L(j)=real(i)
+!             d_obsdcLe(j)=0.02
+!             n_L(j)=3
+!         end do
+!         do i=50,40,-5
+!             j=j+1
+!             peri_L(j)=real(i)
+!             d_obsdcLe(j)=0.02
+!             n_L(j)=4
+!         end do
+!         do i=50,40,-5
+!             j=j+1
+!             peri_L(j)=real(i)
+!             d_obsdcLe(j)=0.02
+!             n_L(j)=5
+!         end do
         ndatad_L=j
         wmin_L=1000./(maxval(peri_L(:ndatad_L))+20)
         wmax_L=1000./(minval(peri_L(:ndatad_L))-2)
@@ -397,11 +399,15 @@ include 'params.h'
         ! create synthetic model
         npt=0
 
-        do i=1,33
-            voro(i,1)=20*i !depth of interface
+        voro(1,1)=1 !depth of interface
+        voro(1,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
+        voro(1,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
+        voro(1,4)=0!0.3-0.5/33.*i !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in
+        do i=2,11
+            voro(i,1)=30*(i-1) !depth of interface
             voro(i,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
-            voro(i,3)=0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
-            voro(i,4)=0.3-0.5/33.*i !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in params.h
+            voro(i,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
+            voro(i,4)=0!0.3-0.5/33.*i !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in params.h
             npt=npt+1
         end do
         
@@ -417,7 +423,7 @@ include 'params.h'
                 qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_R,wmax_R,nmin_R,nmax_R,&
                 nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
             if (error_flag) stop "INVALID INITIAL MODEL - RAYLEIGH - minos_bran.f FAIL 001"
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,ndatad_R,ier) ! extract phase velocities from minos output (pretty ugly)
+            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,rq_R,ndatad_R,ier) ! extract phase velocities from minos output (pretty ugly)
             if (ier) stop "INVALID INITIAL MODEL - RAYLEIGH - CHANGE PERIODS or MODEL"
         endif
         
@@ -428,7 +434,7 @@ include 'params.h'
                 qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_L,wmax_L,nmin_L,nmax_L,&
                 nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
             if (error_flag) stop "INVALID INITIAL MODEL - LOVE - minos_bran.f FAIL 002"
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,ndatad_L,ier)
+            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,rq_R,ndatad_L,ier)
             if (ier) stop "INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
         endif
 
@@ -556,7 +562,7 @@ include 'params.h'
             else
                 write(*,*)"Minos_bran SUCCESS for RAYLEIGH"
             end if
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,ndatad_R,ier)
+            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,rq_R,ndatad_R,ier)
             write(*,*)"dispersion_minos for RAYLEIGH"
             if (ier) tes=.false.
         endif
@@ -576,7 +582,7 @@ include 'params.h'
             else
                 write(*,*)"Minos_bran SUCCESS for LOVE"
             end if
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,ndatad_L,ier)
+            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,rq_R,ndatad_L,ier)
             write(*,*)"dispersion_minos for LOVE"
 
             if (ier) tes=.false.
@@ -1049,7 +1055,7 @@ include 'params.h'
                     goto 1142
                 endif
                 
-                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR_prop,&
+                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR_prop,rq_R_prop,&
                 ndatad_R,ier)
                 if (ier) then 
                     out=0
@@ -1074,7 +1080,7 @@ include 'params.h'
                     goto 1142
                 endif
                 
-                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL_prop,&
+                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL_prop,rq_L_prop,&
                 ndatad_L,ier)
                 
                 if (ier) then 
@@ -1373,35 +1379,38 @@ include 'params.h'
 
 
 
-            IF ((mod(ount,display).EQ.0) THEN ! .and.(mod(ran,50).EQ.0)) THEN
-
-                write(*,*)'processor number',ran+1,'/',nbproc
-                write(*,*)'sample:',ount,'/',burn_in+nsample
-                write(*,*)'number of cells:',npt
-                write(*,*)'Ad_R',Ad_R,'Ad_L',Ad_L
-                write(*,*)'Acceptance rates'
-                write(*,*)'AR_move',100*AcP(1)/PrP(1),100*AcP(2)/PrP(2)
-                write(*,*)'AR_value',100*AcV(1)/PrV(1),100*AcV(2)/PrV(2)
-                write(*,*)'AR_Birth',100*AcB/PrB,'AR_Death',100*AcD/PrD,'sigmav',sigmav
-                write(*,*)'AR_Birtha',100*AcBa/PrBa,'AR_Deatha',100*AcDa/PrDa
-                write(*,*)'AR_xi',100*Acxi/Prxi,'pxi',pxi
-                write(*,*)'AR_vp',100*Ac_vp/Pr_vp,'p_vp',p_vp
-                write(*,*)'AR_Ad_R',100*Acnd_R/Prnd_R,'pAd_R',pAd_R
-                write(*,*)'AR_Ad_L',100*Acnd_L/Prnd_L,'pAd_L',pAd_L
-                write(*,*)'npt_iso',npt_iso,'npt_ani',npt_ani
-                write(*,*)'recalculated',recalculated
-                !write(*,*)Ar_birth_old,sigmav_old,sigmav
-                write(*,*)'-----------------------------------------'
-                write(*,*)
-                write(*,*)
-                
-                recalculated=0
-                
-            END IF
+            
 
         !write(*,*)ount
 
         endif
+        
+        IF ((mod(ount,display).EQ.0)) THEN ! .and.(mod(ran,50).EQ.0)) THEN
+
+            write(*,*)'processor number',ran+1,'/',nbproc
+            write(*,*)'sample:',ount,'/',burn_in+nsample
+            write(*,*)'number of cells:',npt
+            write(*,*)'Ad_R',Ad_R,'Ad_L',Ad_L
+            write(*,*)'Acceptance rates'
+            write(*,*)'AR_move',100*AcP(1)/PrP(1),100*AcP(2)/PrP(2)
+            write(*,*)'AR_value',100*AcV(1)/PrV(1),100*AcV(2)/PrV(2)
+            write(*,*)'AR_Birth',100*AcB/PrB,'AR_Death',100*AcD/PrD,'sigmav',sigmav
+            write(*,*)'AR_Birtha',100*AcBa/PrBa,'AR_Deatha',100*AcDa/PrDa
+            write(*,*)'AR_xi',100*Acxi/Prxi,'pxi',pxi
+            write(*,*)'AR_vp',100*Ac_vp/Pr_vp,'p_vp',p_vp
+            write(*,*)'AR_Ad_R',100*Acnd_R/Prnd_R,'pAd_R',pAd_R
+            write(*,*)'AR_Ad_L',100*Acnd_L/Prnd_L,'pAd_L',pAd_L
+            write(*,*)'npt_iso',npt_iso,'npt_ani',npt_ani
+            write(*,*)'recalculated',recalculated
+            !write(*,*)Ar_birth_old,sigmav_old,sigmav
+            write(*,*)'-----------------------------------------'
+            write(*,*)
+            write(*,*)
+            
+            recalculated=0
+            
+        END IF
+        
     end do !End Markov chain
     
     ! best fitting model

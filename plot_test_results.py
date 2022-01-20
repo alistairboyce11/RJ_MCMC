@@ -1,4 +1,4 @@
- #!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 ###################################### RUN IMPORTS ############################
@@ -58,7 +58,7 @@ if Layer_Hist:
     plt.xlabel('Number of layers')
     plt.ylabel('Frequency')
     
-    plt.show()
+    # plt.show()
     plt.savefig(directory+'/PLOTS/'+'Layer_hist.pdf')
     plt.close()
 
@@ -91,7 +91,7 @@ if Layers_Aniso_Tr:
     plt.pcolor(l)
     plt.colorbar()
     plt.plot([0, nlay], [0, nlay], '--r', linewidth=1)
-    plt.show()
+    # plt.show()
     plt.savefig(directory+'/PLOTS/'+'Layers_Aniso_Tr.pdf')
     plt.close()
 
@@ -160,8 +160,8 @@ if Posterior:
     ax0.set_ylabel('Depth (km)',fontsize=10)
     ax2.set_xlabel(r'Vp, (km/s)',fontsize=10)
     ax2.set_title('P-wave velocity')
-    ax1.pcolormesh(xis,depths,xid,cmap='viridis')
-    ax0.pcolormesh(vsvs,depths,vsvd,cmap='viridis')
+    ax1.pcolormesh(xis,depths,xid,cmap='magma_r')
+    ax0.pcolormesh(vsvs,depths,vsvd,cmap='magma_r')
 
     # true model overlaid on the posterior (only for synthetic tests)
     file=open(directory+'/'+'true_model.out','r')
@@ -190,7 +190,7 @@ if Posterior:
     except:
         pass
 
-    ax2.pcolormesh(vps,depths,vpd,cmap='viridis')
+    ax2.pcolormesh(vps,depths,vpd,cmap='magma_r')
     plt.setp(ax2.get_yticklabels(), visible=False)
 
 
@@ -240,7 +240,7 @@ if Posterior:
 
     fig.suptitle('Posterior and Averages')
 
-    plt.show()
+    # plt.show()
     plt.savefig(directory+'/PLOTS/'+'Posterior.pdf')
     plt.close()
 
@@ -296,7 +296,7 @@ if Sigmad:
     plt.xlabel('Love uncertainty parameter')
     plt.ylabel('Frequency')
     plt.plot(d,sigmad_L)
-    plt.show()
+    # plt.show()
     plt.savefig(directory+'/PLOTS/'+'Sigmad_L.pdf')
     plt.close()
 
@@ -333,7 +333,7 @@ if Convergence:
     plt.xlabel('Iteration number')
     plt.ylabel('Misfit')
     plt.legend()
-    plt.show()
+    # plt.show()
     plt.savefig(directory+'/PLOTS/'+'Convergence_misfit.pdf')
     plt.close()
     
@@ -360,7 +360,7 @@ if Convergence:
     plt.ylabel('Number of Layers')
     plt.xlim([0,nsample])
     plt.legend()
-    plt.show()
+    # plt.show()
     plt.savefig(directory+'/PLOTS/'+'Convergence_layers.pdf')
     plt.close()
 
@@ -388,7 +388,7 @@ if Convergence:
     plt.ylabel('XXX')
     plt.xlim([0,nsample])
     plt.legend()
-    plt.show()
+    # plt.show()
     plt.savefig(directory+'/PLOTS/'+'Convergence_sigma_R.pdf')
     plt.close()
 
@@ -415,7 +415,7 @@ if Convergence:
     plt.ylabel('XXX')
     plt.xlim([0,nsample])
     plt.legend()
-    plt.show()
+    # plt.show()
     plt.savefig(directory+'/PLOTS/'+'Convergence_sigma_L.pdf')
     plt.close()
 
@@ -448,7 +448,7 @@ if Convergence:
     plt.ylabel('XXX')
     plt.xlim([0,nsample])
     plt.legend()
-    plt.show()
+    # plt.show()
     plt.savefig(directory+'/PLOTS/'+'Convergence_Birth.pdf')
     plt.close()
 
@@ -481,7 +481,7 @@ if Convergence:
     plt.ylabel('XXX')
     plt.xlim([0,nsample])
     plt.legend()
-    plt.show()
+    # plt.show()
     plt.savefig(directory+'/PLOTS/'+'Convergence_Death.pdf')
     plt.close()
 
@@ -508,7 +508,7 @@ if Convergence:
     plt.ylabel('XXX')
     plt.xlim([0,nsample])
     plt.legend()
-    plt.show()
+    # plt.show()
     plt.savefig(directory+'/PLOTS/'+'Convergence_xi.pdf')
     plt.close()
 
@@ -535,7 +535,7 @@ if Convergence:
     plt.ylabel('XXX')
     plt.xlim([0,nsample])
     plt.legend()
-    plt.show()
+    # plt.show()
     plt.savefig(directory+'/PLOTS/'+'Convergence_vp.pdf')
     plt.close()
     
@@ -562,7 +562,7 @@ if Convergence:
     plt.ylabel('XXX')
     plt.xlim([0,nsample])
     plt.legend()
-    plt.show()
+    # plt.show()
     plt.savefig(directory+'/PLOTS/'+'Convergence_vs1.pdf')
     plt.close()
     
@@ -589,8 +589,62 @@ if Convergence:
     plt.ylabel('XXX')
     plt.xlim([0,nsample])
     plt.legend()
-    plt.show()
+    # plt.show()
     plt.savefig(directory+'/PLOTS/'+'Convergence_vs2.pdf')
+    plt.close()
+    
+    ################ acceptance rates for change in depth (upper half) over time, for one core and average over all cores ###############
+    file=open(directory+'/'+'Convergence_dp1.out','r')
+    lines=file.readlines()
+    file.close()
+
+    burn_in=int(lines[0].split()[0])
+    nsample=int(lines[0].split()[1])
+
+    condp1_one=[]
+    condp1=[]
+    for line in lines[1:]:
+        data=line.split()
+        condp1_one.append(float(data[0]))
+        condp1.append(float(data[1]))
+
+    plt.figure('convergence_dp1')
+    plt.title('Depth Change Rate Convergence, upper half')
+    plt.plot(condp1_one[burn_in:],label='depth change upper half, one core')
+    plt.plot(condp1[burn_in:],label='depth change upper half, all cores')
+    plt.xlabel('Iteration number')
+    plt.ylabel('XXX')
+    plt.xlim([0,nsample])
+    plt.legend()
+    # plt.show()
+    plt.savefig(directory+'/PLOTS/'+'Convergence_dp1.pdf')
+    plt.close()
+    
+    ################ acceptance rates for change in depth (lower half) over time, for one core and average over all cores ###############
+    file=open(directory+'/'+'Convergence_dp2.out','r')
+    lines=file.readlines()
+    file.close()
+
+    burn_in=int(lines[0].split()[0])
+    nsample=int(lines[0].split()[1])
+
+    condp2_one=[]
+    condp2=[]
+    for line in lines[1:]:
+        data=line.split()
+        condp2_one.append(float(data[0]))
+        condp2.append(float(data[1]))
+
+    plt.figure('convergence_dp2')
+    plt.title('Depth Change Rate Convergence, lower half')
+    plt.plot(condp2_one[burn_in:],label='depth change lower half, one core')
+    plt.plot(condp2[burn_in:],label='depth change lower half, all cores')
+    plt.xlabel('Iteration number')
+    plt.ylabel('XXX')
+    plt.xlim([0,nsample])
+    plt.legend()
+    # plt.show()
+    plt.savefig(directory+'/PLOTS/'+'Convergence_dp2.pdf')
     plt.close()
 
 ################################# Average dispersion curves ################################################
@@ -689,7 +743,7 @@ if Dispersion:
 
     plt.xlim([np.min(period_R+period_L),np.max(period_R+period_L)])
 
-    plt.show()
+    # plt.show()
     plt.savefig(directory+'/PLOTS/'+'Dispersion.pdf')
     plt.close()
 
