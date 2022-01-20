@@ -441,7 +441,7 @@ c***  print *, "rotspl: POS: 012: goto 50: count = ", count
 c***  print *, "- - - - - - - - - - - - - - - - - - - - - - - - -"
       count = count + 1
       if (count.gt.count_max) then
-        print *, count
+c***    print *, count
         error_flag = .true.
         return
       end if
