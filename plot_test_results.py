@@ -18,12 +18,12 @@ print('Arguments:      ',sys.argv)
 print('Options [1] :     RJ_MCMC_Tests/XYZ_test/OUT_TEST')
 # python plot_test_results.py ./OUT_TEST2
 
-#num_args=len(sys.argv)
-#if num_args < 2:
-#    print('Number of arguments (' + str(num_args) +') too low... exit')
-#    exit('exiting....')
+num_args=len(sys.argv)
+if num_args < 2:
+   print('Number of arguments (' + str(num_args) +') too low... exit')
+   exit('exiting....')
     
-directory = 'OUT_REF'#str(sys.argv[1])
+directory = str(sys.argv[1])
 print('Plotting results for: ' +str(directory))
 
 
