@@ -1393,7 +1393,7 @@ include 'params.h'
     write(filenamemax,"('/bestmodel_',I3.3,'.out')") rank    
     open(56,file=dirname//filenamemax,status='replace')
     write(56,*) nptmax,likemax
-    do i=1,npt
+    do i=1,nptmax
         write(56,*)voromax(i,1),voromax(i,2),voromax(i,3),voromax(i,4)
     enddo
     close(56)
