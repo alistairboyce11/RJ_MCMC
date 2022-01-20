@@ -66,6 +66,7 @@ include 'data_joint.h'
     real convBs(nsample+burn_in),convB(nsample+burn_in),convPs(nsample+burn_in),convP(nsample+burn_in) ! birth rates, vp change rates
     real convvp(nsample+burn_in),convvps(nsample+burn_in),convxis(nsample+burn_in),convxi(nsample+burn_in)
     real convvs1(nsample+burn_in),convvs1s(nsample+burn_in),convvs2(nsample+burn_in),convvs2s(nsample+burn_in)
+    real convdp1(nsample+burn_in),convdp1s(nsample+burn_in),convdp2(nsample+burn_in),convdp2s(nsample+burn_in)
     real convBas(nsample+burn_in),convBa(nsample+burn_in) ! anisotropic birth rates
     real convDs(nsample+burn_in),convD(nsample+burn_in),convDas(nsample+burn_in),convDa(nsample+burn_in)
 
@@ -315,6 +316,14 @@ include 'data_joint.h'
     convBas=0
     convD=0
     convDs=0
+    convvs1=0
+    convvs1s=0
+    convvs2=0
+    convvs2s=0
+    convdp1=0
+    convdp1s=0
+    convdp2=0
+    convdp2s=0
     convDa=0
     convDas=0
     convP=0
@@ -618,6 +627,16 @@ include 'data_joint.h'
                 PrD=0
                 AcB=0
                 AcD=0
+            endif
+            
+            if ((Ac_vp/(Pr_vp+1))<0.01) then 
+                write(filenamemax,"('/stuck_',I3.3,'.out')") rank    
+                open(56,file=dirname//filenamemax,status='replace')
+                write(56,*) npt
+                do i=1,npt
+                    write(56,*)voromax(i,1),voromax(i,2),voromax(i,3),voromax(i,4)
+                enddo
+                close(56)
             endif
             
             !-----------------------------------------------
@@ -1195,13 +1214,19 @@ include 'data_joint.h'
                 
                 alpha=exp(logalpha)
                 alphasum=alphasum+alpha
-                histo_alt(npt,:)=histo_alt(npt,:)+alpha
+                do idis=1,numdis
+                    histo_alt(npt,idis)=histo_alt(npt,idis)+alpha(idis)
                 
                 ! average dispersion curve and variance
                 d_cRmoy=d_cRmoy+d_cR*alpharef
                 d_cLmoy=d_cLmoy+d_cL*alpharef
                 d_cRdelta=d_cRdelta+(d_cR**2)*alpharef
                 d_cLdelta=d_cLdelta+(d_cL**2)*alpharef
+                
+                d_cRmoy_wide=d_cRmoy_wide+d_cR
+                d_cLmoy_wide=d_cLmoy_wide+d_cL
+                d_cRdelta_wide=d_cRdelta_wide+(d_cR**2)
+                d_cLdelta_wide=d_cLdelta_wide+(d_cL**2)
                 
                 do idis=1,numdis
                     d_cRmoy_alt(:,idis)=d_cRmoy_alt(:,idis)+d_cR*alpha(idis)
@@ -1368,6 +1393,8 @@ include 'data_joint.h'
             convvp(ount)=100*Ac_vp/Pr_vp
             convvs1(ount)=100*Acv(1)/Prv(1)
             convvs2(ount)=100*Acv(2)/Prv(2)
+            convdp1(ount)=100*Acp(1)/Prp(1)
+            convdp2(ount)=100*Acp(2)/Prp(2)
             convxi(ount)=100*Acxi/Prxi
             convd_R(ount)=lsd_R
             convd_L(ount)=lsd_L
@@ -1388,7 +1415,7 @@ include 'data_joint.h'
             !**********************************************************************
 
         endif
-        IF ((mod(ount,display).EQ.0).and.(mod(ran,50).EQ.0)) THEN
+        IF ((mod(ount,display).EQ.0).and.(mod(ran,10).EQ.0)) THEN
 
             write(*,*)'processor number',ran+1,'/',nbproc
             write(*,*)'sample:',ount,'/',burn_in+nsample
@@ -1524,6 +1551,8 @@ include 'data_joint.h'
         call MPI_REDUCE(convvp,convvps,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(convvs1,convvs1s,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(convvs2,convvs2s,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(convdp1,convdp1s,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(convdp2,convdp2s,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(convxi,convxis,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(histoch,histochs,disd,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(histoch_alt,histoch_alts,disd*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
@@ -1615,6 +1644,8 @@ include 'data_joint.h'
         convvps=convvps/j
         convvs1s=convvs1s/j
         convvs2s=convvs2s/j
+        convdp1s=convdp1s/j
+        convdp2s=convdp2s/j
         convxis=convxis/j
  
         probanis=probanis/j
@@ -1635,9 +1666,9 @@ include 'data_joint.h'
         avvps_wide=avvps_wide/j
         avxis_wide=avxis_wide/j
         
-        avvss_wide=avvss_wide/j
-        avvps_wide=avvps_wide/j
-        avxis_wide=avxis_wide/j
+        avvss_alt=avvss_alt/j
+        avvps_alt=avvps_alt/j
+        avxis_alt=avxis_alt/j
 
     endif
     
@@ -1654,6 +1685,21 @@ include 'data_joint.h'
         do i=1,disd
             d=d_min+(i-0.5)*prof/real(disd)
             write(65,*)d,histochs(i)
+        enddo
+        close(65)
+        
+        open(65,file=dirname//'/Change_points_wide.out',status='replace')
+        do i=1,disd
+            d=d_min+(i-0.5)*prof/real(disd)
+            write(65,*)d,histoch_wides(i)
+        enddo
+        close(65)
+        
+        open(65,file=dirname//'/Change_points_alt.out',status='replace')
+        write(65,*)numdis
+        do i=1,disd
+            d=d_min+(i-0.5)*prof/real(disd)
+            write(65,*)d,histoch_alts(i,:)
         enddo
         close(65)
 
@@ -1883,19 +1929,21 @@ include 'data_joint.h'
 
 
         open(45,file=dirname//'/NB_layers.out',status='replace')
+        write(45,*)malay
         do i=1,malay
             write(45,*)histos(i)
         enddo
         close(45)
         
         open(45,file=dirname//'/NB_layers_wide.out',status='replace')
+        write(45,*)malay
         do i=1,malay
             write(45,*)histo_wides(i)
         enddo
         close(45)
         
         open(45,file=dirname//'/NB_layers_alt.out',status='replace')
-        write(45,*)numdis
+        write(45,*)malay,numdis
         do i=1,malay
             write(45,*)histo_alts(i,:numdis)
         enddo
@@ -1933,6 +1981,20 @@ include 'data_joint.h'
         write(54,*)burn_in,nsample,burn_in,nsample
         do i=1,nsample+burn_in
             write(54,*)convvs2(i),convvs2s(i)
+        enddo
+        close(54)
+        
+        open(54,file=dirname//'/Convergence_dp1.out',status='replace')
+        write(54,*)burn_in,nsample,burn_in,nsample
+        do i=1,nsample+burn_in
+            write(54,*)convdp1(i),convdp1s(i)
+        enddo
+        close(54)
+        
+        open(54,file=dirname//'/Convergence_dp2.out',status='replace')
+        write(54,*)burn_in,nsample,burn_in,nsample
+        do i=1,nsample+burn_in
+            write(54,*)convdp2(i),convdp2s(i)
         enddo
         close(54)
         
