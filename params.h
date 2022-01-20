@@ -65,3 +65,7 @@
 ! maximum distance between mode and period
        real maxdis
        parameter (maxdis=30.)
+
+! max acceptable raylquo
+        real maxrq
+        parameter (maxrq=10.)
