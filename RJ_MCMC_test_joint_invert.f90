@@ -72,7 +72,9 @@ include 'data_joint.h'
 
     logical isoflag(malay),isoflag_prop(malay) ! is this layer isotropic?
     real d_cR(ndatadmax),d_cL(ndatadmax),d_cR_tmp(ndatadmax),d_cL_tmp(ndatadmax) ! phase velocity as simulated by forward modelling
+    real rq_R(ndatadmax),rq_L(ndatadmax) ! errors from modelling
     real d_cR_prop(ndatadmax),d_cL_prop(ndatadmax),d_cR_prop_tmp(ndatadmax),d_cL_prop_tmp(ndatadmax) ! phase velocity as simulated by forward modelling
+    real rq_R_prop(ndatadmax),rq_L_prop(ndatadmax)
     !for MPI
     integer ra,ran,rank, nbproc, ierror ,status(MPI_STATUS_SIZE),group_world,good_group,MPI_COMM_small,flag
     ! ierror: MPI-related error status, nbproc: MPI-related, number of processes, rank, group_world: MPI-related
@@ -462,7 +464,7 @@ include 'data_joint.h'
             if (error_flag) then
                 tes=.false.
             end if
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,ndatad_R,ier)
+            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,rq_R,ndatad_R,ier)
             if (ier) tes=.false.
         endif
         
@@ -477,7 +479,7 @@ include 'data_joint.h'
             if (error_flag) then
                 tes=.false.
             end if
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,ndatad_L,ier)
+            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,rq_L,ndatad_L,ier)
             
             if (ier) tes=.false.
         endif
@@ -967,7 +969,7 @@ include 'data_joint.h'
                     goto 1142
                 endif
                 
-                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR_prop,&
+                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR_prop,rq_R_prop,&
                 ndatad_R,ier)
                 if (ier) then 
                     out=0
@@ -988,7 +990,7 @@ include 'data_joint.h'
                     out=0
                     goto 1142
                 endif
-                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL_prop,&
+                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL_prop,rq_L_prop,&
                 ndatad_L,ier)
                 
                 if (ier) then 
