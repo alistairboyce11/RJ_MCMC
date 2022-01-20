@@ -56,7 +56,9 @@ include 'data_joint.h'
 
     logical isoflag(malay),isoflag_prop(malay) ! is this layer isotropic?
     real d_cR(ndatadmax),d_cL(ndatadmax),d_cR_tmp(ndatadmax),d_cL_tmp(ndatadmax) ! phase velocity as simulated by forward modelling
+    real rq_R(ndatadmax),rq_L(ndatadmax) ! errors from modelling
     real d_cR_prop(ndatadmax),d_cL_prop(ndatadmax),d_cR_prop_tmp(ndatadmax),d_cL_prop_tmp(ndatadmax) ! phase velocity as simulated by forward modelling
+    real rq_R_prop(ndatadmax),rq_L_prop(ndatadmax)
     !for MPI
     integer ra,ran,rank, nbproc, ierror ,status(MPI_STATUS_SIZE),group_world,good_group,MPI_COMM_small,flag
     ! ierror: MPI-related error status, nbproc: MPI-related, number of processes, rank, group_world: MPI-related
@@ -190,7 +192,7 @@ include 'data_joint.h'
 !             n_R(j)=4
 !         end do
         ndatad_R=j
-        wmin_R=1000./(maxval(peri_R(:ndatad_R))+10)
+        wmin_R=1000./(maxval(peri_R(:ndatad_R))+20)
         wmax_R=1000./(minval(peri_R(:ndatad_R))-2)
         nmin_R=minval(n_R(:ndatad_R))
         nmax_R=maxval(n_R(:ndatad_R))
@@ -228,7 +230,7 @@ include 'data_joint.h'
 !             n_L(j)=4
 !         end do
         ndatad_L=j
-        wmin_L=1000./(maxval(peri_L(:ndatad_L))+10)
+        wmin_L=1000./(maxval(peri_L(:ndatad_L))+20)
         wmax_L=1000./(minval(peri_L(:ndatad_L))-2)
         nmin_L=minval(n_L(:ndatad_L))
         nmax_L=maxval(n_L(:ndatad_L))
@@ -277,7 +279,7 @@ include 'data_joint.h'
                 qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_R,wmax_R,nmin_R,nmax_R,&
                 nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
             if (error_flag) stop "INVALID INITIAL MODEL - RAYLEIGH - minos_bran.f FAIL 001"
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,ndatad_R,ier) ! extract phase velocities from minos output (pretty ugly)
+            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,rq_R,ndatad_R,ier) ! extract phase velocities from minos output (pretty ugly)
             if (ier) stop "INVALID INITIAL MODEL - RAYLEIGH - CHANGE PERIODS or MODEL"
         endif
         
@@ -289,7 +291,7 @@ include 'data_joint.h'
                 qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_L,wmax_L,nmin_L,nmax_L,&
                 nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
             if (error_flag) stop "INVALID INITIAL MODEL - LOVE - minos_bran.f FAIL 002"
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,ndatad_L,ier)
+            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,rq_L,ndatad_L,ier)
             if (ier) stop "INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
         endif
 
@@ -363,7 +365,7 @@ include 'data_joint.h'
                 qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_R,wmax_R,nmin_R,nmax_R,&
                 nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
             if (error_flag) stop "INVALID INITIAL MODEL - RAYLEIGH - minos_bran.f FAIL 001-1"
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,ndatad_R,ier) ! extract phase velocities from minos output (pretty ugly)
+            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,rq_R,ndatad_R,ier) ! extract phase velocities from minos output (pretty ugly)
             if (ier) stop "INVALID INITIAL MODEL - RAYLEIGH - CHANGE PERIODS or MODEL"
         endif
         
@@ -375,7 +377,7 @@ include 'data_joint.h'
                 qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_L,wmax_L,nmin_L,nmax_L,&
                 nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
             if (error_flag) stop "INVALID INITIAL MODEL - LOVE - minos_bran.f FAIL 002-1"
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,ndatad_L,ier)
+            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,rq_L,ndatad_L,ier)
             if (ier) stop "INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
         endif
 
@@ -447,7 +449,7 @@ include 'data_joint.h'
                 qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_R,wmax_R,nmin_R,nmax_R,&
                 nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
             if (error_flag) stop "INVALID INITIAL MODEL - RAYLEIGH - minos_bran.f FAIL 001-2"
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,ndatad_R,ier) ! extract phase velocities from minos output (pretty ugly)
+            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,rq_R,ndatad_R,ier) ! extract phase velocities from minos output (pretty ugly)
             if (ier) stop "INVALID INITIAL MODEL - RAYLEIGH - CHANGE PERIODS or MODEL"
         endif
         
@@ -459,7 +461,7 @@ include 'data_joint.h'
                 qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_L,wmax_L,nmin_L,nmax_L,&
                 nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
             if (error_flag) stop "INVALID INITIAL MODEL - LOVE - minos_bran.f FAIL 002-2"
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,ndatad_L,ier)
+            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,rq_L,ndatad_L,ier)
             if (ier) stop "INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
         endif
 
@@ -640,7 +642,7 @@ include 'data_joint.h'
                 tes=.false.
                 write(*,*)"Minos_bran FAILED for RAYLEIGH 003"
             end if
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,ndatad_R,ier)
+            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,rq_R,ndatad_R,ier)
             if (ier) tes=.false.
         endif
         
@@ -655,7 +657,7 @@ include 'data_joint.h'
             if (error_flag) then
                 tes=.false.
             endif
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,ndatad_L,ier)
+            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,rq_L,ndatad_L,ier)
             
             if (ier) tes=.false.
         endif
@@ -1121,7 +1123,7 @@ include 'data_joint.h'
                     out=0
                     goto 142
                 endif
-                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR_prop,&
+                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR_prop,rq_R_prop,&
                 ndatad_R,ier)
                 if (ier) then 
                     out=0
@@ -1143,7 +1145,7 @@ include 'data_joint.h'
                     out=0
                     goto 142
                 endif
-                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL_prop,&
+                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL_prop,rq_L_prop,&
                 ndatad_L,ier)
                 
                 if (ier) then 
@@ -1331,7 +1333,7 @@ include 'data_joint.h'
                 tes=.false.
                 write(*,*)"Minos_bran FAILED for RAYLEIGH 003"
             end if
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,ndatad_R,ier)
+            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,rq_R,ndatad_R,ier)
             if (ier) tes=.false.
         endif
         
@@ -1346,7 +1348,7 @@ include 'data_joint.h'
             if (error_flag) then
                 tes=.false.
             endif
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,ndatad_L,ier)
+            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,rq_L,ndatad_L,ier)
             
             if (ier) tes=.false.
         endif
@@ -1807,7 +1809,7 @@ include 'data_joint.h'
                         out=0
                         goto 11142
                     endif
-                    call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR_prop,&
+                    call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR_prop,rq_R_prop,&
                     ndatad_R,ier)
                     if (ier) then 
                         out=0
@@ -1829,7 +1831,7 @@ include 'data_joint.h'
                         out=0
                         goto 11142
                     endif
-                    call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL_prop,&
+                    call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL_prop,rq_L_prop,&
                     ndatad_L,ier)
                     
                     if (ier) then 
