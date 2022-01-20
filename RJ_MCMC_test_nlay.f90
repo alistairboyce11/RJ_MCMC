@@ -22,14 +22,15 @@ include 'params.h'
     ! Parameters of the Markov chain
     !-----------------------------------------
 
-    character (len=*), parameter :: dirname = 'OUT_FINDSTUCK' ! This is where output info files are saved and input data files are taken.
+
+    character (len=*), parameter :: dirname = 'OUT_TEST' ! This is where output info files are saved and input data files are taken.
     character*8, parameter :: storename = 'STORFFC1'     ! This is where output models are saved
-    integer, parameter :: burn_in = 20000 ! 9000! 55000 !Burn-in period
-    integer, parameter :: nsample = 200000 ! 10000! 50000!Post burn-in
+    integer, parameter :: burn_in = 90000 ! 9000! 55000 !Burn-in period
+    integer, parameter :: nsample = 100000 ! 10000! 50000!Post burn-in
     integer, parameter :: thin = 50    !Thinning of the chain 
 
     integer, parameter :: Scratch = 1     ! 0: Start from Stored model 1: Start from scratch
-    integer, parameter :: store = 99999999    !Store models every "store" iteration. 
+    integer, parameter :: store = 100    !Store models every "store" iteration. 
 
     ! Each chain is run for 'burn_in + nsample' steps in total. The first burn-in samples are discarded as burn-in steps, only after which the sampling algorithm is assumed to have converged. To eliminate dependent samples in the ensemble solution, every thin model visited in the second part is selected for the ensemble. The convergence of the algorithm is monitored with a number of indicators such as acceptance rates, and sampling efficiency is optimized by adjusting the variance of the Gaussian proposal functions 
 
@@ -39,7 +40,7 @@ include 'params.h'
 
     !depth
     real, parameter :: d_min = 0   ! depth bounds  
-    real, parameter :: d_max = 300 
+    real, parameter :: d_max = 660 
       
     real, parameter :: width = 0.4 ! width of the prior in vsv
     
@@ -73,7 +74,7 @@ include 'params.h'
     ! Parameters for Displaying results 
     !-------------------------------------------- 
 
-    integer, parameter :: display = 1000 ! display results in OUT/mpi.out 
+    integer, parameter :: display = 10 ! display results in OUT/mpi.out 
     !every display samples
 
      !discretezation for the posterior distribution.
@@ -304,42 +305,42 @@ include 'params.h'
         ndatad_R=0
         j=0
         ! careful: periods listed by decreasing period, increasing harmonic order
-        do i=200,40,-5 !synthetic periods, harmonics, uncertainties
+        do i=360,40,-10 !synthetic periods, harmonics, uncertainties
             j=j+1
             peri_R(j)=real(i)
             d_obsdcRe(j)=0.01
             n_R(j)=0
         end do
-!         do i=240,40,-10
-!             j=j+1
-!             peri_R(j)=real(i)
-!             d_obsdcRe(j)=0.01
-!             n_R(j)=1
-!         end do
-!         do i=160,40,-10
-!             j=j+1
-!             peri_R(j)=real(i)
-!             d_obsdcRe(j)=0.01
-!             n_R(j)=2
-!         end do
-!         do i=90,40,-10
-!             j=j+1
-!             peri_R(j)=real(i)
-!             d_obsdcRe(j)=0.01
-!             n_R(j)=3
-!         end do
-!         do i=50,40,-5
-!             j=j+1
-!             peri_R(j)=real(i)
-!             d_obsdcRe(j)=0.01
-!             n_R(j)=4
-!         end do
-!         do i=50,40,-5
-!             j=j+1
-!             peri_R(j)=real(i)
-!             d_obsdcRe(j)=0.01
-!             n_R(j)=5
-!         end do
+        do i=240,40,-10
+            j=j+1
+            peri_R(j)=real(i)
+            d_obsdcRe(j)=0.01
+            n_R(j)=1
+        end do
+        do i=160,40,-10
+            j=j+1
+            peri_R(j)=real(i)
+            d_obsdcRe(j)=0.01
+            n_R(j)=2
+        end do
+        do i=90,40,-10
+            j=j+1
+            peri_R(j)=real(i)
+            d_obsdcRe(j)=0.01
+            n_R(j)=3
+        end do
+        do i=50,40,-5
+            j=j+1
+            peri_R(j)=real(i)
+            d_obsdcRe(j)=0.01
+            n_R(j)=4
+        end do
+        do i=50,40,-5
+            j=j+1
+            peri_R(j)=real(i)
+            d_obsdcRe(j)=0.01
+            n_R(j)=5
+        end do
         ndatad_R=j
         wmin_R=1000./(maxval(peri_R(:ndatad_R))+20)
         wmax_R=1000./(minval(peri_R(:ndatad_R))-2)
@@ -348,42 +349,42 @@ include 'params.h'
         
         ndatad_L=0
         j=0
-        do i=200,40,-5
+        do i=360,40,-10
             j=j+1
             peri_L(j)=real(i)
-            d_obsdcLe(j)=0.01
+            d_obsdcLe(j)=0.02
             n_L(j)=0
         end do
-!         do i=240,40,-10
-!             j=j+1
-!             peri_L(j)=real(i)
-!             d_obsdcLe(j)=0.02
-!             n_L(j)=1
-!         end do
-!         do i=160,40,-10
-!             j=j+1
-!             peri_L(j)=real(i)
-!             d_obsdcLe(j)=0.02
-!             n_L(j)=2
-!         end do
-!         do i=90,40,-10
-!             j=j+1
-!             peri_L(j)=real(i)
-!             d_obsdcLe(j)=0.02
-!             n_L(j)=3
-!         end do
-!         do i=50,40,-5
-!             j=j+1
-!             peri_L(j)=real(i)
-!             d_obsdcLe(j)=0.02
-!             n_L(j)=4
-!         end do
-!         do i=50,40,-5
-!             j=j+1
-!             peri_L(j)=real(i)
-!             d_obsdcLe(j)=0.02
-!             n_L(j)=5
-!         end do
+        do i=240,40,-10
+            j=j+1
+            peri_L(j)=real(i)
+            d_obsdcLe(j)=0.02
+            n_L(j)=1
+        end do
+        do i=160,40,-10
+            j=j+1
+            peri_L(j)=real(i)
+            d_obsdcLe(j)=0.02
+            n_L(j)=2
+        end do
+        do i=90,40,-10
+            j=j+1
+            peri_L(j)=real(i)
+            d_obsdcLe(j)=0.02
+            n_L(j)=3
+        end do
+        do i=50,40,-5
+            j=j+1
+            peri_L(j)=real(i)
+            d_obsdcLe(j)=0.02
+            n_L(j)=4
+        end do
+        do i=50,40,-5
+            j=j+1
+            peri_L(j)=real(i)
+            d_obsdcLe(j)=0.02
+            n_L(j)=5
+        end do
         ndatad_L=j
         wmin_L=1000./(maxval(peri_L(:ndatad_L))+20)
         wmax_L=1000./(minval(peri_L(:ndatad_L))-2)
@@ -395,25 +396,14 @@ include 'params.h'
         
         ! create synthetic model
         npt=0
-        
-        voro(1,1)=1 !depth of interface
-        voro(1,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
-        voro(1,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
-        voro(1,4)=0!0.3-0.5/33.*i !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in
-        do i=2,11
-            voro(i,1)=30*(i-1) !depth of interface
+
+        do i=1,33
+            voro(i,1)=20*i !depth of interface
             voro(i,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
-            voro(i,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
-            voro(i,4)=0!0.3-0.5/33.*i !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in params.h
+            voro(i,3)=0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
+            voro(i,4)=0.3-0.5/33.*i !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in params.h
             npt=npt+1
         end do
-        
-        voro(5,2)=voro(5,2)-0.05
-        voro(6,2)=voro(6,2)+0.05
-        
-!         do i=5,10
-!             voro(i,2)=voro(i,2)+0.005
-!         enddo
         
         ! take voro, combine it with prem into a format suitable for minos
         call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
@@ -448,11 +438,11 @@ include 'params.h'
         ! Add Gaussian errors to synthetic data
         
         do i=1,ndatad_R
-            d_obsdcR(i)=d_obsdcR(i)+gasdev(ra)*0.1
+            d_obsdcR(i)=d_obsdcR(i)+gasdev(ra)*0.02
         end do
         
         do i=1,ndatad_L
-            d_obsdcL(i)=d_obsdcL(i)+gasdev(ra)*0.1
+            d_obsdcL(i)=d_obsdcL(i)+gasdev(ra)*0.05
         end do
         
         ! write synthetic model into a file
@@ -1382,7 +1372,8 @@ include 'params.h'
             !**********************************************************************
 
 
-            IF ((mod(ount,display).EQ.0).and.(mod(ran,10).EQ.0)) THEN
+
+            IF ((mod(ount,display).EQ.0) THEN ! .and.(mod(ran,50).EQ.0)) THEN
 
                 write(*,*)'processor number',ran+1,'/',nbproc
                 write(*,*)'sample:',ount,'/',burn_in+nsample
@@ -1417,7 +1408,7 @@ include 'params.h'
     write(filenamemax,"('/bestmodel_',I3.3,'.out')") rank    
     open(56,file=dirname//filenamemax,status='replace')
     write(56,*) nptmax,likemax
-    do i=1,npt
+    do i=1,nptmax
         write(56,*)voromax(i,1),voromax(i,2),voromax(i,3),voromax(i,4)
     enddo
     close(56)
