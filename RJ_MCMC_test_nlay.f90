@@ -22,10 +22,10 @@ include 'params.h'
     ! Parameters of the Markov chain
     !-----------------------------------------
 
-    character (len=*), parameter :: dirname = 'OUT_REF' ! This is where output info files are saved and input data files are taken.
+    character (len=*), parameter :: dirname = 'OUT_FINDSTUCK' ! This is where output info files are saved and input data files are taken.
     character*8, parameter :: storename = 'STORFFC1'     ! This is where output models are saved
     integer, parameter :: burn_in = 20000 ! 9000! 55000 !Burn-in period
-    integer, parameter :: nsample = 100000 ! 10000! 50000!Post burn-in
+    integer, parameter :: nsample = 200000 ! 10000! 50000!Post burn-in
     integer, parameter :: thin = 50    !Thinning of the chain 
 
     integer, parameter :: Scratch = 1     ! 0: Start from Stored model 1: Start from scratch
@@ -145,6 +145,7 @@ include 'params.h'
     integer nptref,malayv ! number of points in reference model, number of layers in voro
     real convBs(nsample+burn_in),convB(nsample+burn_in),convPs(nsample+burn_in),convP(nsample+burn_in) ! birth rates, vp change rates
     real convvs1(nsample+burn_in),convvs1s(nsample+burn_in),convvs2(nsample+burn_in),convvs2s(nsample+burn_in)
+    real convdp1(nsample+burn_in),convdp1s(nsample+burn_in),convdp2(nsample+burn_in),convdp2s(nsample+burn_in)
     real convvp(nsample+burn_in),convvps(nsample+burn_in),convxis(nsample+burn_in),convxi(nsample+burn_in)
     real convBas(nsample+burn_in),convBa(nsample+burn_in) ! anisotropic birth rates
     real convDs(nsample+burn_in),convD(nsample+burn_in),convDas(nsample+burn_in),convDa(nsample+burn_in)
@@ -242,6 +243,14 @@ include 'params.h'
     convBas=0
     convD=0
     convDs=0
+    convvs1=0
+    convvs1s=0
+    convvs2=0
+    convvs2s=0
+    convdp1=0
+    convdp1s=0
+    convdp2=0
+    convdp2s=0
     convDa=0
     convDas=0
     convP=0
@@ -339,7 +348,7 @@ include 'params.h'
         
         ndatad_L=0
         j=0
-        do i=200,40,-10
+        do i=200,40,-5
             j=j+1
             peri_L(j)=real(i)
             d_obsdcLe(j)=0.01
@@ -399,6 +408,9 @@ include 'params.h'
             npt=npt+1
         end do
         
+        voro(5,2)=voro(5,2)-0.05
+        voro(6,2)=voro(6,2)+0.05
+        
 !         do i=5,10
 !             voro(i,2)=voro(i,2)+0.005
 !         enddo
@@ -436,11 +448,11 @@ include 'params.h'
         ! Add Gaussian errors to synthetic data
         
         do i=1,ndatad_R
-            d_obsdcR(i)=d_obsdcR(i)+gasdev(ra)*0.01
+            d_obsdcR(i)=d_obsdcR(i)+gasdev(ra)*0.1
         end do
         
         do i=1,ndatad_L
-            d_obsdcL(i)=d_obsdcL(i)+gasdev(ra)*0.01
+            d_obsdcL(i)=d_obsdcL(i)+gasdev(ra)*0.1
         end do
         
         ! write synthetic model into a file
@@ -713,6 +725,16 @@ include 'params.h'
                 PrD=0
                 AcB=0
                 AcD=0
+            endif
+            
+            if ((Ac_vp/(Pr_vp+1))<0.01) then 
+                write(filenamemax,"('/stuck_',I3.3,'.out')") rank    
+                open(56,file=dirname//filenamemax,status='replace')
+                write(56,*) npt
+                do i=1,npt
+                    write(56,*)voromax(i,1),voromax(i,2),voromax(i,3),voromax(i,4)
+                enddo
+                close(56)
             endif
             
             !-----------------------------------------------
@@ -1337,6 +1359,8 @@ include 'params.h'
             convD(ount)=100*AcD/PrD
             convvs1(ount)=100*Acv(1)/Prv(1)
             convvs2(ount)=100*Acv(2)/Prv(2)
+            convdp1(ount)=100*Acp(1)/Prp(1)
+            convdp2(ount)=100*Acp(2)/Prp(2)
             convvp(ount)=100*Ac_vp/Pr_vp
             convxi(ount)=100*Acxi/Prxi
             convd_R(ount)=lsd_R
@@ -1358,7 +1382,7 @@ include 'params.h'
             !**********************************************************************
 
 
-            IF ((mod(ount,display).EQ.0).and.(mod(ran,50).EQ.0)) THEN
+            IF ((mod(ount,display).EQ.0).and.(mod(ran,10).EQ.0)) THEN
 
                 write(*,*)'processor number',ran+1,'/',nbproc
                 write(*,*)'sample:',ount,'/',burn_in+nsample
@@ -1463,6 +1487,8 @@ include 'params.h'
         call MPI_REDUCE(convD,convDs,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(convvs1,convvs1s,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(convvs2,convvs2s,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(convdp1,convdp1s,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(convdp2,convdp2s,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(convvp,convvps,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(convxi,convxis,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(histoch,histochs,disd,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
@@ -1504,6 +1530,8 @@ include 'params.h'
         convDas=convDas/j
         convvs1s=convvs1s/j
         convvs2s=convvs2s/j
+        convdp1s=convdp1s/j
+        convdp2s=convdp2s/j
         convvps=convvps/j
         convxis=convxis/j
  
@@ -1661,6 +1689,20 @@ include 'params.h'
         write(54,*)burn_in,nsample,burn_in,nsample
         do i=1,nsample+burn_in
             write(54,*)convvs2(i),convvs2s(i)
+        enddo
+        close(54)
+        
+        open(54,file=dirname//'/Convergence_dp1.out',status='replace')
+        write(54,*)burn_in,nsample,burn_in,nsample
+        do i=1,nsample+burn_in
+            write(54,*)convdp1(i),convdp1s(i)
+        enddo
+        close(54)
+        
+        open(54,file=dirname//'/Convergence_dp2.out',status='replace')
+        write(54,*)burn_in,nsample,burn_in,nsample
+        do i=1,nsample+burn_in
+            write(54,*)convdp2(i),convdp2s(i)
         enddo
         close(54)
         
