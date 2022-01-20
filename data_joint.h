@@ -1,8 +1,8 @@
 
-    character (len=*), parameter :: dirname = 'OUT_TESTJOINT1'
+    character (len=*), parameter :: dirname = 'OUT_ALLJOINT3'
     character*8, parameter :: storename = 'STORFFC1'
     integer, parameter :: burn_in = 20000! 55000 !Burn-in period
-    integer, parameter :: nsample = 100000! 50000!Post burn-in
+    integer, parameter :: nsample = 200000! 50000!Post burn-in
     
     integer, parameter :: thin = 50    !Thinning of the chain 
 
@@ -17,20 +17,20 @@
 
     !depth
     real, parameter :: d_min = 0   ! depth bounds  
-    real, parameter :: d_max = 660 
+    real, parameter :: d_max = 300 
       
-    real, parameter :: width = 0.1 ! width of the prior in vsv
+    real, parameter :: width = 0.4 ! width of the prior in vsv
     
-    real, parameter :: vpvsv_min = -0.1 ! bounds of the prior in vp/vs
-    real, parameter :: vpvsv_max = 0.1
+    real, parameter :: vpvsv_min = -0.4 ! bounds of the prior in vp/vs
+    real, parameter :: vpvsv_max = 0.4
 
-    real, parameter :: xi_min = 0.9 ! bounds of the prior in xi
-    real, parameter :: xi_max = 1.1
+    real, parameter :: xi_min = 0.5 ! bounds of the prior in xi
+    real, parameter :: xi_max = 1.5
 
-    double precision, parameter ::    Ad_R_max = 5 ! bounds of the prior in Ad_R - the error parameter for rayleigh wave velocity
+    double precision, parameter ::    Ad_R_max = 25 ! bounds of the prior in Ad_R - the error parameter for rayleigh wave velocity
     double precision, parameter ::    Ad_R_min = 0.0000002
 
-    double precision, parameter ::    Ad_L_max = 5 ! bounds of the prior in Ad_L
+    double precision, parameter ::    Ad_L_max = 25 ! bounds of the prior in Ad_L
     double precision, parameter ::    Ad_L_min = 0.0000002
 
     !-----------------------------------------
@@ -51,7 +51,7 @@
     ! Parameters for Displaying results 
     !-------------------------------------------- 
 
-    integer, parameter :: display = 10000 ! display results in OUT/mpi.out 
+    integer, parameter :: display = 1000 ! display results in OUT/mpi.out 
     !every display samples
 
      !discretezation for the posterior distribution.
@@ -81,4 +81,7 @@
     real, parameter :: widening_start=2.
     integer, parameter :: n_w=10
     real,parameter :: widening_step=1.
-    integer,parameter :: nsample_widening=20000! 50000!Post burn-in
+    integer,parameter :: nsample_widening=10000! 50000!Post burn-in
+    integer,parameter :: burn_in_widening=3000! 50000!Post burn-in
+    
+    logical,parameter :: getting_old=.true.
