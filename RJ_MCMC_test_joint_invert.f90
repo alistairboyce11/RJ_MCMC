@@ -463,9 +463,12 @@ include 'data_joint.h'
                 nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
             if (error_flag) then
                 tes=.false.
+                write(*,*)"Minos_bran FAILED for RAYLEIGH 003"
             end if
             call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,rq_R,ndatad_R,ier)
+            
             if (ier) tes=.false.
+            if (maxval(rq_R(:ndatad_R))>maxrq*eps) tes=.false.
         endif
         
         if (ndatad_L>0) then
@@ -478,10 +481,12 @@ include 'data_joint.h'
                 nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
             if (error_flag) then
                 tes=.false.
+                write(*,*)"Minos_bran FAILED for LOVE 004"
             end if
             call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,rq_L,ndatad_L,ier)
             
             if (ier) tes=.false.
+            if (maxval(rq_L(:ndatad_L))>maxrq*eps) tes=.false.
         endif
         
         if (j>250) stop "CAN'T INITIALIZE MODEL" ! if it doesn't work after 250 tries, give up
@@ -963,7 +968,7 @@ include 'data_joint.h'
                     nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
                 if (error_flag) then 
                     out=0
-                    
+                    write(*,*)"INVALID PROPOSED MODEL - RAYLEIGH - minos_bran.f FAIL 005"
                     write(*,*)move,noisd_R,value
                     
                     goto 1142
@@ -973,6 +978,12 @@ include 'data_joint.h'
                 ndatad_R,ier)
                 if (ier) then 
                     out=0
+                    write(*,*)"INVALID PROPOSED MODEL - RAYLEIGH..."
+                    goto 1142
+                endif
+                if (maxval(rq_R(:ndatad_R))>maxrq*eps) then
+                    out=0
+                    write(*,*)"BAD UNDERTAINTIES - RAYLEIGH..."
                     goto 1142
                 endif
 
@@ -988,6 +999,7 @@ include 'data_joint.h'
                     nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
                 if (error_flag) then 
                     out=0
+                    write(*,*)"INVALID PROPOSED MODEL - LOVE - minos_bran.f FAIL 006"
                     goto 1142
                 endif
                 call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL_prop,rq_L_prop,&
@@ -995,6 +1007,13 @@ include 'data_joint.h'
                 
                 if (ier) then 
                     out=0
+                    write(*,*)"INVALID PROPOSED MODEL - LOVE..."
+                    goto 1142
+                endif
+                
+                if (maxval(rq_L(:ndatad_L))>maxrq*eps) then
+                    out=0
+                    write(*,*)"BAD UNDERTAINTIES - LOVE..."
                     goto 1142
                 endif
 
