@@ -1029,24 +1029,20 @@ program RJ_MCMC
             !    write(*,*)'vp change succeeded'
         elseif (u<0.3) then !change position--------------------------------------------
             move=.true.
-            ! Depth of first and last depth points are fixed
+
             ind=1+ceiling(ran3(ra)*(npt-1))
             if (ind==1) ind=2
  
             !if (ount.GT.burn_in) then 
             if (voro(ind,1)<(d_max/2)) then
                 PrP(1)=PrP(1)+1
+                voro_prop(ind,1)=voro(ind,1)+gasdev(ra)*pd1
             else
                 PrP(2)=PrP(2)+1
+                voro_prop(ind,1)=voro(ind,1)+gasdev(ra)*pd2
             endif
             !endif
  
-            if (voro(ind,1)<(d_max/2)) then
-                voro_prop(ind,1)=voro(ind,1)+gasdev(ra)*pd1
-            else
-                voro_prop(ind,1)=voro(ind,1)+gasdev(ra)*pd2
-            endif
-        
             if ((voro_prop(ind,1)<=d_min).or.(voro_prop(ind,1)>=d_max)) then
                 out=0
             endif
@@ -1077,24 +1073,20 @@ program RJ_MCMC
             value=.true.
             ind=ceiling(ran3(ra)*npt)
             if (ind==0) ind=1
-            !if (ount.GT.burn_in) then 
-            !write(*,*)voro(ind,1),d_max/2
-            if (voro(ind,1)<(d_max/2)) then
-                PrV(1)=PrV(1)+1
-            else
-                PrV(2)=PrV(2)+1
-            endif
-            !endif
+
             if (ind>npt) then
                 write(*,*)npt,ind
                 stop "763"
             endif
+            
             if (voro(ind,1)<(d_max/2)) then
+                PrV(1)=PrV(1)+1
                 voro_prop(ind,2)=voro(ind,2)+gasdev(ra)*pv1
             else
+                PrV(2)=PrV(2)+1
                 voro_prop(ind,2)=voro(ind,2)+gasdev(ra)*pv2
             endif
-            !voro_prop(ind,2) = -width+2*width*ran3(ra)
+
             
             !Check if oustide bounds of prior, width relates to vsv.
             if ((voro_prop(ind,2)<=-width).or.(voro_prop(ind,2)>=width)) then
