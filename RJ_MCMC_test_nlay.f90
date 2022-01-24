@@ -576,9 +576,9 @@ include 'params.h'
             do i=1,ndatad_L
                 d_obsdcL(i)=d_obsdcL(i)+gasdev(ra)*0.05
             end do
-            do i=1,nbproc
-                call MPI_SEND(d_obsdcR, ndatadmax, MPI_Real, i, 1, MPI_COMM_WORLD, ierror)
-                call MPI_SEND(d_obsdcL, ndatadmax, MPI_Real, i, 1, MPI_COMM_WORLD, ierror)
+            do i=2,nbproc
+                call MPI_SEND(d_obsdcR, ndatadmax, MPI_Real, i-1, 1, MPI_COMM_WORLD, ierror)
+                call MPI_SEND(d_obsdcL, ndatadmax, MPI_Real, i-1, 1, MPI_COMM_WORLD, ierror)
             enddo
         else
             call MPI_RECV(d_obsdcR, ndatadmax, MPI_Real, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierror)
