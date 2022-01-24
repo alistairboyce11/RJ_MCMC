@@ -10,9 +10,11 @@
 
 program RJ_MCMC
 
+    use mpi
     implicit none
-include 'mpif.h'
-include 'params.h'
+    ! include 'mpif.h'
+    include 'params.h'
+    
     !             ----------------------------------
     !             BEGINING OF THE USER-DEFINED PARAMETERS
     !             ----------------------------------
@@ -567,23 +569,31 @@ include 'params.h'
         
         ! Add Gaussian errors to synthetic data
         
-        
-        
-        IF (ran==0) THEN
+        IF (nbproc.gt.1) THEN
+            IF (ran==0) THEN
+                do i=1,ndatad_R
+                    d_obsdcR(i)=d_obsdcR(i)+gasdev(ra)*0.02
+                end do
+                do i=1,ndatad_L
+                    d_obsdcL(i)=d_obsdcL(i)+gasdev(ra)*0.05
+                end do
+                do i=2,nbproc
+                    call MPI_SEND(d_obsdcR, ndatadmax, MPI_Real, i-1, 1, MPI_COMM_WORLD, ierror)
+                    call MPI_SEND(d_obsdcL, ndatadmax, MPI_Real, i-1, 1, MPI_COMM_WORLD, ierror)
+                enddo
+            else
+                call MPI_RECV(d_obsdcR, ndatadmax, MPI_Real, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierror)
+                call MPI_RECV(d_obsdcL, ndatadmax, MPI_Real, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierror)
+            endif
+        else
             do i=1,ndatad_R
                 d_obsdcR(i)=d_obsdcR(i)+gasdev(ra)*0.02
             end do
             do i=1,ndatad_L
                 d_obsdcL(i)=d_obsdcL(i)+gasdev(ra)*0.05
             end do
-            do i=2,nbproc
-                call MPI_SEND(d_obsdcR, ndatadmax, MPI_Real, i-1, 1, MPI_COMM_WORLD, ierror)
-                call MPI_SEND(d_obsdcL, ndatadmax, MPI_Real, i-1, 1, MPI_COMM_WORLD, ierror)
-            enddo
-        else
-            call MPI_RECV(d_obsdcR, ndatadmax, MPI_Real, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierror)
-            call MPI_RECV(d_obsdcL, ndatadmax, MPI_Real, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierror)
         endif
+
         
         ! write synthetic model into a file
         open(65,file=dirname//'/true_model.out',status='replace')
