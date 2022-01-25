@@ -555,8 +555,8 @@ program RJ_MCMC
                 call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
                     peri_L_tmp,n_L_tmp,d_cL_tmp,rq_L,ndatad_L_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
                 d_cL(nlims_L(1,iharm):nlims_L(2,iharm))=d_cL_tmp
-                if (ier) stop "ier INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
-                if (maxval(abs(rq_L(:ndatad_L_tmp)))>maxrq*eps) stop "rq INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
+                if (ier) stop "INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
+                if (maxval(abs(rq_L(:ndatad_L_tmp)))>maxrq*eps) stop "INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
             enddo
             
 !             call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
