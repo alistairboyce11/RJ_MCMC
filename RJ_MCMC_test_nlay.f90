@@ -23,7 +23,7 @@ include 'params.h'
     !-----------------------------------------
 
 
-    character (len=*), parameter :: dirname = 'OUT_FINDSTUCK' ! This is where output info files are saved and input data files are taken.
+    character (len=*), parameter :: dirname = 'OUT_FINDSTUCK3' ! This is where output info files are saved and input data files are taken.
     character*8, parameter :: storename = 'STORFFC1'     ! This is where output models are saved
     integer, parameter :: burn_in = 90000 ! 9000! 55000 !Burn-in period
     integer, parameter :: nsample = 100000 ! 10000! 50000!Post burn-in
@@ -74,7 +74,7 @@ include 'params.h'
     ! Parameters for Displaying results 
     !-------------------------------------------- 
 
-    integer, parameter :: display = 10 ! display results in OUT/mpi.out 
+    integer, parameter :: display = 1000 ! display results in OUT/mpi.out 
     !every display samples
 
      !discretezation for the posterior distribution.
@@ -211,6 +211,7 @@ include 'params.h'
   
     testing=.true.
     if (testing) write(*,*)'testing with synthetic model'
+    write(*,*)'testing',maxrq
     ra=rank !seed for RNG
     ran=rank
     inorout=0
@@ -498,6 +499,7 @@ include 'params.h'
         voro(1,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
         voro(1,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
         voro(1,4)=0!0.3-0.5/33.*i !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in
+        npt=npt+1
         do i=2,11
             voro(i,1)=30*(i-1) !depth of interface
             voro(i,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
@@ -530,7 +532,7 @@ include 'params.h'
                     peri_R_tmp,n_R_tmp,d_cR_tmp,rq_R,ndatad_R_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
                 d_cR(nlims_R(1,iharm):nlims_R(2,iharm))=d_cR_tmp
                 if (ier) stop "INVALID INITIAL MODEL - RAYLEIGH - CHANGE PERIODS or MODEL"
-                if (maxval(rq_R(:ndatad_R_tmp))>maxrq*eps) stop "INVALID INITIAL MODEL - RAYLEIGH - CHANGE PERIODS or MODEL"
+                if (maxval(abs(rq_R(:ndatad_R_tmp)))>maxrq*eps) stop "INVALID INITIAL MODEL - RAYLEIGH - CHANGE PERIODS or MODEL"
             enddo
         endif
         
@@ -550,7 +552,7 @@ include 'params.h'
                     peri_L_tmp,n_L_tmp,d_cL_tmp,rq_L,ndatad_L_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
                 d_cL(nlims_L(1,iharm):nlims_L(2,iharm))=d_cL_tmp
                 if (ier) stop "INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
-                if (maxval(rq_L(:ndatad_L_tmp))>maxrq*eps) stop "INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
+                if (maxval(abs(rq_L(:ndatad_L_tmp)))>maxrq*eps) stop "INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
             enddo
             
 !             call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
@@ -713,7 +715,7 @@ include 'params.h'
                 write(*,*)"dispersion_minos for RAYLEIGH"
                 d_cR(nlims_R(1,iharm):nlims_R(2,iharm))=d_cR_tmp
                 if (ier) tes=.false.
-                if (maxval(rq_R(:ndatad_R_tmp))>maxrq*eps) tes=.false.
+                if (maxval(abs(rq_R(:ndatad_R_tmp)))>maxrq*eps) tes=.false.
             enddo
         endif
         
@@ -740,7 +742,7 @@ include 'params.h'
                 write(*,*)"dispersion_minos for LOVE"
                 d_cL(nlims_L(1,iharm):nlims_L(2,iharm))=d_cL_tmp
                 if (ier) tes=.false.
-                if (maxval(rq_L(:ndatad_L_tmp))>maxrq*eps) tes=.false.
+                if (maxval(abs(rq_L(:ndatad_L_tmp)))>maxrq*eps) tes=.false.
             enddo
         
         endif
@@ -1247,7 +1249,7 @@ include 'params.h'
                         goto 1142
                     endif
                     
-                    if (maxval(rq_R(:ndatad_R_tmp))>maxrq*eps) then
+                    if (maxval(abs(rq_R(:ndatad_R_tmp)))>maxrq*eps) then
                         out=0
                         write(*,*)"BAD UNDERTAINTIES - RAYLEIGH..."
                         goto 1142
@@ -1284,7 +1286,7 @@ include 'params.h'
                         goto 1142
                     endif
                     
-                    if (maxval(rq_L(:ndatad_L_tmp))>maxrq*eps) then
+                    if (maxval(abs(rq_L(:ndatad_L_tmp)))>maxrq*eps) then
                         out=0
                         write(*,*)"BAD UNDERTAINTIES - LOVE..."
                         goto 1142
