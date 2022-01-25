@@ -415,77 +415,77 @@ program RJ_MCMC
             n_L(j)=0
             j=j+1
         end do
-        numharm_R(numharm_count)=0
-        nlims_R(2,numharm_count)=j-1
-        wmin_R(numharm_count)=1000./(maxval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))+20)
-        wmax_R(numharm_count)=1000./(minval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))-2)
+        numharm_L(numharm_count)=0
+        nlims_L(2,numharm_count)=j-1
+        wmin_L(numharm_count)=1000./(maxval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))+20)
+        wmax_L(numharm_count)=1000./(minval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))-2)
         
 !         numharm_count=numharm_count+1
-!         nlims_R(1,numharm_count)=j
+!         nlims_L(1,numharm_count)=j
 !         do i=240,40,-10
 !             peri_L(j)=real(i)
 !             d_obsdcLe(j)=0.02
 !             n_L(j)=1
 !             j=j+1
 !         end do
-!         numharm_R(numharm_count)=1
-!         nlims_R(2,numharm_count)=j-1
-!         wmin_R(numharm_count)=1000./(maxval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))+20)
-!         wmax_R(numharm_count)=1000./(minval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))-2)
+!         numharm_L(numharm_count)=1
+!         nlims_L(2,numharm_count)=j-1
+!         wmin_L(numharm_count)=1000./(maxval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))+20)
+!         wmax_L(numharm_count)=1000./(minval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))-2)
 
 !         numharm_count=numharm_count+1
-!         nlims_R(1,numharm_count)=j
+!         nlims_L(1,numharm_count)=j
 !         do i=160,40,-10
 !             peri_L(j)=real(i)
 !             d_obsdcLe(j)=0.02
 !             n_L(j)=2
 !             j=j+1
 !         end do
-!         numharm_R(numharm_count)=2
-!         nlims_R(2,numharm_count)=j-1
-!         wmin_R(numharm_count)=1000./(maxval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))+20)
-!         wmax_R(numharm_count)=1000./(minval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))-2)
+!         numharm_L(numharm_count)=2
+!         nlims_L(2,numharm_count)=j-1
+!         wmin_L(numharm_count)=1000./(maxval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))+20)
+!         wmax_L(numharm_count)=1000./(minval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))-2)
 
 !         numharm_count=numharm_count+1
-!         nlims_R(1,numharm_count)=j
+!         nlims_L(1,numharm_count)=j
 !         do i=90,40,-10
 !             peri_L(j)=real(i)
 !             d_obsdcLe(j)=0.02
 !             n_L(j)=3
 !             j=j+1
 !         end do
-!         numharm_R(numharm_count)=3
-!         nlims_R(2,numharm_count)=j-1
-!         wmin_R(numharm_count)=1000./(maxval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))+20)
-!         wmax_R(numharm_count)=1000./(minval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))-2)
+!         numharm_L(numharm_count)=3
+!         nlims_L(2,numharm_count)=j-1
+!         wmin_L(numharm_count)=1000./(maxval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))+20)
+!         wmax_L(numharm_count)=1000./(minval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))-2)
 
 !         numharm_count=numharm_count+1
-!         nlims_R(1,numharm_count)=j
+!         nlims_L(1,numharm_count)=j
 !         do i=50,40,-5
 !             peri_L(j)=real(i)
 !             d_obsdcLe(j)=0.02
 !             n_L(j)=4
 !             j=j+1
 !         end do
-!         numharm_R(numharm_count)=4
-!         nlims_R(2,numharm_count)=j-1
-!         wmin_R(numharm_count)=1000./(maxval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))+20)
-!         wmax_R(numharm_count)=1000./(minval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))-2)
+!         numharm_L(numharm_count)=4
+!         nlims_L(2,numharm_count)=j-1
+!         wmin_L(numharm_count)=1000./(maxval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))+20)
+!         wmax_L(numharm_count)=1000./(minval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))-2)
 
 !         numharm_count=numharm_count+1
-!         nlims_R(1,numharm_count)=j
+!         nlims_L(1,numharm_count)=j
 !         do i=50,40,-5
 !             peri_L(j)=real(i)
 !             d_obsdcLe(j)=0.02
 !             n_L(j)=5
 !             j=j+1
 !         end do
-!         numharm_R(numharm_count)=5
-!         nlims_R(2,numharm_count)=j-1
-!         wmin_R(numharm_count)=1000./(maxval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))+20)
-!         wmax_R(numharm_count)=1000./(minval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))-2)
-
+!         numharm_L(numharm_count)=5
+!         nlims_L(2,numharm_count)=j-1
+!         wmin_L(numharm_count)=1000./(maxval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))+20)
+!         wmax_L(numharm_count)=1000./(minval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))-2)
         ndatad_L=j-1
+        nharm_L=numharm_count
         wmin_L=1000./(maxval(peri_L(:ndatad_L))+20)
         wmax_L=1000./(minval(peri_L(:ndatad_L))-2)
         nmin_L=minval(n_L(:ndatad_L))
@@ -504,7 +504,7 @@ program RJ_MCMC
         npt=npt+1
         do i=2,11
             voro(i,1)=30*(i-1) !depth of interface
-            voro(i,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
+            voro(i,2)=0. !0.1*(-1)**i  !vsv=vsv_prem*(1+voro(i,2))
             voro(i,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
             voro(i,4)=0!0.3-0.5/33.*i !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in params.h
             npt=npt+1
@@ -548,13 +548,15 @@ program RJ_MCMC
                     nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
                 if (error_flag) stop "INVALID INITIAL MODEL - LOVE - minos_bran.f FAIL 002"
                 peri_L_tmp=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
-                n_L_tmp=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
                 ndatad_L_tmp=nlims_L(2,iharm)-nlims_L(1,iharm)+1 ! fortran slices take the first and the last element
+                n_L_tmp(:ndatad_L_tmp)=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                write(*,*)c_ph(:nmodes)
+                
                 call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
                     peri_L_tmp,n_L_tmp,d_cL_tmp,rq_L,ndatad_L_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
                 d_cL(nlims_L(1,iharm):nlims_L(2,iharm))=d_cL_tmp
-                if (ier) stop "INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
-                if (maxval(abs(rq_L(:ndatad_L_tmp)))>maxrq*eps) stop "INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
+                if (ier) stop "ier INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
+                if (maxval(abs(rq_L(:ndatad_L_tmp)))>maxrq*eps) stop "rq INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
             enddo
             
 !             call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
@@ -1417,8 +1419,8 @@ program RJ_MCMC
                 likemax=(lsd_L+lsd_R)
             endif
         
-            
-    
+        
+        
         endif
 
         npt_ani=0
