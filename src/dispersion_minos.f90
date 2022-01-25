@@ -18,6 +18,8 @@ subroutine dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri,n,
     ier=.false.
     allfine=.true.
     
+    if (nmodes==0) ier=.true.
+    
     do j=1,ndatad
         if (n(j)==n_mode(imin2-1)) then
             imin=imin2-1
