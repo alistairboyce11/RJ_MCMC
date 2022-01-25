@@ -1,4 +1,4 @@
-subroutine dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri,n,d_c,rq,ndatad,ier,idis,imin_idis)
+subroutine dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri,n,d_c,rq,ndatad,ier)
 
     implicit none
     include '../params.h'
@@ -10,15 +10,15 @@ subroutine dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri,n,
     real,dimension(ndatadmax),intent(out) :: d_c,rq
     integer :: j,i,imin,imin2
     real :: dmin,dmin_new
-    logical,intent(out) :: ier,idis
-    integer,intent(out) :: imin_idis
+    logical,intent(out) :: ier
     logical :: allfine
     real, external :: interp
     
     imin2=2
     ier=.false.
-    idis=.false.
     allfine=.true.
+    
+    if (nmodes==0) ier=.true.
     
     do j=1,ndatad
         if (n(j)==n_mode(imin2-1)) then
