@@ -25,10 +25,10 @@ program RJ_MCMC
     !-----------------------------------------
 
 
-    character (len=*), parameter :: dirname = 'OUT_FINDSTUCK3' ! This is where output info files are saved and input data files are taken.
+    character (len=*), parameter :: dirname = 'OUT_FINDSTUCK4' ! This is where output info files are saved and input data files are taken.
     character*8, parameter :: storename = 'STORFFC1'     ! This is where output models are saved
     integer, parameter :: burn_in = 90000 ! 9000! 55000 !Burn-in period
-    integer, parameter :: nsample = 100000 ! 10000! 50000!Post burn-in
+    integer, parameter :: nsample = 300000 ! 10000! 50000!Post burn-in
     integer, parameter :: thin = 50    !Thinning of the chain 
 
     integer, parameter :: Scratch = 1     ! 0: Start from Stored model 1: Start from scratch
@@ -550,7 +550,6 @@ program RJ_MCMC
                 peri_L_tmp=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
                 ndatad_L_tmp=nlims_L(2,iharm)-nlims_L(1,iharm)+1 ! fortran slices take the first and the last element
                 n_L_tmp(:ndatad_L_tmp)=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
-                write(*,*)c_ph(:nmodes)
                 
                 call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
                     peri_L_tmp,n_L_tmp,d_cL_tmp,rq_L,ndatad_L_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
