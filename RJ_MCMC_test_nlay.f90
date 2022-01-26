@@ -25,10 +25,10 @@ program RJ_MCMC
     !-----------------------------------------
 
 
-    character (len=*), parameter :: dirname = 'OUT_FINDSTUCK2' ! This is where output info files are saved and input data files are taken.
+    character (len=*), parameter :: dirname = 'OUT_FINDSTUCK4' ! This is where output info files are saved and input data files are taken.
     character*8, parameter :: storename = 'STORFFC1'     ! This is where output models are saved
     integer, parameter :: burn_in = 90000 ! 9000! 55000 !Burn-in period
-    integer, parameter :: nsample = 100000 ! 10000! 50000!Post burn-in
+    integer, parameter :: nsample = 300000 ! 10000! 50000!Post burn-in
     integer, parameter :: thin = 50    !Thinning of the chain 
 
     integer, parameter :: Scratch = 1     ! 0: Start from Stored model 1: Start from scratch
