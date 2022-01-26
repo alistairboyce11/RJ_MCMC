@@ -135,13 +135,13 @@ if Posterior:
             i+=1
     xid[:,disv//2-1]=0 # else the isotropic layers dominate the anisotropy density plot
 
-    for i in range(np.shape(vsvd)[0]): # normalisation by depth, not strictly necessary
-        s=np.amax(vsvd[i,:])
-        vsvd[i,:]=vsvd[i,:]/s
+    # for i in range(np.shape(vsvd)[0]): # normalisation by depth, not strictly necessary
+    #     s=np.amax(vsvd[i,:])
+    #     vsvd[i,:]=vsvd[i,:]/s
 
-    for i in range(np.shape(vpd)[0]): # normalisation by depth, not strictly necessary
-        s=np.amax(vpd[i,:])
-        vpd[i,:]=vpd[i,:]/s
+    # for i in range(np.shape(vpd)[0]): # normalisation by depth, not strictly necessary
+    #     s=np.amax(vpd[i,:])
+    #     vpd[i,:]=vpd[i,:]/s
 
     fig, (ax0, ax1, ax2, ax4, ax5) = plt.subplots(nrows=1, ncols=5, sharey=True,
                                         figsize=(12, 6))
@@ -160,8 +160,8 @@ if Posterior:
     ax0.set_ylabel('Depth (km)',fontsize=10)
     ax2.set_xlabel(r'Vp, (km/s)',fontsize=10)
     ax2.set_title('P-wave velocity')
-    ax1.pcolormesh(xis,depths,xid,cmap='magma_r')
-    ax0.pcolormesh(vsvs,depths,vsvd,cmap='magma_r')
+    ax1.pcolormesh(xis,depths[:-1],xid[:-1,:],cmap='magma_r')
+    ax0.pcolormesh(vsvs,depths[:-1],vsvd[:-1,:],cmap='magma_r')
 
     # true model overlaid on the posterior (only for synthetic tests)
     file=open(directory+'/'+'true_model.out','r')
@@ -190,7 +190,7 @@ if Posterior:
     except:
         pass
 
-    ax2.pcolormesh(vps,depths,vpd,cmap='magma_r')
+    ax2.pcolormesh(vps,depths[:-1],vpd[:-1,:],cmap='magma_r')
     plt.setp(ax2.get_yticklabels(), visible=False)
 
 
