@@ -706,7 +706,7 @@ program RJ_MCMC
         write(65,*)nharm_R
         do k=1,nharm_R
             write(65,*)numharm_R(k)
-            write(65,*)nlims_R(1,k),nlims_R(2,k)
+            write(65,*)nlims_R(2,k)-nlims_R(1,k)
             !write(65,*)wmin_R(k),wmax_R(k)
             do i=nlims_R(1,k),nlims_R(2,k)
                 write(65,*)n_R(i),peri_R(i),d_obsdcR(i),d_obsdCRe(i)
@@ -720,7 +720,7 @@ program RJ_MCMC
         write(65,*)nharm_L
         do k=1,nharm_L
             write(65,*)numharm_L(k)
-            write(65,*)nlims_L(1,k),nlims_L(2,k)
+            write(65,*)nlims_L(2,k)-nlims_L(1,k)
             !write(65,*)wmin_L(k),wmax_L(k)
             do i=nlims_L(1,k),nlims_L(2,k)
                 write(65,*)n_L(i),peri_L(i),d_obsdcL(i),d_obsdCLe(i)
