@@ -601,29 +601,36 @@ program RJ_MCMC
     
     else ! real data , untested , unedited, will probably need a little work to get working
         ! GET SWD DATA ---------------------------------------------------------------- 
+        nlims_cur=1
         open(65,file=dirname//'/dispersion.in',status='old')! 65: name of the opened file in memory (unit identifier)
-        read(65,*,IOSTAT=io)ndatad_R
-        read(65,*,IOSTAT=io)nharm_R
+        read(65,*,IOSTAT=io)ndatad_R ! number of Rayleigh modes
+        read(65,*,IOSTAT=io)nharm_R ! number of harmonics
         do k=1,nharm_R
-            read(65,*,IOSTAT=io)numharm_R(k)
-            read(65,*,IOSTAT=io)nlims_R(1,k),nlims_R(2,k)
+            read(65,*,IOSTAT=io)numharm_R(k) ! number of the harmonic (fundamental=0, first=1 etc.)
+            read(65,*,IOSTAT=io)nlims_cur_diff ! number of modes for this harmonic
+            nlims_R(1,k)=nlims_cur
+            nlims_R(2,k)=nlims_R(1,k)+nlims_cur_diff
             !read(65,*,IOSTAT=io)wmin_R(k),wmax_R(k)
-            do i=nlims_R(1,k),nlims_R(2,k)
+            do i=nlims_cur,nlims_cur+nlims_cur_diff
                 read(65,*,IOSTAT=io)n_R(i),peri_R(i),d_obsdcR(i),d_obsdCRe(i)
             enddo
+            nlims_cur=nlims_R(2,k)+1
         enddo
         
         
-        
-        read(65,*,IOSTAT=io)ndatad_L
-        read(65,*,IOSTAT=io)nharm_L
+        nlims_cur=1
+        read(65,*,IOSTAT=io)ndatad_L ! number of Love modes
+        read(65,*,IOSTAT=io)nharm_L ! number of harmonics
         do k=1,nharm_L
-            read(65,*,IOSTAT=io)numharm_L(k)
-            read(65,*,IOSTAT=io)nlims_L(1,k),nlims_L(2,k)
+            read(65,*,IOSTAT=io)numharm_L(k) ! number of the harmonic (fundamental=0, first=1 etc.)
+            read(65,*,IOSTAT=io)nlims_cur_diff ! number of modes for this harmonic
+            nlims_L(1,k)=nlims_cur
+            nlims_L(2,k)=nlims_L(1,k)+nlims_cur_diff
             !read(65,*,IOSTAT=io)wmin_L(k),wmax_L(k)
-            do i=nlims_L(1,k),nlims_L(2,k)
+            do i=nlims_cur,nlims_cur+nlims_cur_diff
                 read(65,*,IOSTAT=io)n_L(i),peri_L(i),d_obsdcL(i),d_obsdCLe(i)
             enddo
+            nlims_cur=nlims_L(2,k)+1
         enddo
         close(65)
         
