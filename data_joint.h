@@ -1,8 +1,8 @@
 
-    character (len=*), parameter :: dirname = 'OUT_ALLJOINT3'
+    character (len=*), parameter :: dirname = 'OUT_TESTJOINT3'
     character*8, parameter :: storename = 'STORFFC1'
-    integer, parameter :: burn_in = 20000! 55000 !Burn-in period
-    integer, parameter :: nsample = 200000! 50000!Post burn-in
+    integer, parameter :: burn_in = 10000! 55000 !Burn-in period
+    integer, parameter :: nsample = 100000! 50000!Post burn-in
     
     integer, parameter :: thin = 50    !Thinning of the chain 
 
@@ -72,16 +72,17 @@
     integer, parameter :: lmin=1 !min and max mode numbers (constrained by periods anyway) 
     integer, parameter :: lmax=6000
     integer, parameter :: nmodes_max=10000 !max number of modes
+    integer, parameter :: nharmo_max=6 !max number of harmonics
     
     ! parameters for joint inversion
     integer, parameter :: numdis_max=2
     real, parameter :: logalpha_min=-200
     real, parameter :: logalpha_max=20
     integer, parameter :: num_logalpha=200
-    real, parameter :: widening_start=2.
-    integer, parameter :: n_w=10
-    real,parameter :: widening_step=1.
+    real, parameter :: widening_start=1.2
+    integer, parameter :: n_w=20
+    real,parameter :: widening_step=0.2
     integer,parameter :: nsample_widening=10000! 50000!Post burn-in
-    integer,parameter :: burn_in_widening=3000! 50000!Post burn-in
+    integer,parameter :: burn_in_widening=5000! 50000!Post burn-in
     
     logical,parameter :: getting_old=.true.
