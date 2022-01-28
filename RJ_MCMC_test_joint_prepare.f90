@@ -25,6 +25,7 @@ program RJ_MCMC
 
     integer i,ii,sample,ind,ount,k ! various indices
     integer th
+    integer nlims_cur,nlims_cur_diff
     logical ier, error_flag ! error flags for dispersion curves and minos_bran
     integer npt,npt_prop,npt_iso,npt_ani ! numbers of points, isotropic, anisotropic
     logical accept,tes,birth,birtha,death,deatha,move,value,noisd_R,noisd_L,ani,change_vp !which parameter did we change?
@@ -736,36 +737,43 @@ program RJ_MCMC
     
     else ! real data , untested , unedited, will probably need a little work to get working
         ! GET SWD DATA ---------------------------------------------------------------- 
+        nlims_cur=1
         open(65,file=dirname//'/dispersion.in',status='old')! 65: name of the opened file in memory (unit identifier)
         read(65,*,IOSTAT=io)numdis
         read(65,*,IOSTAT=io)ndatad_R
         read(65,*,IOSTAT=io)nharm_R
         do k=1,nharm_R
             read(65,*,IOSTAT=io)numharm_R(k)
-            read(65,*,IOSTAT=io)nlims_R(1,k),nlims_R(2,k)
+            read(65,*,IOSTAT=io)nlims_cur_diff
+            nlims_R(1,k)=nlims_cur
+            nlims_R(2,k)=nlims_R(1,k)+nlims_cur_diff
             !read(65,*,IOSTAT=io)wmin_R(k),wmax_R(k)
-            do i=nlims_R(1,k),nlims_R(2,k)
+            do i=nlims_cur,nlims_cur+nlims_cur_diff
                 read(65,*,IOSTAT=io)n_R(i),peri_R(i),d_obsdcR(i),d_obsdCRe(i)
                 do j=1,numdis
                     read(65,*,IOSTAT=io)d_obsdcR_alt(i,j),d_obsdCRe_alt(i,j)
                 enddo
             enddo
+            nlims_cur=nlims_R(2,k)+1
         enddo
         
         
-        
+        nlims_cur=1
         read(65,*,IOSTAT=io)ndatad_L
         read(65,*,IOSTAT=io)nharm_L
         do k=1,nharm_L
             read(65,*,IOSTAT=io)numharm_L(k)
-            read(65,*,IOSTAT=io)nlims_L(1,k),nlims_L(2,k)
+            read(65,*,IOSTAT=io)nlims_cur_diff
+            nlims_L(1,k)=nlims_cur
+            nlims_L(2,k)=nlims_L(1,k)+nlims_cur_diff
             !read(65,*,IOSTAT=io)wmin_L(k),wmax_L(k)
-            do i=nlims_L(1,k),nlims_L(2,k)
+            do i=nlims_cur,nlims_cur+nlims_cur_diff
                 read(65,*,IOSTAT=io)n_L(i),peri_L(i),d_obsdcL(i),d_obsdCLe(i)
                 do j=1,numdis
                     read(65,*,IOSTAT=io)d_obsdcL_alt(i,j),d_obsdCLe_alt(i,j)
                 enddo
             enddo
+            nlims_cur=nlims_L(2,k)+1
         enddo
         close(65)
         
