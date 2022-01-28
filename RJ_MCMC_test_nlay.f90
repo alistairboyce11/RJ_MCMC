@@ -25,7 +25,7 @@ program RJ_MCMC
     !-----------------------------------------
 
 
-    character (len=*), parameter :: dirname = 'OUT_FINDSTUCK4' ! This is where output info files are saved and input data files are taken.
+    character (len=*), parameter :: dirname = 'OUT_FINDSTUCK5' ! This is where output info files are saved and input data files are taken.
     character*8, parameter :: storename = 'STORFFC1'     ! This is where output models are saved
     integer, parameter :: burn_in = 90000 ! 9000! 55000 !Burn-in period
     integer, parameter :: nsample = 300000 ! 10000! 50000!Post burn-in
@@ -181,6 +181,7 @@ program RJ_MCMC
     integer :: recalculated !counts the number of times we need to improve eps
     logical :: stuck
     integer :: nharm_R,nharm_L,iharm
+    
     ! todo: implement a test with raylquo
 1000 format(I4)
 
@@ -557,14 +558,6 @@ program RJ_MCMC
                 if (ier) stop "ier INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
                 if (maxval(abs(rq_L(:ndatad_L_tmp)))>maxrq*eps) stop "rq INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
             enddo
-            
-!             call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
-!                 qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_L,wmax_L,nmin_L,nmax_L,&
-!                 nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
-!             if (error_flag) stop "INVALID INITIAL MODEL - LOVE - minos_bran.f FAIL 002"
-!             call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,rq_R,ndatad_L,ier)
-!             if (ier) stop "INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
-!             if (maxval(rq_L(:ndatad_L))>maxrq*eps) stop "INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
         endif
 
         d_obsdcR(:ndatad_R)=d_cR(:ndatad_R)
@@ -608,50 +601,50 @@ program RJ_MCMC
     
     else ! real data , untested , unedited, will probably need a little work to get working
         ! GET SWD DATA ---------------------------------------------------------------- 
-        open(51,file=dirname//'/Data_SWD_R.in',status='old') ! 51: name of the opened file in memory (unit identifier)
-        ndatad_R=0
-        do i=1,ndatadmax
-            read(51,*,IOSTAT=io)peri_R(i),n_R(i),d_obsdcR(i),d_obsdcRe(i)
-            if (io > 0) then
-                stop "Check input.  Something was wrong"
-            elseif (io < 0) then
-                exit
-            else
-                ndatad_R=ndatad_R+1
-            endif
-            if (i==ndatadmax) stop "number of Dispersion data >= ndatadmax"
-        end do
-        close(51)
-        
-!         wmin_R=1000./(maxval(peri_R)+2)
-!         wmax_R=1000./(minval(peri_R)-2)
-!         nmin_R=minval(n_R)
-!         nmax_R=maxval(n_R) ! formerly minval(n_R) 221121 AB
-        
-        open(51,file=dirname//'/Data_SWD_L.in',status='old') ! 51: name of the opened file in memory (unit identifier)
-        ndatad_L=0
-        do i=1,ndatadmax
-            read(51,*,IOSTAT=io)peri_L(i),n_L(i),d_obsdcL(i),d_obsdcLe(i)
-            if (io > 0) then
-                stop "Check input.  Something was wrong"
-            elseif (io < 0) then
-                exit
-            else
-                ndatad_L=ndatad_L+1
-            endif
-            if (i==ndatadmax) stop "number of Dispersion data >= ndatadmax"
+        open(65,file=dirname//'/dispersion.in',status='old')! 65: name of the opened file in memory (unit identifier)
+        read(65,*,IOSTAT=io)ndatad_R
+        read(65,*,IOSTAT=io)nharm_R
+        do k=1,nharm_R
+            read(65,*,IOSTAT=io)numharm_R(k)
+            read(65,*,IOSTAT=io)nlims_R(1,k),nlims_R(2,k)
+            !read(65,*,IOSTAT=io)wmin_R(k),wmax_R(k)
+            do i=nlims_R(1,k),nlims_R(2,k)
+                read(65,*,IOSTAT=io)n_R(i),peri_R(i),d_obsdcR(i),d_obsdCRe(i)
+            enddo
         enddo
-        close(51)! close the file
         
-!         wmin_L=1000./(maxval(peri_L)+2)
-!         wmax_L=1000./(minval(peri_L)-2)
-!         nmin_L=minval(n_L)
-!         nmax_L=maxval(n_L) ! formerly minval(n_L) 221121 AB
+        
+        
+        read(65,*,IOSTAT=io)ndatad_L
+        read(65,*,IOSTAT=io)nharm_L
+        do k=1,nharm_L
+            read(65,*,IOSTAT=io)numharm_L(k)
+            read(65,*,IOSTAT=io)nlims_L(1,k),nlims_L(2,k)
+            !read(65,*,IOSTAT=io)wmin_L(k),wmax_L(k)
+            do i=nlims_L(1,k),nlims_L(2,k)
+                read(65,*,IOSTAT=io)n_L(i),peri_L(i),d_obsdcL(i),d_obsdCLe(i)
+            enddo
+        enddo
+        close(65)
+        
+        do k=1,nharm_R
+            wmin_R(k)=1000./(maxval(peri_R(nlims_R(1,k):nlims_R(2,k)))+20)
+            wmax_R(k)=1000./(minval(peri_R(nlims_R(1,k):nlims_R(2,k)))-2)
+        enddo
+        
+        do k=1,nharm_L
+            wmin_L(k)=1000./(maxval(peri_L(nlims_L(1,k):nlims_L(2,k)))+20)
+            wmax_L(k)=1000./(minval(peri_L(nlims_L(1,k):nlims_L(2,k)))-2)
+        enddo
+        
+        nmin_R=minval(n_R(:ndatad_R))
+        nmax_R=maxval(n_R(:ndatad_R))
+        
+        nmin_L=minval(n_L(:ndatad_L))
+        nmax_L=maxval(n_L(:ndatad_L))
         
         if (ndatad_R>=ndatad_L) tref=sum(peri_R(:ndatad_R))/ndatad_R
         if (ndatad_L>ndatad_R) tref=sum(peri_L(:ndatad_L))/ndatad_L
-        
-        write(*,*)'DONE READING REAL DATA'
         
     endif
     
@@ -975,8 +968,9 @@ program RJ_MCMC
 
         !*************************************************************
         if (u<0.1) then !change xi--------------------------------------------
+            Prxi=Prxi+1 !increase counter to calculate acceptance rates
+            ani=.true.
             if (npt_ani.ne.0) then
-                ani=.true.
                 !write(*,*)'changing ani'
                 ! Choose randomly an anisotropic cell among the npt_ani possibilities
                 ind2 = ceiling(ran3(ra)*(npt_ani))
@@ -991,7 +985,6 @@ program RJ_MCMC
                     endif
                 enddo
                 
-                Prxi=Prxi+1 !increase counter to calculate acceptance rates
                 if (ind>npt) stop "684"
                 if (voro(ind,3)==-1) stop "874" ! Anisotropic layer selected is isotropic...
                 voro_prop(ind,3)=voro(ind,3)+gasdev(ra)*pxi
