@@ -9,11 +9,10 @@
 !********************************************************************
 
 program RJ_MCMC
-
+    use mpi
     implicit none
-include 'mpif.h'
-include 'params.h'
-include 'data_joint.h'
+    include 'params.h'
+    include 'data_joint.h'
 
     !***************************************************************
 
@@ -26,6 +25,7 @@ include 'data_joint.h'
 
     integer i,ii,sample,ind,ount,k ! various indices
     integer th
+    integer nlims_cur,nlims_cur_diff
     logical ier, error_flag ! error flags for dispersion curves and minos_bran
     integer npt,npt_prop,npt_iso,npt_ani ! numbers of points, isotropic, anisotropic
     logical accept,tes,birth,birtha,death,deatha,move,value,noisd_R,noisd_L,ani,change_vp !which parameter did we change?
@@ -33,7 +33,12 @@ include 'data_joint.h'
     integer ind2,ind_vp,ind_vsv,ind_xi,j !more indices, mostly for posterior. j sometimes is the number of processors, careful at the end!
     real d !for calculating posterior, mostly depth
     real peri_R(ndatadmax),peri_L(ndatadmax) !periods of data
+    real peri_R_tmp(ndatadmax),peri_L_tmp(ndatadmax) !periods of data
+    
     integer n_R(ndatadmax),n_L(ndatadmax),nmax_R,nmax_L,nmin_R,nmin_L !harmonic number of modes
+    integer n_R_tmp(ndatadmax),n_L_tmp(ndatadmax)
+    integer nlims_R(2,nharmo_max),nlims_L(2,nharmo_max),numharm_count,numharm_R(nharmo_max),numharm_L(nharmo_max)
+
     real PrB,AcB,PrD,AcD,Prnd_R,Acnd_R,Prnd_L,Acnd_L,&
         Acba,Prba,Acda,Prda,out,Prxi,Acxi,Pr_vp,&
         Ac_vp,PrP(2),PrV(2),AcP(2),AcV(2) ! to adjust acceptance rates for all different parameters
@@ -48,7 +53,7 @@ include 'data_joint.h'
     real sigmav,sigmav_old,sigmav_new,AR_birth_old   !proposal on velocity when Birth move  
     real d_obsdcR(ndatadmax),d_obsdcL(ndatadmax),d_obsdcRe(ndatadmax),d_obsdcLe(ndatadmax) !observed data
     integer inorout(21000),inorouts(21000),members(21000),io ! mpi related variables
-    integer ndatad_R,ndatad_L !number of observed data points
+    integer ndatad_R,ndatad_L,ndatad_R_tmp,ndatad_L_tmp !number of observed data points
     real pxi,p_vp,pd1,pv1,pd2,pv2,pAd_R,pAd_L ! related to observed data for azimuthal anisotropy
     ! Geometry parameters
     ! Traces
@@ -71,8 +76,10 @@ include 'data_joint.h'
     integer nptfinal,nic,noc,nic_ref,noc_ref,jcom ! more inputs
     integer nmodes,n_mode(nmodes_max),l_mode(nmodes_max) ! outputs of forward modelling
     real c_ph(nmodes_max),period(nmodes_max),raylquo(nmodes_max),tref ! more outputs, rayquo: error measurement, should be of the order of eps
-    real wmin_R,wmax_R,wmin_L,wmax_L ! more inputs for forward modelling
-    real wmin_R_tmp,wmax_R_tmp,wmin_L_tmp,wmax_L_tmp ! more inputs for forward modelling
+
+    real wmin_R(nharmo_max),wmax_R(nharmo_max),wmin_L(nharmo_max),wmax_L(nharmo_max) ! more inputs f
+    logical stuck
+    integer nharm_R,nharm_L,iharm
     
     integer idis, numdis,i_al ! additional stuff for joint inversion
     real like_alt,like_alt_L,like_alt_R
@@ -105,6 +112,7 @@ include 'data_joint.h'
     real best_current_pd1,best_current_pd2,best_current_sigmav
     integer best_current_npt
     real best_current_voro(malay,4)
+    logical burnin_in_progress
 
     ! todo: implement a test with raylquo
 1000 format(I4)
@@ -130,7 +138,8 @@ include 'data_joint.h'
     testing=.true.
     if (testing) write(*,*)'testing with synthetic model'
     
-    ra=0
+    ra=rank
+    ran=rank
     
     !************************************************************
     !                READ PREM 
@@ -159,77 +168,179 @@ include 'data_joint.h'
     if (testing) then !!!!!!!testing: create synthetic model
         write(*,*)'testing'
         ndatad_R=0
-        j=0
+        j=1
+        numharm_count=1
         ! careful: periods listed by decreasing period, increasing harmonic order
+        nlims_R(1,numharm_count)=j
         do i=200,40,-5 !synthetic periods, harmonics, uncertainties
-            j=j+1
             peri_R(j)=real(i)
             d_obsdcRe(j)=0.01
             n_R(j)=0
+            j=j+1
         end do
-!         do i=200,50,-5
-!             j=j+1
+        numharm_R(numharm_count)=0
+        nlims_R(2,numharm_count)=j-1
+        wmin_R(numharm_count)=1000./(maxval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))+20)
+        wmax_R(numharm_count)=1000./(minval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))-2)
+        
+!         numharm_count=numharm_count+1
+!         nlims_R(1,numharm_count)=j
+!         do i=240,40,-10
+!             
 !             peri_R(j)=real(i)
 !             d_obsdcRe(j)=0.01
 !             n_R(j)=1
-!         end do
-!         do i=200,50,-5
 !             j=j+1
+!         end do
+!         numharm_R(numharm_count)=1
+!         nlims_R(2,numharm_count)=j-1
+!         wmin_R(numharm_count)=1000./(maxval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))+20)
+!         wmax_R(numharm_count)=1000./(minval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))-2)
+
+!         numharm_count=numharm_count+1
+!         nlims_R(1,numharm_count)=j
+!         do i=160,40,-10
+!             
 !             peri_R(j)=real(i)
 !             d_obsdcRe(j)=0.01
 !             n_R(j)=2
-!         end do
-!         do i=150,50,-5
 !             j=j+1
+!         end do
+!         numharm_R(numharm_count)=2
+!         nlims_R(2,numharm_count)=j-1
+!         wmin_R(numharm_count)=1000./(maxval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))+20)
+!         wmax_R(numharm_count)=1000./(minval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))-2)
+
+!         numharm_count=numharm_count+1
+!         nlims_R(1,numharm_count)=j
+!         do i=90,40,-10
+!             
 !             peri_R(j)=real(i)
 !             d_obsdcRe(j)=0.01
 !             n_R(j)=3
-!         end do
-!         do i=100,50,-5
 !             j=j+1
+!         end do
+!         numharm_R(numharm_count)=3
+!         nlims_R(2,numharm_count)=j-1
+!         wmin_R(numharm_count)=1000./(maxval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))+20)
+!         wmax_R(numharm_count)=1000./(minval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))-2)
+
+!         numharm_count=numharm_count+1
+!         nlims_R(1,numharm_count)=j
+!         do i=50,40,-5
+!             
 !             peri_R(j)=real(i)
 !             d_obsdcRe(j)=0.01
 !             n_R(j)=4
+!             j=j+1
 !         end do
-        ndatad_R=j
-        wmin_R=1000./(maxval(peri_R(:ndatad_R))+20)
-        wmax_R=1000./(minval(peri_R(:ndatad_R))-2)
+!         numharm_R(numharm_count)=4
+!         nlims_R(2,numharm_count)=j-1
+!         wmin_R(numharm_count)=1000./(maxval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))+20)
+!         wmax_R(numharm_count)=1000./(minval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))-2)
+
+!         numharm_count=numharm_count+1
+!         nlims_R(1,numharm_count)=j
+!         do i=50,40,-5
+!             
+!             peri_R(j)=real(i)
+!             d_obsdcRe(j)=0.01
+!             n_R(j)=5
+!             j=j+1
+!         end do
+!         numharm_R(numharm_count)=5
+!         nlims_R(2,numharm_count)=j-1
+!         wmin_R(numharm_count)=1000./(maxval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))+20)
+!         wmax_R(numharm_count)=1000./(minval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))-2)
+
+        ndatad_R=j-1
+        nharm_R=numharm_count
+!         wmin_R=1000./(maxval(peri_R(:ndatad_R))+20)
+!         wmax_R=1000./(minval(peri_R(:ndatad_R))-2)
         nmin_R=minval(n_R(:ndatad_R))
         nmax_R=maxval(n_R(:ndatad_R))
         
         ndatad_L=0
-        j=0
+        j=1
+        numharm_count=1
+        nlims_L(1,numharm_count)=j
         do i=200,40,-5
-            j=j+1
             peri_L(j)=real(i)
-            d_obsdcLe(j)=0.01
+            d_obsdcLe(j)=0.02
             n_L(j)=0
+            j=j+1
         end do
-!         do i=200,50,-10
-!             j=j+1
+        numharm_L(numharm_count)=0
+        nlims_L(2,numharm_count)=j-1
+        wmin_L(numharm_count)=1000./(maxval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))+20)
+        wmax_L(numharm_count)=1000./(minval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))-2)
+        
+!         numharm_count=numharm_count+1
+!         nlims_L(1,numharm_count)=j
+!         do i=240,40,-10
 !             peri_L(j)=real(i)
-!             d_obsdcLe(j)=0.01
+!             d_obsdcLe(j)=0.02
 !             n_L(j)=1
-!         end do
-!         do i=200,50,-5
 !             j=j+1
+!         end do
+!         numharm_L(numharm_count)=1
+!         nlims_L(2,numharm_count)=j-1
+!         wmin_L(numharm_count)=1000./(maxval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))+20)
+!         wmax_L(numharm_count)=1000./(minval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))-2)
+
+!         numharm_count=numharm_count+1
+!         nlims_L(1,numharm_count)=j
+!         do i=160,40,-10
 !             peri_L(j)=real(i)
-!             d_obsdcLe(j)=0.01
+!             d_obsdcLe(j)=0.02
 !             n_L(j)=2
-!         end do
-!         do i=150,50,-5
 !             j=j+1
+!         end do
+!         numharm_L(numharm_count)=2
+!         nlims_L(2,numharm_count)=j-1
+!         wmin_L(numharm_count)=1000./(maxval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))+20)
+!         wmax_L(numharm_count)=1000./(minval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))-2)
+
+!         numharm_count=numharm_count+1
+!         nlims_L(1,numharm_count)=j
+!         do i=90,40,-10
 !             peri_L(j)=real(i)
-!             d_obsdcLe(j)=0.01
+!             d_obsdcLe(j)=0.02
 !             n_L(j)=3
-!         end do
-!         do i=100,50,-5
 !             j=j+1
-!             peri_L(j)=real(i)
-!             d_obsdcLe(j)=0.01
-!             n_L(j)=4
 !         end do
-        ndatad_L=j
+!         numharm_L(numharm_count)=3
+!         nlims_L(2,numharm_count)=j-1
+!         wmin_L(numharm_count)=1000./(maxval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))+20)
+!         wmax_L(numharm_count)=1000./(minval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))-2)
+
+!         numharm_count=numharm_count+1
+!         nlims_L(1,numharm_count)=j
+!         do i=50,40,-5
+!             peri_L(j)=real(i)
+!             d_obsdcLe(j)=0.02
+!             n_L(j)=4
+!             j=j+1
+!         end do
+!         numharm_L(numharm_count)=4
+!         nlims_L(2,numharm_count)=j-1
+!         wmin_L(numharm_count)=1000./(maxval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))+20)
+!         wmax_L(numharm_count)=1000./(minval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))-2)
+
+!         numharm_count=numharm_count+1
+!         nlims_L(1,numharm_count)=j
+!         do i=50,40,-5
+!             peri_L(j)=real(i)
+!             d_obsdcLe(j)=0.02
+!             n_L(j)=5
+!             j=j+1
+!         end do
+!         numharm_L(numharm_count)=5
+!         nlims_L(2,numharm_count)=j-1
+!         wmin_L(numharm_count)=1000./(maxval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))+20)
+!         wmax_L(numharm_count)=1000./(minval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))-2)
+        ndatad_L=j-1
+        nharm_L=numharm_count
         wmin_L=1000./(maxval(peri_L(:ndatad_L))+20)
         wmax_L=1000./(minval(peri_L(:ndatad_L))-2)
         nmin_L=minval(n_L(:ndatad_L))
@@ -245,6 +356,7 @@ include 'data_joint.h'
         voro(1,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
         voro(1,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
         voro(1,4)=0!0.3-0.5/33.*i !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in
+        npt=1
         do i=2,11
             voro(i,1)=30*(i-1) !depth of interface
             voro(i,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
@@ -264,37 +376,52 @@ include 'data_joint.h'
 !         voro(18,4)=-0.3
 !         voro(19,4)=-0.3
         
-        
         ! take voro, combine it with prem into a format suitable for minos
         call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
             r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
         
         !calculate synthetic dispersion curves
-        if (ndatad_R>0) then         
-            
+        if (ndatad_R>0) then
             jcom=3 !rayleigh waves
             
-            nmodes=0
-            call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
-                qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_R,wmax_R,nmin_R,nmax_R,&
-                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
-            if (error_flag) stop "INVALID INITIAL MODEL - RAYLEIGH - minos_bran.f FAIL 001"
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,rq_R,ndatad_R,ier) ! extract phase velocities from minos output (pretty ugly)
-            if (ier) stop "INVALID INITIAL MODEL - RAYLEIGH - CHANGE PERIODS or MODEL"
-            if (maxval(rq_R(:ndatad_R))>maxrq*eps) stop "INVALID INITIAL MODEL - RAYLEIGH - CHANGE PERIODS or MODEL"
+            do iharm=1,nharm_R
+                nmodes=0
+                call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
+                    qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,&
+                    wmin_R(iharm),wmax_R(iharm),numharm_R(iharm),numharm_R(iharm),&
+                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
+                if (error_flag) stop "INVALID INITIAL MODEL - RAYLEIGH - minos_bran.f FAIL 001"
+                peri_R_tmp=peri_R(nlims_R(1,iharm):nlims_R(2,iharm))
+                ndatad_R_tmp=nlims_R(2,iharm)-nlims_R(1,iharm)+1 ! fortran slices take the first and the last element
+                n_R_tmp(:ndatad_R_tmp)=n_R(nlims_R(1,iharm):nlims_R(2,iharm))
+                
+                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
+                    peri_R_tmp,n_R_tmp,d_cR_tmp,rq_R,ndatad_R_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
+                d_cR(nlims_R(1,iharm):nlims_R(2,iharm))=d_cR_tmp
+                if (ier) stop "INVALID INITIAL MODEL - RAYLEIGH - CHANGE PERIODS or MODEL"
+                if (maxval(abs(rq_R(:ndatad_R_tmp)))>maxrq*eps) stop "INVALID INITIAL MODEL - RAYLEIGH - CHANGE PERIODS or MODEL"
+            enddo
         endif
         
         if (ndatad_L>0) then
-            
             jcom=2 !love waves
-            nmodes=0
-            call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
-                qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_L,wmax_L,nmin_L,nmax_L,&
-                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
-            if (error_flag) stop "INVALID INITIAL MODEL - LOVE - minos_bran.f FAIL 002"
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,rq_L,ndatad_L,ier)
-            if (ier) stop "INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
-            if (maxval(rq_L(:ndatad_L))>maxrq*eps) stop "INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
+            do iharm=1,nharm_L
+                nmodes=0
+                call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
+                    qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,&
+                    wmin_L(iharm),wmax_L(iharm),numharm_L(iharm),numharm_L(iharm),&
+                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
+                if (error_flag) stop "INVALID INITIAL MODEL - LOVE - minos_bran.f FAIL 002"
+                peri_L_tmp=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                ndatad_L_tmp=nlims_L(2,iharm)-nlims_L(1,iharm)+1 ! fortran slices take the first and the last element
+                n_L_tmp(:ndatad_L_tmp)=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                
+                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
+                    peri_L_tmp,n_L_tmp,d_cL_tmp,rq_L,ndatad_L_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
+                d_cL(nlims_L(1,iharm):nlims_L(2,iharm))=d_cL_tmp
+                if (ier) stop "ier INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
+                if (maxval(abs(rq_L(:ndatad_L_tmp)))>maxrq*eps) stop "rq INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
+            enddo
         endif
 
         d_obsdcR(:ndatad_R)=d_cR(:ndatad_R)        
@@ -302,13 +429,30 @@ include 'data_joint.h'
         
         !add errors
         
-        do i=1,ndatad_R
-            d_obsdcR(i)=d_obsdcR(i)+gasdev(ra)*0.1
-        end do
-        
-        do i=1,ndatad_L
-            d_obsdcL(i)=d_obsdcL(i)+gasdev(ra)*0.1
-        end do
+        IF (nbproc.gt.1) THEN
+            IF (ran==0) THEN
+                do i=1,ndatad_R
+                    d_obsdcR(i)=d_obsdcR(i)+gasdev(ra)*0.1
+                end do
+                do i=1,ndatad_L
+                    d_obsdcL(i)=d_obsdcL(i)+gasdev(ra)*0.1
+                end do
+                do i=2,nbproc
+                    call MPI_SEND(d_obsdcR, ndatadmax, MPI_Real, i-1, 1, MPI_COMM_WORLD, ierror)
+                    call MPI_SEND(d_obsdcL, ndatadmax, MPI_Real, i-1, 1, MPI_COMM_WORLD, ierror)
+                enddo
+            else
+                call MPI_RECV(d_obsdcR, ndatadmax, MPI_Real, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierror)
+                call MPI_RECV(d_obsdcL, ndatadmax, MPI_Real, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierror)
+            endif
+        else
+            do i=1,ndatad_R
+                d_obsdcR(i)=d_obsdcR(i)+gasdev(ra)*0.1
+            end do
+            do i=1,ndatad_L
+                d_obsdcL(i)=d_obsdcL(i)+gasdev(ra)*0.1
+            end do
+        endif
         
         ! write synthetic model into a file
         open(65,file=dirname//'/true_model.out',status='replace')
@@ -358,45 +502,78 @@ include 'data_joint.h'
             r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
         
         !calculate synthetic dispersion curves
-        if (ndatad_R>0) then         
-            
+        if (ndatad_R>0) then
             jcom=3 !rayleigh waves
             
-            nmodes=0
-            call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
-                qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_R,wmax_R,nmin_R,nmax_R,&
-                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
-            if (error_flag) stop "INVALID INITIAL MODEL - RAYLEIGH - minos_bran.f FAIL 001-1"
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,rq_R,ndatad_R,ier) ! extract phase velocities from minos output (pretty ugly)
-            if (ier) stop "INVALID INITIAL MODEL - RAYLEIGH - CHANGE PERIODS or MODEL"
-            if (maxval(rq_R(:ndatad_R))>maxrq*eps) stop "INVALID INITIAL MODEL - RAYLEIGH - CHANGE PERIODS or MODEL"
+            do iharm=1,nharm_R
+                nmodes=0
+                call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
+                    qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,&
+                    wmin_R(iharm),wmax_R(iharm),numharm_R(iharm),numharm_R(iharm),&
+                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
+                if (error_flag) stop "INVALID INITIAL MODEL - RAYLEIGH - minos_bran.f FAIL 001"
+                peri_R_tmp=peri_R(nlims_R(1,iharm):nlims_R(2,iharm))
+                ndatad_R_tmp=nlims_R(2,iharm)-nlims_R(1,iharm)+1 ! fortran slices take the first and the last element
+                n_R_tmp(:ndatad_R_tmp)=n_R(nlims_R(1,iharm):nlims_R(2,iharm))
+                
+                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
+                    peri_R_tmp,n_R_tmp,d_cR_tmp,rq_R,ndatad_R_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
+                d_cR(nlims_R(1,iharm):nlims_R(2,iharm))=d_cR_tmp
+                if (ier) stop "INVALID INITIAL MODEL - RAYLEIGH - CHANGE PERIODS or MODEL"
+                if (maxval(abs(rq_R(:ndatad_R_tmp)))>maxrq*eps) stop "INVALID INITIAL MODEL - RAYLEIGH - CHANGE PERIODS or MODEL"
+            enddo
         endif
         
         if (ndatad_L>0) then
-            
             jcom=2 !love waves
-            nmodes=0
-            call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
-                qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_L,wmax_L,nmin_L,nmax_L,&
-                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
-            if (error_flag) stop "INVALID INITIAL MODEL - LOVE - minos_bran.f FAIL 002-1"
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,rq_L,ndatad_L,ier)
-            if (ier) stop "INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
-            if (maxval(rq_L(:ndatad_L))>maxrq*eps) stop "INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
+            do iharm=1,nharm_L
+                nmodes=0
+                call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
+                    qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,&
+                    wmin_L(iharm),wmax_L(iharm),numharm_L(iharm),numharm_L(iharm),&
+                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
+                if (error_flag) stop "INVALID INITIAL MODEL - LOVE - minos_bran.f FAIL 002"
+                peri_L_tmp=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                ndatad_L_tmp=nlims_L(2,iharm)-nlims_L(1,iharm)+1 ! fortran slices take the first and the last elementwrite(*,*)'now here',rank
+                n_L_tmp(:ndatad_L_tmp)=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                
+                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
+                    peri_L_tmp,n_L_tmp,d_cL_tmp,rq_L,ndatad_L_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
+                d_cL(nlims_L(1,iharm):nlims_L(2,iharm))=d_cL_tmp
+                if (ier) stop "ier INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
+                if (maxval(abs(rq_L(:ndatad_L_tmp)))>maxrq*eps) stop "rq INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
+            enddo
         endif
-
+        
         d_obsdcR_alt(:ndatad_R,1)=d_cR(:ndatad_R)
         d_obsdcL_alt(:ndatad_L,1)=d_cL(:ndatad_L)
         
         !add errors
         
-        do i=1,ndatad_R
-            d_obsdcR_alt(i,1)=d_obsdcR_alt(i,1)+gasdev(ra)*0.1
-        end do
-        
-        do i=1,ndatad_L
-            d_obsdcL_alt(i,1)=d_obsdcL_alt(i,1)+gasdev(ra)*0.1
-        end do
+        IF (nbproc.gt.1) THEN
+            IF (ran==0) THEN
+                do i=1,ndatad_R
+                    d_obsdcR_alt(i,1)=d_obsdcR_alt(i,1)+gasdev(ra)*0.1
+                end do
+                do i=1,ndatad_L
+                    d_obsdcL_alt(i,1)=d_obsdcL_alt(i,1)+gasdev(ra)*0.1
+                end do
+!                 do i=2,nbproc
+!                     call MPI_SEND(d_obsdcR_alt, ndatadmax*numdis_max, MPI_Real, i-1, 2, MPI_COMM_WORLD, ierror)
+!                     call MPI_SEND(d_obsdcL_alt, ndatadmax*numdis_max, MPI_Real, i-1, 2, MPI_COMM_WORLD, ierror)
+!                 enddo
+!             else
+!                 call MPI_RECV(d_obsdcR_alt, ndatadmax*numdis_max, MPI_Real, 0, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierror)
+!                 call MPI_RECV(d_obsdcL_alt, ndatadmax*numdis_max, MPI_Real, 0, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierror)
+            endif
+        else
+            do i=1,ndatad_R
+                d_obsdcR_alt(i,1)=d_obsdcR_alt(i,1)+gasdev(ra)*0.1
+            end do
+            do i=1,ndatad_L
+                d_obsdcL_alt(i,1)=d_obsdcL_alt(i,1)+gasdev(ra)*0.1
+            end do
+        endif
         
         open(65,file=dirname//'/true_model_1.out',status='replace')
         do i=1,nptfinal
@@ -444,45 +621,77 @@ include 'data_joint.h'
             r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
         
         !calculate synthetic dispersion curves
-        if (ndatad_R>0) then         
-            
+        if (ndatad_R>0) then
             jcom=3 !rayleigh waves
             
-            nmodes=0
-            call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
-                qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_R,wmax_R,nmin_R,nmax_R,&
-                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
-            if (error_flag) stop "INVALID INITIAL MODEL - RAYLEIGH - minos_bran.f FAIL 001-2"
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,rq_R,ndatad_R,ier) ! extract phase velocities from minos output (pretty ugly)
-            if (ier) stop "INVALID INITIAL MODEL - RAYLEIGH - CHANGE PERIODS or MODEL"
-            if (maxval(rq_R(:ndatad_R))>maxrq*eps) stop "INVALID INITIAL MODEL - RAYLEIGH - CHANGE PERIODS or MODEL"
+            do iharm=1,nharm_R
+                nmodes=0
+                call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
+                    qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,&
+                    wmin_R(iharm),wmax_R(iharm),numharm_R(iharm),numharm_R(iharm),&
+                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
+                if (error_flag) stop "INVALID INITIAL MODEL - RAYLEIGH - minos_bran.f FAIL 001"
+                peri_R_tmp=peri_R(nlims_R(1,iharm):nlims_R(2,iharm))
+                ndatad_R_tmp=nlims_R(2,iharm)-nlims_R(1,iharm)+1 ! fortran slices take the first and the last element
+                n_R_tmp(:ndatad_R_tmp)=n_R(nlims_R(1,iharm):nlims_R(2,iharm))
+                
+                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
+                    peri_R_tmp,n_R_tmp,d_cR_tmp,rq_R,ndatad_R_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
+                d_cR(nlims_R(1,iharm):nlims_R(2,iharm))=d_cR_tmp
+                if (ier) stop "INVALID INITIAL MODEL - RAYLEIGH - CHANGE PERIODS or MODEL"
+                if (maxval(abs(rq_R(:ndatad_R_tmp)))>maxrq*eps) stop "INVALID INITIAL MODEL - RAYLEIGH - CHANGE PERIODS or MODEL"
+            enddo
         endif
         
         if (ndatad_L>0) then
-            
             jcom=2 !love waves
-            nmodes=0
-            call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
-                qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_L,wmax_L,nmin_L,nmax_L,&
-                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
-            if (error_flag) stop "INVALID INITIAL MODEL - LOVE - minos_bran.f FAIL 002-2"
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,rq_L,ndatad_L,ier)
-            if (ier) stop "INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
-            if (maxval(rq_L(:ndatad_L))>maxrq*eps) stop "INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
+            do iharm=1,nharm_L
+                nmodes=0
+                call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
+                    qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,&
+                    wmin_L(iharm),wmax_L(iharm),numharm_L(iharm),numharm_L(iharm),&
+                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
+                if (error_flag) stop "INVALID INITIAL MODEL - LOVE - minos_bran.f FAIL 002"
+                peri_L_tmp=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                ndatad_L_tmp=nlims_L(2,iharm)-nlims_L(1,iharm)+1 ! fortran slices take the first and the last element
+                n_L_tmp(:ndatad_L_tmp)=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                
+                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
+                    peri_L_tmp,n_L_tmp,d_cL_tmp,rq_L,ndatad_L_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
+                d_cL(nlims_L(1,iharm):nlims_L(2,iharm))=d_cL_tmp
+                if (ier) stop "ier INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
+                if (maxval(abs(rq_L(:ndatad_L_tmp)))>maxrq*eps) stop "rq INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
+            enddo
         endif
 
         d_obsdcR_alt(:ndatad_R,2)=d_cR(:ndatad_R)        
         d_obsdcL_alt(:ndatad_L,2)=d_cL(:ndatad_L)
         
         !add errors
-        
-        do i=1,ndatad_R
-            d_obsdcR_alt(i,2)=d_obsdcR_alt(i,2)+gasdev(ra)*0.1
-        end do
-        
-        do i=1,ndatad_L
-            d_obsdcL_alt(i,2)=d_obsdcL_alt(i,2)+gasdev(ra)*0.1
-        end do
+        IF (nbproc.gt.1) THEN
+            IF (ran==0) THEN
+                do i=1,ndatad_R
+                    d_obsdcR_alt(i,2)=d_obsdcR_alt(i,2)+gasdev(ra)*0.1
+                end do
+                do i=1,ndatad_L
+                    d_obsdcL_alt(i,2)=d_obsdcL_alt(i,2)+gasdev(ra)*0.1
+                end do
+                do i=2,nbproc
+                    call MPI_SEND(d_obsdcR_alt, ndatadmax*numdis_max, MPI_Real, i-1, 3, MPI_COMM_WORLD, ierror)
+                    call MPI_SEND(d_obsdcL_alt, ndatadmax*numdis_max, MPI_Real, i-1, 3, MPI_COMM_WORLD, ierror)
+                enddo
+            else
+                call MPI_RECV(d_obsdcR_alt, ndatadmax*numdis_max, MPI_Real, 0, 3, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierror)
+                call MPI_RECV(d_obsdcL_alt, ndatadmax*numdis_max, MPI_Real, 0, 3, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierror)
+            endif
+        else
+            do i=1,ndatad_R
+                d_obsdcR_alt(i,2)=d_obsdcR_alt(i,2)+gasdev(ra)*0.1
+            end do
+            do i=1,ndatad_L
+                d_obsdcL_alt(i,2)=d_obsdcL_alt(i,2)+gasdev(ra)*0.1
+            end do
+        endif
         
         numdis=2
         
@@ -492,69 +701,97 @@ include 'data_joint.h'
         enddo
         close(65)
         
-        open(65,file=dirname//'/dispersion.inout',status='replace')
-        write(65,*),numdis
+        open(65,file=dirname//'/dispersion.in',status='replace')
+        write(65,*)numdis
         write(65,*)ndatad_R
-        do i=1,ndatad_R
-            write(65,*)n_R(i),peri_R(i),d_obsdcR(i),d_obsdCRe(i)
-            do j=1,numdis
-                write(65,*)d_obsdcR_alt(i,j),d_obsdCRe_alt(i,j)
+        write(65,*)nharm_R
+        do k=1,nharm_R
+            write(65,*)numharm_R(k)
+            write(65,*)nlims_R(2,k)-nlims_R(1,k)
+            !write(65,*)wmin_R(k),wmax_R(k)
+            do i=nlims_R(1,k),nlims_R(2,k)
+                write(65,*)n_R(i),peri_R(i),d_obsdcR(i),d_obsdCRe(i)
+                do j=1,numdis
+                    write(65,*)d_obsdcR_alt(i,j),d_obsdCRe_alt(i,j)
+                enddo
             enddo
         enddo
+        
         write(65,*)ndatad_L
-        do i=1,ndatad_L
-            write(65,*)n_L(i),peri_L(i),d_obsdcL(i),d_obsdCLe(i)
-            do j=1,numdis
-                write(65,*)d_obsdcL_alt(i,j),d_obsdCLe_alt(i,j)
+        write(65,*)nharm_L
+        do k=1,nharm_L
+            write(65,*)numharm_L(k)
+            write(65,*)nlims_L(2,k)-nlims_L(1,k)
+            !write(65,*)wmin_L(k),wmax_L(k)
+            do i=nlims_L(1,k),nlims_L(2,k)
+                write(65,*)n_L(i),peri_L(i),d_obsdcL(i),d_obsdCLe(i)
+                do j=1,numdis
+                    write(65,*)d_obsdcL_alt(i,j),d_obsdCLe_alt(i,j)
+                enddo
             enddo
         enddo
         close(65)
-        
         
         
         write(*,*)'DONE INITIALIZING'
     
     else ! real data , untested , unedited, will probably need a little work to get working
         ! GET SWD DATA ---------------------------------------------------------------- 
-        open(51,file=dirname//'/Data_SWD_R.in',status='old') ! 51: name of the opened file in memory (unit identifier)
-        ndatad_R=0
-        do i=1,ndatadmax
-            read(51,*,IOSTAT=io)peri_R(i),n_R(i),d_obsdcR(i),d_obsdcRe(i)
-            if (io > 0) then
-                stop "Check input.  Something was wrong"
-            elseif (io < 0) then
-                exit
-            else
-                ndatad_R=ndatad_R+1
-            endif
-            if (i==ndatadmax) stop "number of Dispersion data >= ndatadmax"
-        end do
-        close(51)
-        
-        wmin_R=1000./(maxval(peri_R)+2)
-        wmax_R=1000./(minval(peri_R)-2)
-        nmin_R=minval(n_R)
-        nmax_R=minval(n_R)
-        
-        open(51,file=dirname//'/Data_SWD_L.in',status='old') ! 51: name of the opened file in memory (unit identifier)
-        ndatad_L=0
-        do i=1,ndatadmax
-            read(51,*,IOSTAT=io)peri_L(i),n_L(i),d_obsdcL(i),d_obsdcLe(i)
-            if (io > 0) then
-                stop "Check input.  Something was wrong"
-            elseif (io < 0) then
-                exit
-            else
-                ndatad_L=ndatad_L+1
-            endif
-            if (i==ndatadmax) stop "number of Dispersion data >= ndatadmax"
+        nlims_cur=1
+        open(65,file=dirname//'/dispersion.in',status='old')! 65: name of the opened file in memory (unit identifier)
+        read(65,*,IOSTAT=io)numdis
+        read(65,*,IOSTAT=io)ndatad_R
+        read(65,*,IOSTAT=io)nharm_R
+        do k=1,nharm_R
+            read(65,*,IOSTAT=io)numharm_R(k)
+            read(65,*,IOSTAT=io)nlims_cur_diff
+            nlims_R(1,k)=nlims_cur
+            nlims_R(2,k)=nlims_R(1,k)+nlims_cur_diff
+            !read(65,*,IOSTAT=io)wmin_R(k),wmax_R(k)
+            do i=nlims_cur,nlims_cur+nlims_cur_diff
+                read(65,*,IOSTAT=io)n_R(i),peri_R(i),d_obsdcR(i),d_obsdCRe(i)
+                do j=1,numdis
+                    read(65,*,IOSTAT=io)d_obsdcR_alt(i,j),d_obsdCRe_alt(i,j)
+                enddo
+            enddo
+            nlims_cur=nlims_R(2,k)+1
         enddo
-        close(51)! close the file
         
-        wmin_L=1000./(maxval(peri_L)+2)
-        wmax_L=1000./(minval(peri_L)-2)
-        nmin_L=minval(n_L)
-        nmax_L=minval(n_L)
+        
+        nlims_cur=1
+        read(65,*,IOSTAT=io)ndatad_L
+        read(65,*,IOSTAT=io)nharm_L
+        do k=1,nharm_L
+            read(65,*,IOSTAT=io)numharm_L(k)
+            read(65,*,IOSTAT=io)nlims_cur_diff
+            nlims_L(1,k)=nlims_cur
+            nlims_L(2,k)=nlims_L(1,k)+nlims_cur_diff
+            !read(65,*,IOSTAT=io)wmin_L(k),wmax_L(k)
+            do i=nlims_cur,nlims_cur+nlims_cur_diff
+                read(65,*,IOSTAT=io)n_L(i),peri_L(i),d_obsdcL(i),d_obsdCLe(i)
+                do j=1,numdis
+                    read(65,*,IOSTAT=io)d_obsdcL_alt(i,j),d_obsdCLe_alt(i,j)
+                enddo
+            enddo
+            nlims_cur=nlims_L(2,k)+1
+        enddo
+        close(65)
+        
+        do k=1,nharm_R
+            wmin_R(k)=1000./(maxval(peri_R(nlims_R(1,k):nlims_R(2,k)))+20)
+            wmax_R(k)=1000./(minval(peri_R(nlims_R(1,k):nlims_R(2,k)))-2)
+        enddo
+        
+        do k=1,nharm_L
+            wmin_L(k)=1000./(maxval(peri_L(nlims_L(1,k):nlims_L(2,k)))+20)
+            wmax_L(k)=1000./(minval(peri_L(nlims_L(1,k):nlims_L(2,k)))-2)
+        enddo
+        
+        nmin_R=minval(n_R(:ndatad_R))
+        nmax_R=maxval(n_R(:ndatad_R))
+        
+        nmin_L=minval(n_L(:ndatad_L))
+        nmax_L=maxval(n_L(:ndatad_L))
         
         if (ndatad_R>=ndatad_L) tref=sum(peri_R(:ndatad_R))/ndatad_R
         if (ndatad_L>ndatad_R) tref=sum(peri_L(:ndatad_L))/ndatad_L
@@ -603,6 +840,7 @@ include 'data_joint.h'
     inorouts=0
     
     ier=.false.
+    stuck=.false.
     
     
     ! to do: branch out on different cores
@@ -635,40 +873,64 @@ include 'data_joint.h'
             !voro(i,3)=-1
             voro(i,4)= vpvsv_min+(vpvsv_max-vpvsv_min)*ran3(ra)
         enddo
-
+        
+        call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+        
         if (ndatad_R>0) then
-            nmodes=0
-            call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-                r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+            
             jcom=3 !rayleigh waves
-            call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
-                qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_R,wmax_R,nmin_R,nmax_R,&
-                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
-            if (error_flag) then
-                tes=.false.
-                write(*,*)"Minos_bran FAILED for RAYLEIGH 003"
-            end if
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,rq_R,ndatad_R,ier)
-            if (ier) tes=.false.
-            if (maxval(rq_R(:ndatad_R))>maxrq*eps) tes=.false.
+            
+            do iharm=1,nharm_R
+                nmodes=0
+                call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
+                    qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,&
+                    wmin_R(iharm),wmax_R(iharm),numharm_R(iharm),numharm_R(iharm),&
+                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
+                if (error_flag) then 
+                    tes=.false.
+                    write(*,*)"Minos_bran FAILED for RAYLEIGH 004"
+                else
+                    write(*,*)"Minos_bran SUCCESS for RAYLEIGH"
+                end if
+                peri_R_tmp=peri_R(nlims_R(1,iharm):nlims_R(2,iharm))
+                n_R_tmp=n_R(nlims_R(1,iharm):nlims_R(2,iharm))
+                ndatad_R_tmp=nlims_R(2,iharm)-nlims_R(1,iharm)+1 ! fortran slices take the first and the last element
+                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
+                    peri_R_tmp,n_R_tmp,d_cR_tmp,rq_R,ndatad_R_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
+                write(*,*)"dispersion_minos for RAYLEIGH"
+                d_cR(nlims_R(1,iharm):nlims_R(2,iharm))=d_cR_tmp
+                if (ier) tes=.false.
+                if (maxval(abs(rq_R(:ndatad_R_tmp)))>maxrq*eps) tes=.false.
+            enddo
         endif
         
         if (ndatad_L>0) then
-            nmodes=0
-            call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-                r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+        
             jcom=2 !love waves
-            call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
-                qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_L,wmax_L,nmin_L,nmax_L,&
-                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
-            if (error_flag) then
-                tes=.false.
-                write(*,*)"Minos_bran FAILED for LOVE 004"
-            endif
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,rq_L,ndatad_L,ier)
-            
-            if (ier) tes=.false.
-            if (maxval(rq_L(:ndatad_L))>maxrq*eps) tes=.false.
+            do iharm=1,nharm_L
+                nmodes=0
+                call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
+                    qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,&
+                    wmin_L(iharm),wmax_L(iharm),numharm_L(iharm),numharm_L(iharm),&
+                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
+                if (error_flag) then 
+                    tes=.false.
+                    write(*,*)"Minos_bran FAILED for LOVE 004"
+                else
+                    write(*,*)"Minos_bran SUCCESS for LOVE"
+                end if
+                peri_L_tmp=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                n_L_tmp=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                ndatad_L_tmp=nlims_L(2,iharm)-nlims_L(1,iharm)+1 ! fortran slices take the first and the last element
+                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
+                peri_L_tmp,n_L_tmp,d_cL_tmp,rq_L,ndatad_L_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
+                write(*,*)"dispersion_minos for LOVE"
+                d_cL(nlims_L(1,iharm):nlims_L(2,iharm))=d_cL_tmp
+                if (ier) tes=.false.
+                if (maxval(abs(rq_L(:ndatad_L_tmp)))>maxrq*eps) tes=.false.
+            enddo
+        
         endif
         
         if (j>250) stop "CAN'T INITIALIZE MODEL" ! if it doesn't work after 250 tries, give up
@@ -715,8 +977,8 @@ include 'data_joint.h'
     like= (liked_R + liked_L)
     like_w=like/widening_prop
     
-    if (ran==1) write(*,*)widening_prop
-    if (ran==1) write(*,*)like,like_w
+    if (ran==0) write(*,*)widening_prop
+    if (ran==0) write(*,*)like,like_w
     
     
     sample=0
@@ -747,583 +1009,7 @@ include 'data_joint.h'
     Ar_birth_old=0   
     
     
-
-    do while (ount<burn_in) ! Burn-in
-        ount=ount+1
-        malayv=malay
-        if (mod(ount,every)==0) then ! check regularly if acceptance rates are in an acceptable range, else change proposal width
-        
-            if ((Ac_vp/(Pr_vp+1))>0.54) p_vp=p_vp*(1+perturb)! if not increase width of proposition density
-            if ((Ac_vp/(Pr_vp+1))<0.34) p_vp=p_vp*(1-perturb)! or decrease it
-            if ((Acxi/(Prxi+1))>0.54) pxi=pxi*(1+perturb)
-            if ((Acxi/(Prxi+1))<0.34) pxi=pxi*(1-perturb)
-            if ((Acnd_R/(Prnd_R+1))>0.54) pAd_R=pAd_R*(1+perturb) ! for rayleigh waves
-            if ((Acnd_R/(Prnd_R+1))<0.34) pAd_R=pAd_R*(1-perturb)
-            if ((Acnd_L/(Prnd_L+1))>0.54) pAd_L=pAd_L*(1+perturb) ! for love waves
-            if ((Acnd_L/(Prnd_L+1))<0.34) pAd_L=pAd_L*(1-perturb)
-      
-            if ((Acv(1)/(Prv(1)+1))>0.54) pv1=pv1*(1+perturb) ! 2 layers for vsv
-            if ((Acv(1)/(Prv(1)+1))<0.34) pv1=pv1*(1-perturb)
-      
-            if ((Acv(2)/(Prv(2)+1))>0.54) pv2=pv2*(1+perturb) 
-            if ((Acv(2)/(Prv(2)+1))<0.34) pv2=pv2*(1-perturb)
-      
-            if ((Acp(1)/(Prp(1)+1))>0.54) pd1=pd1*(1+perturb) ! 2 layers for changing depth
-            if ((Acp(1)/(Prp(1)+1))<0.34) pd1=pd1*(1-perturb)
-       
-            if ((Acp(2)/(Prp(2)+1))>0.54) pd2=pd2*(1+perturb)
-            if ((Acp(2)/(Prp(2)+1))<0.34) pd2=pd2*(1-perturb)
-            
-            ! UPDATE SIGMAV
-            if ((abs((AcB/PrB)-Ar_birth_old)>2*abs((AcB/PrB)-(AcD/PrD))).and.&
-                (AcB.ne.0)) then !special treatement for adding/removing layers
-
-                if ((AcB/PrB)>Ar_birth_old) then! Going in the right direction
-                    if (sigmav>sigmav_old) then !Going up
-                        sigmav_new=sigmav*(1+perturb)
-                    else !Going down
-                        sigmav_new=sigmav*(1-perturb)
-                    endif
-                else ! Going in the wrong direction
-                    if (sigmav>sigmav_old) then !Going up
-                        sigmav_new=sigmav*(1-perturb)
-                    else
-                        sigmav_new=sigmav*(1+perturb)
-                    endif
-                endif
-                !write(*,*)sigmav_new
-                !write(*,*)
-                sigmav_old=sigmav
-                sigmav=sigmav_new
-                Ar_birth_old=AcB/PrB
-                PrB=0
-                PrD=0
-                AcB=0
-                AcD=0
-            endif
-            
-            if ((Ac_vp/(Pr_vp+1))<0.01) then 
-                write(filenamemax,"('/stuck_',I3.3,'.out')") rank    
-                open(56,file=dirname//filenamemax,status='replace')
-                write(56,*) npt
-                do i=1,npt
-                    write(56,*)voromax(i,1),voromax(i,2),voromax(i,3),voromax(i,4)
-                enddo
-                close(56)
-            endif
-            
-            !-----------------------------------------------
-
-            PrP=0
-            PrV=0
-            PrBa=0
-            PrDa=0
-            AcP=0
-            AcV=0
-            AcBa=0
-            AcDa=0
-            Acnd_R=0
-            Prnd_R=0
-            Acxi=0
-            Prxi=0
-            Ac_vp=0
-            Pr_vp=0
-            Prnd_L=0
-            Acnd_L=0
-        endif
-    
-        isoflag_prop = isoflag
-        voro_prop=voro
-        like_prop =like
-        liked_R_prop=liked_R
-        liked_L_prop=liked_L
-        
-    
-        npt_prop = npt        
-    
-        lsd_R_prop = lsd_R
-        lsd_L_prop =lsd_L
-        Ad_R_prop = Ad_R
-        Ad_L_prop = Ad_L
-        
-
-        u=ran3(ra)
-        ind=1
-        out=1 ! indicates if change is acceptable, i. e. not out of bounds etc.
-        move=.false.
-        value=.false.
-        birth=.false.
-        birtha=.false.
-        deatha=.false.
-        death=.false.
-        noisd_R=.false.
-        noisd_L=.false.
-        logprob_vsv=0
-        logprob_vp=0
-        ani=.false.
-        change_vp=.false.
-        
-
-        npt_ani=0
-        npt_iso=0
-        
-        do i=1,npt
-            if (isoflag(i).eqv..true.) npt_iso=npt_iso+1
-            if (isoflag(i).eqv..false.) npt_ani=npt_ani+1
-        enddo
-        if ((npt_iso+npt_ani).ne.npt) stop "Error here"
-
-        !*************************************************************
-
-        !                   Propose a new model
-
-        !*************************************************************
-        if (u<0) then
-            continue
-        
-        elseif (u<0.1) then !change xi--------------------------------------------
-            if (npt_ani.ne.0) then
-                ani=.true.
-                ! Choose randomly an anisotropic cell among the npt_ani possibilities
-                ind2 = ceiling(ran3(ra)*(npt_ani))
-                if (ind2==0) ind2=1 !number of the anisotropic cell
-                    
-                j=0
-                do ii=1,npt
-                    if (isoflag(ii).eqv..false.) j=j+1
-                    if (j==ind2) then
-                        ind=ii ! number of the cell in voro
-                        exit
-                    endif
-                enddo
-                
-                Prxi=Prxi+1 !increase counter to calculate acceptance rates
-                if (ind>npt) stop "684"
-                if (voro(ind,3)==-1) stop "874"
-                voro_prop(ind,3)=voro(ind,3)+gasdev(ra)*pxi
-                if (isoflag(ind).eqv..true.) stop "isoflag1"
-                
-                !Check if oustide bounds of prior
-                if ((voro_prop(ind,3)<=xi_min).or.(voro_prop(ind,3)>=xi_max)) then
-                    out=0
-                endif
-            endif
-        elseif (u<0.2) then !change vp --------------------------------------------
-            change_vp=.true.
-                
-            ! Choose a random cell
-            ind=ceiling(ran3(ra)*npt)
-            if (ind==0) ind=1
-            
-            Pr_vp=Pr_vp+1
-            if (ind>npt) then
-                out=0
-            else
-                voro_prop(ind,4)=voro(ind,4)+gasdev(ra)*p_vp
-            
-                !Check if oustide bounds of prior
-                if ((voro_prop(ind,4)<=vpvsv_min).or.(voro_prop(ind,4)>=vpvsv_max)) out=0
-                
-            endif     
-        elseif (u<0.3) then !change position--------------------------------------------
-            move=.true.
-            ind=1+ceiling(ran3(ra)*(npt-1))
-            if (ind==1) ind=2
- 
-            !if (ount.GT.burn_in) then 
-            if (voro(ind,1)<(d_max/2)) then
-                PrP(1)=PrP(1)+1
-            else
-                PrP(2)=PrP(2)+1
-            endif
-            !endif
- 
-            if (voro(ind,1)<(d_max/2)) then
-                voro_prop(ind,1)=voro(ind,1)+gasdev(ra)*pd1
-            else
-                voro_prop(ind,1)=voro(ind,1)+gasdev(ra)*pd2
-            endif
-        
-            if ((voro_prop(ind,1)<=d_min).or.(voro_prop(ind,1)>=d_max)) then
-                out=0
-            endif
-            if ((voro_prop(ind,2)<=-width).or.(voro_prop(ind,2)>=width)) then
-                out=0
-            endif
- 
-        elseif (u<0.4) then ! Change noise parameter for rayleigh waves
-            noisd_R=.true.
-            Prnd_R = Prnd_R + 1
-            Ad_R_prop = Ad_R+gasdev(ra)*pAd_R
-            !Check if oustide bounds of prior
-            if ((Ad_R_prop<=Ad_R_min).or.(Ad_R_prop>=Ad_R_max)) then
-                out=0
-            endif
-        elseif (u<0.5) then ! Change noise parameter for love waves
-            noisd_L=.true.
-            Prnd_L = Prnd_L + 1
-            Ad_L_prop = Ad_L+gasdev(ra)*pAd_L
-            !Check if oustide bounds of prior
-            if ((Ad_L_prop<=Ad_L_min).or.(Ad_L_prop>=Ad_L_max)) then
-                out=0
-            endif         
-        
-        elseif (u<.6) then ! change vsv-----------------------------------
-            
-            value=.true.
-            ind=ceiling(ran3(ra)*npt)
-            if (ind==0) ind=1
-            !if (ount.GT.burn_in) then 
-            !write(*,*)voro(ind,1),d_max/2
-            if (voro(ind,1)<(d_max/2)) then
-                PrV(1)=PrV(1)+1
-            else
-                PrV(2)=PrV(2)+1
-            endif
-            !endif
-            if (ind>npt) then
-                write(*,*)npt,ind
-                stop "763"
-            endif
-            if (voro(ind,1)<(d_max/2)) then
-                voro_prop(ind,2)=voro(ind,2)+gasdev(ra)*pv1
-            else
-                voro_prop(ind,2)=voro(ind,2)+gasdev(ra)*pv2
-            endif
-            !voro_prop(ind,2) = -width+2*width*ran3(ra)
-            
-            !Check if oustide bounds of prior
-            if ((voro_prop(ind,2)<=-width).or.(voro_prop(ind,2)>=width)) then
-                out=0
-            endif
-
-
-        elseif (u<0.7) then !Birth of an isotropic cell -------------------------------------
-            birth = .true.
-            PrB = PrB + 1
-            npt_prop = npt + 1
-            if (npt_prop>malayv) then  !MODIF 
-                out=0
-            else
-                voro_prop(npt_prop,1) = d_min+ran3(ra)*(d_max-d_min)
-                call whichcell_d(voro_prop(npt_prop,1),voro,npt,ind)!
-
-                voro_prop(npt_prop,2) = voro(ind,2)+gasdev(ra)*sigmav ! sigmav: special width for new layers
-                !voro_prop(npt_prop,2) = -width+2*width*ran3(ra) ! use completely random new value
-                voro_prop(npt_prop,3) = -1
-                !voro_prop(npt_prop,4) = voro(ind,4)+gasdev(ra)*p_vp 
-                voro_prop(npt_prop,4) = vpvsv_min+(vpvsv_max-vpvsv_min)*ran3(ra)
-                isoflag_prop(npt_prop) = .true. 
-                
-                logprob_vsv=log(1/(sigmav*sqrt(2*pi)))-((voro(ind,2)-voro_prop(npt_prop,2))**2)/(2*sigmav**2) ! correct acceptance rates because transdimensional
-                !logprob_vp=log(1/(p_vp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(npt_prop,4))**2)/(2*p_vp**2)
-                
-                !Check bounds                    
-                if ((voro_prop(npt_prop,2)<=-width).or.(voro_prop(npt_prop,2)>=width)) then
-                    out=0
-                end if
-                if ((voro_prop(npt_prop,4)<=vpvsv_min).or.(voro_prop(npt_prop,4)>=vpvsv_max)) then
-                    out=0
-                end if
-            endif
-        elseif (u<0.8) then !death an isotropic cell !---------------------------------------    !
-
-            death = .true.
-            PrD = PrD + 1
-            if(npt_iso==0) then
-                out=0
-            else
-            
-                ind2 = ceiling(ran3(ra)*(npt_iso)) 
-                if (ind2==0) ind2=1
-
-                j=0
-                do ii=1,npt
-                    if (isoflag(ii).eqv..true.) j=j+1
-                    if (j==ind2) then
-                        ind=ii
-                        exit
-                    endif
-                enddo
-                if (voro(ind,3).NE.-1) stop "1092" 
-            endif
-
-            npt_prop=npt-1
-            
-            if ((npt_prop<milay)) then!.or.(ind==1)) then
-                out=0
-            else
-                voro_prop(ind,:)=voro(npt,:)
-                isoflag_prop(ind)=isoflag(npt)
-            
-                call whichcell_d(voro(ind,1),voro_prop,npt_prop,ind2)
-                logprob_vsv=log(1/(sigmav*sqrt(2*pi)))-((voro(ind,2)-voro_prop(ind2,2))**2)/(2*sigmav**2) ! same as for birth
-                !logprob_vp=log(1/(p_vp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(ind2,4))**2)/(2*p_vp**2)
-                
-            endif
-        elseif (u<0.9) then !Birth an anisotropic layer----------------------------------------
-            birtha = .true.
-            PrBa = PrBa + 1    
-            if (npt_iso==0) then
-                out=0
-            else
-                ! Choose randomly an isotropic cell among the npt_iso possibilities
-                ind2 = ceiling(ran3(ra)*(npt_iso))
-                if (ind2==0) ind2=1
-                j=0
-                do ii=1,npt
-                    if (isoflag(ii).eqv..true.) j=j+1
-                    if (j==ind2) then
-                        ind=ii
-                        exit
-                    endif
-                enddo
-                voro_prop(ind,3) =  xi_min+(xi_max-xi_min)*ran3(ra) 
-                if (voro(ind,3).NE.-1) stop "1130"
-                if ((voro_prop(ind,3)<=xi_min).or.(voro_prop(ind,3)>=xi_max)) then
-                    write(*,*)'anisotropy out of bounds'
-                    out=0
-                endif
-                isoflag_prop(ind)=.false.
-            endif
-        
-        !else
-        elseif (u<1.1) then !death of an anisotropic layer!---------------------------------------    
-            deatha = .true.
-            PrDa = PrDa + 1
-            if (npt_ani==0) then
-                out=0
-            else
-                ! Choose randomly an anisotropic cell among the npt_ani possibilities
-                ind2 = ceiling(ran3(ra)*(npt_ani))
-                if (ind2==0) ind2=1
-                j=0
-                do ii=1,npt
-                    if (isoflag(ii).eqv..false.) j=j+1
-                    if (j==ind2) then
-                        ind=ii
-                        exit
-                    endif
-                enddo
-                voro_prop(ind,3)=-1
-                isoflag_prop(ind)=.true.
-            endif        
-        else
-            out=0
-            
-        endif
-        
-        !**************************************************************************
-
-        !         After  moving a cell, Get the misfit of the proposed model
-
-        !**************************************************************************
-        if (out==1) then ! maybe we don't need a forward calculation for changes in noise parameters
-
-            if (ndatad_R>0) then
-                call combine(model_ref,nptref,nic_ref,noc_ref,voro_prop,npt_prop,d_max,&
-                    r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
-                jcom=3 !rayleigh waves
-                nmodes=0
-                call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
-                    qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_R,wmax_R,nmin_R,nmax_R,&
-                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
-                if (error_flag) then 
-                    out=0
-                    write(*,*)"INVALID PROPOSED MODEL - RAYLEIGH - minos_bran.f FAIL 005"
-                    goto 142
-                endif
-                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR_prop,rq_R_prop,&
-                ndatad_R,ier)
-                if (ier) then 
-                    out=0
-                    write(*,*)"INVALID PROPOSED MODEL - RAYLEIGH..."
-                    goto 142
-                endif
-                
-                if (maxval(rq_R(:ndatad_R))>maxrq*eps) then
-                    out=0
-                    write(*,*)"BAD UNDERTAINTIES - RAYLEIGH..."
-                    goto 1142
-                endif
-
-            endif
-            
-            if (ndatad_L>0) then
-                call combine(model_ref,nptref,nic_ref,noc_ref,voro_prop,npt_prop,d_max,&
-                    r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
-                jcom=2 !love waves
-                nmodes=0
-                call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
-                    qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_L,wmax_L,nmin_L,nmax_L,&
-                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
-
-                if (error_flag) then 
-                    out=0
-                    write(*,*)"INVALID PROPOSED MODEL - LOVE - minos_bran.f FAIL 006"
-                    goto 142
-                endif
-                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL_prop,rq_L_prop,&
-                ndatad_L,ier)
-                
-                if (ier) then 
-                    out=0
-                    write(*,*)"INVALID PROPOSED MODEL - LOVE..."
-                    goto 142
-                endif
-                
-                if (maxval(rq_L(:ndatad_L))>maxrq*eps) then
-                    out=0
-                    write(*,*)"BAD UNDERTAINTIES - LOVE..."
-                    goto 1142
-                endif
-
-            endif
-            
-            lsd_R_prop=0
-            lsd_L_prop=0
-            liked_R_prop=0
-            liked_L_prop=0
-            do i=1,ndatad_R
-                lsd_R_prop=lsd_R_prop+(d_obsdCR(i)-d_cR_prop(i))**2
-                liked_R_prop=liked_R_prop+(d_obsdCR(i)-d_cR_prop(i))**2/(2*(Ad_R_prop*d_obsdCRe(i))**2) ! prendre en compte erreurs mesurées
-            end do
-            do i=1,ndatad_L
-                lsd_L_prop=lsd_L_prop+(d_obsdCL(i)-d_cL_prop(i))**2
-                liked_L_prop=liked_L_prop+(d_obsdCL(i)-d_cL_prop(i))**2/(2*(Ad_L_prop*d_obsdCLe(i))**2) ! prendre en compte erreurs mesurées
-            end do
-            
-        endif 
-        
-        like_prop=(liked_R_prop+liked_L_prop) !log-likelihood of the proposed model
-        like_prop_w=like_prop/widening_prop
-        
-   142 Accept = .false.
-        
-        ! now check if we accept the new model - different treatement depending on the change
-        if (birth) then!------------------------------------------------------------------
-    
-            if (log(ran3(ra))<log(out) + log(real(npt)+1)-log(real(npt_prop)+1) -&
-                log(2*width)-logprob_vsv&!-log(vpvsv_max-vpvsv_min)-logprob_vp&
-                -like_prop_w+like_w) then ! transdimensional case
-                accept=.true.
-                AcB=AcB+1
-            endif
-        
-        elseif (death) then!-------------------------------------------------------------
-        
-            if (log(ran3(ra))<log(out) + log(real(npt)+1)&
-                -log(real(npt_prop)+1) + &
-                log(2*width)+logprob_vsv&!+log(vpvsv_max-vpvsv_min)+logprob_vp&
-                -like_prop_w+like_w) then! transdimensional case
-                accept=.true.
-                AcD=AcD+1
-            endif
-        
-        elseif (noisd_R) then !@@@@@@@@@@@@@@@@@@@@@@@@@@@@ logrsig  @@@@@@@@@@@@
-            logrsig=ndatad_R*log(Ad_R/Ad_R_prop)/widening_prop ! ATTENTION avc ld 2
-            if (log(ran3(ra))<logrsig+log(out)-like_prop_w+like_w) then ! hierarchical case
-                accept=.true.
-                Acnd_R=Acnd_R+1
-            endif
-        elseif (noisd_L) then !@@@@@@@@@@@@@@@@@@@@@@@@@@@@ logrsig  @@@@@@@@@@@@
-            logrsig=ndatad_L*log(Ad_L/Ad_L_prop)/widening_prop ! ATTENTION avc ld 2
-            if (log(ran3(ra))<logrsig+log(out)-like_prop_w+like_w) then ! hierarchical case
-                accept=.true.
-                Acnd_L=Acnd_L+1
-            endif            
-        else !NO JUMP-------------------------------------------------------------------
-    
-            if (log(ran3(ra))<log(out)-like_prop_w+like_w)then
-                if (ind>malayv) stop  '1082'
-                accept=.true.
-                if (value) then
-                    if (voro(ind,1)<(d_max/2)) then
-                        AcV(1)=AcV(1)+1
-                    else
-                        AcV(2)=AcV(2)+1
-                    endif
-                elseif (move) then
-                    if (voro(ind,1)<(d_max/2)) then
-                        AcP(1)=AcP(1)+1
-                    else
-                        AcP(2)=AcP(2)+1
-                    endif
-                elseif(ani)then
-                    Acxi=Acxi+1
-                elseif(change_vp)then
-                    Ac_vp=Ac_vp+1        
-                endif                    
-                if (birtha) then
-                    Acba=Acba+1
-                elseif (deatha) then
-                    Acda=Acda+1        
-                endif
-            endif!accept
-        endif 
-        
-        !***********************************************************************************
-        !   If we accept the proposed model, update the status of the Markov Chain
-        !***********************************************************************************
-        if (accept) then 
-            isoflag=isoflag_prop
-            voro=voro_prop
-            like=like_prop
-            like_w=like_prop_w
-        
-            liked_L=liked_L_prop
-            liked_R=liked_R_prop
-            lsd_L=lsd_L_prop        
-            lsd_R=lsd_R_prop
-            npt=npt_prop
-            Ad_R=Ad_R_prop
-            Ad_L=Ad_L_prop
-            
-            d_cR=d_cR_prop
-            d_cL=d_cL_prop
-            
-    
-        endif
-
-        npt_ani=0
-        npt_iso=0
-    
-        do i=1,npt
-            if (isoflag(i).eqv..true.) npt_iso=npt_iso+1
-            if (isoflag(i).eqv..false.) npt_ani=npt_ani+1
-        enddo
-        if (npt_iso+npt_ani.ne.npt) stop "Error here"
-        
-        IF ((mod(ount,display).EQ.0)) THEN
-
-            write(*,*)'processor number',ran+1,'/',nbproc
-            write(*,*)'widening step: preprocessing'
-            write(*,*)'sample:',ount,'/',burn_in
-            write(*,*)'number of cells:',npt
-            write(*,*)'Ad_R',Ad_R,'Ad_L',Ad_L
-            write(*,*)'Acceptance rates'
-            write(*,*)'AR_move',100*AcP(1)/PrP(1),100*AcP(2)/PrP(2)
-            write(*,*)'AR_value',100*AcV(1)/PrV(1),100*AcV(2)/PrV(2)
-
-            write(*,*)'AR_Birth',100*AcB/PrB,'AR_Death',100*AcD/PrD,'sigmav',sigmav
-            write(*,*)'AR_Birtha',100*AcBa/PrBa,'AR_Deatha',100*AcDa/PrDa
-            write(*,*)'AR_xi',100*Acxi/Prxi,'pxi',pxi
-            write(*,*)'AR__vp',100*Ac_vp/Pr_vp,'p_vp',p_vp
-            write(*,*)'AR_Ad_R',100*Acnd_R/Prnd_R,'pAd_R',pAd_R
-            write(*,*)'AR_Ad_L',100*Acnd_L/Prnd_L,'pAd_L',pAd_L
-            write(*,*)'npt_iso',npt_iso,'npt_ani',npt_ani
-            write(*,*)'widening',widening_prop
-            !write(*,*)Ar_birth_old,sigmav_old,sigmav
-            write(*,*)'-----------------------------------------'
-            write(*,*)
-            write(*,*)
-            
-            
-        END IF
-    end do !End burn-in
-    
-    
-    
+    burnin_in_progress=.true.
     do i_w=1,n_w
         
         
@@ -1345,38 +1031,76 @@ include 'data_joint.h'
         
         ier=.false.
         
+        call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
         
         if (ndatad_R>0) then
-            nmodes=0
-            call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-                r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+            
             jcom=3 !rayleigh waves
-            call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
-                qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_R,wmax_R,nmin_R,nmax_R,&
-                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
-            if (error_flag) then
-                tes=.false.
-            end if
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR,rq_R,ndatad_R,ier)
-            if (ier) tes=.false.
-            if (maxval(rq_R(:ndatad_R))>maxrq*eps) tes=.false.
+            
+            do iharm=1,nharm_R
+                nmodes=0
+                call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
+                    qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,&
+                    wmin_R(iharm),wmax_R(iharm),numharm_R(iharm),numharm_R(iharm),&
+                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
+                if (error_flag) then 
+                    tes=.false.
+                    write(*,*)"Minos_bran FAILED for RAYLEIGH 004"
+                else
+                    write(*,*)"Minos_bran SUCCESS for RAYLEIGH"
+                end if
+                peri_R_tmp=peri_R(nlims_R(1,iharm):nlims_R(2,iharm))
+                n_R_tmp=n_R(nlims_R(1,iharm):nlims_R(2,iharm))
+                ndatad_R_tmp=nlims_R(2,iharm)-nlims_R(1,iharm)+1 ! fortran slices take the first and the last element
+                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
+                    peri_R_tmp,n_R_tmp,d_cR_tmp,rq_R,ndatad_R_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
+                write(*,*)"dispersion_minos for RAYLEIGH"
+                d_cR(nlims_R(1,iharm):nlims_R(2,iharm))=d_cR_tmp
+                if (ier) then 
+                    tes=.false.
+                    write(*,*)'Disperdion_minos RAYLEIGH error'
+                endif
+                if (maxval(abs(rq_R(:ndatad_R_tmp)))>maxrq*eps) then
+                    tes=.false.
+                    write(*,*)'raylquo RAYLEIGH error'
+                endif
+            enddo
         endif
         
         if (ndatad_L>0) then
-            nmodes=0
-            call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-                r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+        
             jcom=2 !love waves
-            call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
-                qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_L,wmax_L,nmin_L,nmax_L,&
-                nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
-            if (error_flag) then
-                tes=.false.
-            endif
-            call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL,rq_L,ndatad_L,ier)
-            
-            if (ier) tes=.false.
-            if (maxval(rq_L(:ndatad_L))>maxrq*eps) tes=.false.
+            do iharm=1,nharm_L
+                nmodes=0
+                call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
+                    qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,&
+                    wmin_L(iharm),wmax_L(iharm),numharm_L(iharm),numharm_L(iharm),&
+                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
+                if (error_flag) then 
+                    tes=.false.
+                    write(*,*)"Minos_bran FAILED for LOVE 004"
+                else
+                    write(*,*)"Minos_bran SUCCESS for LOVE"
+                end if
+                peri_L_tmp=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                n_L_tmp=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                ndatad_L_tmp=nlims_L(2,iharm)-nlims_L(1,iharm)+1 ! fortran slices take the first and the last element
+                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
+                peri_L_tmp,n_L_tmp,d_cL_tmp,rq_L,ndatad_L_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
+                write(*,*)"dispersion_minos for LOVE"
+                d_cL(nlims_L(1,iharm):nlims_L(2,iharm))=d_cL_tmp
+                if (ier) then 
+                    tes=.false.
+                    write(*,*)'Disperdion_minos LOVE error'
+                endif
+                if (maxval(abs(rq_L(:ndatad_L_tmp)))>maxrq*eps) then
+                    tes=.false.
+                    write(*,*)'raylquo LOVE error'
+                endif
+                
+            enddo
+        
         endif
         
         if (.not.tes) stop 'Transition model failed ?????'
@@ -1420,8 +1144,8 @@ include 'data_joint.h'
         like= (liked_R + liked_L)
         like_w=like/widening_prop
         
-        if (ran==1) write(*,*)widening_prop
-        if (ran==1) write(*,*)like,like_w
+        if (ran==0) write(*,*)widening_prop
+        if (ran==0) write(*,*)like,like_w
         
         
         sample=0
@@ -1453,7 +1177,7 @@ include 'data_joint.h'
         
         
     
-        do while (sample<nsample_widening) ! main loop, sample: number of sample post burn-in
+        do while ((sample<nsample_widening).or.burnin_in_progress) ! main loop, sample: number of sample post burn-in
             ount=ount+1
             malayv=malay
             if (mod(ount,every)==0) then ! check regularly if acceptance rates are in an acceptable range, else change proposal width
@@ -1512,7 +1236,7 @@ include 'data_joint.h'
                     open(56,file=dirname//filenamemax,status='replace')
                     write(56,*) npt
                     do i=1,npt
-                        write(56,*)voromax(i,1),voromax(i,2),voromax(i,3),voromax(i,4)
+                        write(56,*)voro(i,1),voro(i,2),voro(i,3),voro(i,4)
                     enddo
                     close(56)
                 endif
@@ -1587,6 +1311,8 @@ include 'data_joint.h'
                 continue
             
             elseif (u<0.1) then !change xi--------------------------------------------
+                Prxi=Prxi+1
+                ani=.true.
                 if (npt_ani.ne.0) then
                     ani=.true.
                     ! Choose randomly an anisotropic cell among the npt_ani possibilities
@@ -1602,7 +1328,7 @@ include 'data_joint.h'
                         endif
                     enddo
                     
-                    Prxi=Prxi+1 !increase counter to calculate acceptance rates
+                     !increase counter to calculate acceptance rates
                     if (ind>npt) stop "684"
                     if (voro(ind,3)==-1) stop "874"
                     voro_prop(ind,3)=voro(ind,3)+gasdev(ra)*pxi
@@ -1612,7 +1338,10 @@ include 'data_joint.h'
                     if ((voro_prop(ind,3)<=xi_min).or.(voro_prop(ind,3)>=xi_max)) then
                         out=0
                     endif
+                else
+                    out=0
                 endif
+                
             elseif (u<0.2) then !change vp --------------------------------------------
                 change_vp=.true.
                     
@@ -1635,17 +1364,11 @@ include 'data_joint.h'
                 ind=1+ceiling(ran3(ra)*(npt-1))
                 if (ind==1) ind=2
      
-                !if (ount.GT.burn_in) then 
                 if (voro(ind,1)<(d_max/2)) then
                     PrP(1)=PrP(1)+1
-                else
-                    PrP(2)=PrP(2)+1
-                endif
-                !endif
-     
-                if (voro(ind,1)<(d_max/2)) then
                     voro_prop(ind,1)=voro(ind,1)+gasdev(ra)*pd1
                 else
+                    PrP(2)=PrP(2)+1
                     voro_prop(ind,1)=voro(ind,1)+gasdev(ra)*pd2
                 endif
             
@@ -1678,21 +1401,16 @@ include 'data_joint.h'
                 value=.true.
                 ind=ceiling(ran3(ra)*npt)
                 if (ind==0) ind=1
-                !if (ount.GT.burn_in) then 
-                !write(*,*)voro(ind,1),d_max/2
-                if (voro(ind,1)<(d_max/2)) then
-                    PrV(1)=PrV(1)+1
-                else
-                    PrV(2)=PrV(2)+1
-                endif
-                !endif
+
                 if (ind>npt) then
                     write(*,*)npt,ind
                     stop "763"
                 endif
                 if (voro(ind,1)<(d_max/2)) then
+                    PrV(1)=PrV(1)+1
                     voro_prop(ind,2)=voro(ind,2)+gasdev(ra)*pv1
                 else
+                    PrV(2)=PrV(2)+1
                     voro_prop(ind,2)=voro(ind,2)+gasdev(ra)*pv2
                 endif
                 !voro_prop(ind,2) = -width+2*width*ran3(ra)
@@ -1824,63 +1542,82 @@ include 'data_joint.h'
     
             !**************************************************************************
             if (out==1) then ! maybe we don't need a forward calculation for changes in noise parameters
+                call combine(model_ref,nptref,nic_ref,noc_ref,voro_prop,npt_prop,d_max,&
+                    r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
     
                 if (ndatad_R>0) then
-                    call combine(model_ref,nptref,nic_ref,noc_ref,voro_prop,npt_prop,d_max,&
-                        r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+                    
                     jcom=3 !rayleigh waves
-                    nmodes=0
-                    call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
-                        qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_R,wmax_R,nmin_R,nmax_R,&
-                        nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
-                    if (error_flag) then 
-                        out=0
-                        write(*,*)"INVALID PROPOSED MODEL - RAYLEIGH - minos_bran.f FAIL 005"
-                        goto 11142
-                    endif
-                    call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_R,n_R,d_cR_prop,rq_R_prop,&
-                    ndatad_R,ier)
-                    if (ier) then 
-                        out=0
-                        write(*,*)"INVALID PROPOSED MODEL - RAYLEIGH..."
-                        goto 11142
-                    endif
-                    if (maxval(rq_R(:ndatad_R))>maxrq*eps) then
-                        out=0
-                        write(*,*)"BAD UNDERTAINTIES - RAYLEIGH..."
-                        goto 1142
-                    endif
-    
+                    
+                    do iharm=1,nharm_R
+                        nmodes=0
+                        call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
+                            qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,&
+                            wmin_R(iharm),wmax_R(iharm),numharm_R(iharm),numharm_R(iharm),&
+                            nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
+                        if (error_flag) then 
+                            out=0
+                            !write(*,*)"INVALID PROPOSED MODEL - RAYLEIGH - minos_bran.f FAIL 005"
+                            goto 11142
+                        endif
+                        
+                        peri_R_tmp=peri_R(nlims_R(1,iharm):nlims_R(2,iharm))
+                        n_R_tmp=n_R(nlims_R(1,iharm):nlims_R(2,iharm))
+                        ndatad_R_tmp=nlims_R(2,iharm)-nlims_R(1,iharm)+1 ! fortran slices take the first and the last element
+                        call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
+                            peri_R_tmp,n_R_tmp,d_cR_prop_tmp,rq_R,ndatad_R_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
+                        !write(*,*)"dispersion_minos for RAYLEIGH"
+                        d_cR_prop(nlims_R(1,iharm):nlims_R(2,iharm))=d_cR_prop_tmp
+                        
+                        if (ier) then 
+                            out=0
+                            !write(*,*)"INVALID PROPOSED MODEL - RAYLEIGH..."
+                            goto 11142
+                        endif
+                        
+                        if (maxval(abs(rq_R(:ndatad_R_tmp)))>maxrq*eps) then
+                            out=0
+                            !write(*,*)"BAD UNDERTAINTIES - RAYLEIGH..."
+                            goto 11142
+                        endif
+                    enddo
                 endif
                 
                 if (ndatad_L>0) then
-                    call combine(model_ref,nptref,nic_ref,noc_ref,voro_prop,npt_prop,d_max,&
-                        r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+                
                     jcom=2 !love waves
-                    nmodes=0
-                    call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
-                        qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,wmin_L,wmax_L,nmin_L,nmax_L,&
-                        nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag)
-
-                    if (error_flag) then 
-                        out=0
-                        write(*,*)"INVALID PROPOSED MODEL - LOVE - minos_bran.f FAIL 006"
-                        goto 11142
-                    endif
-                    call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,peri_L,n_L,d_cL_prop,rq_L_prop,&
-                    ndatad_L,ier)
-                    
-                    if (ier) then 
-                        out=0
-                        write(*,*)"INVALID PROPOSED MODEL - LOVE..."
-                        goto 11142
-                    endif
-                    if (maxval(rq_L(:ndatad_L))>maxrq*eps) then
-                        out=0
-                        write(*,*)"BAD UNDERTAINTIES - LOVE..."
-                        goto 1142
-                    endif
-    
+                    do iharm=1,nharm_L
+                        nmodes=0
+                        call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
+                            qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,&
+                            wmin_L(iharm),wmax_L(iharm),numharm_L(iharm),numharm_L(iharm),&
+                            nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
+                        if (error_flag) then 
+                            out=0
+                            !write(*,*)"INVALID PROPOSED MODEL - LOVE - minos_bran.f FAIL 006"
+                            goto 11142
+                        endif
+                        
+                        peri_L_tmp=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                        n_L_tmp=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                        ndatad_L_tmp=nlims_L(2,iharm)-nlims_L(1,iharm)+1 ! fortran slices take the first and the last element
+                        call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
+                            peri_L_tmp,n_L_tmp,d_cL_prop_tmp,rq_L,ndatad_L_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
+                        !write(*,*)"dispersion_minos for LOVE"
+                        d_cL_prop(nlims_L(1,iharm):nlims_L(2,iharm))=d_cL_prop_tmp
+                        
+                        if (ier) then 
+                            out=0
+                            !write(*,*)"INVALID PROPOSED MODEL - LOVE..."
+                            goto 11142
+                        endif
+                        
+                        if (maxval(abs(rq_L(:ndatad_L_tmp)))>maxrq*eps) then
+                            out=0
+                            !write(*,*)"BAD UNDERTAINTIES - LOVE..."
+                            goto 11142
+                        endif
+                    enddo
                 endif
                 
                 lsd_R_prop=0
@@ -1969,6 +1706,7 @@ include 'data_joint.h'
             !   If we accept the proposed model, update the status of the Markov Chain
             !***********************************************************************************
             if (accept) then 
+                
                 isoflag=isoflag_prop
                 voro=voro_prop
                 like=like_prop
@@ -2009,7 +1747,7 @@ include 'data_joint.h'
                 
         
             endif
-    
+            
             npt_ani=0
             npt_iso=0
         
@@ -2018,6 +1756,44 @@ include 'data_joint.h'
                 if (isoflag(i).eqv..false.) npt_ani=npt_ani+1
             enddo
             if (npt_iso+npt_ani.ne.npt) stop "Error here"
+            
+            ! check for burnin
+            if (burnin_in_progress) then
+                ount=ount+1
+                if (ount>burn_in) then
+                    burnin_in_progress=.false.
+                    ount=0
+                endif
+                
+                IF ((mod(ount,display).EQ.0)) THEN !.and.(mod(ran,10).EQ.0)
+
+                    write(*,*)'processor number',ran+1,'/',nbproc
+                    write(*,*)'widening step:','burn-in'
+                    write(*,*)'sample:',ount,'/',burn_in
+                    write(*,*)'number of cells:',npt
+                    write(*,*)'Ad_R',Ad_R,'Ad_L',Ad_L
+                    write(*,*)'Acceptance rates'
+                    write(*,*)'AR_move',100*AcP(1)/PrP(1),100*AcP(2)/PrP(2)
+                    write(*,*)'AR_value',100*AcV(1)/PrV(1),100*AcV(2)/PrV(2)
+
+                    write(*,*)'AR_Birth',100*AcB/PrB,'AR_Death',100*AcD/PrD,'sigmav',sigmav
+                    write(*,*)'AR_Birtha',100*AcBa/PrBa,'AR_Deatha',100*AcDa/PrDa
+                    write(*,*)'AR_xi',100*Acxi/Prxi,'pxi',pxi
+                    write(*,*)'AR__vp',100*Ac_vp/Pr_vp,'p_vp',p_vp
+                    write(*,*)'AR_Ad_R',100*Acnd_R/Prnd_R,'pAd_R',pAd_R
+                    write(*,*)'AR_Ad_L',100*Acnd_L/Prnd_L,'pAd_L',pAd_L
+                    write(*,*)'npt_iso',npt_iso,'npt_ani',npt_ani
+                    write(*,*)'widening',widening_prop
+                    !write(*,*)Ar_birth_old,sigmav_old,sigmav
+                    write(*,*)'-----------------------------------------'
+                    write(*,*)
+                    write(*,*)
+                    
+                    
+                END IF
+                
+                cycle
+            endif
             
             !****************************************************************
     
@@ -2071,7 +1847,7 @@ include 'data_joint.h'
                 endif
     
             endif
-            IF ((mod(ount,display).EQ.0).and.(mod(ran,10).EQ.0)) THEN
+            IF ((mod(ount,display).EQ.0)) THEN !.and.(mod(ran,10).EQ.0)
 
                 write(*,*)'processor number',ran+1,'/',nbproc
                 write(*,*)'widening step:',i_w,'/',n_w
@@ -2163,7 +1939,7 @@ include 'data_joint.h'
                 enddo
             elseif (flag==1) then
                 call MPI_RECV(alphamax_props, numdis_max, MPI_Real, 0, 1, MPI_COMM_small, MPI_STATUS_IGNORE, ierror)
-                call MPI_SEND(alpharefmax_props, 1, MPI_Real, 0, 1, MPI_COMM_small, MPI_STATUS_IGNORE, ierror)
+                call MPI_RECV(alpharefmax_props, 1, MPI_Real, 0, 1, MPI_COMM_small, MPI_STATUS_IGNORE, ierror)
             endif
             do idis=1,numdis
                 
