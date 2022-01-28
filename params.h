@@ -68,4 +68,4 @@
 
 ! max acceptable raylquo
         real maxrq
-        parameter (maxrq=10.)
+        parameter (maxrq=1000.)
