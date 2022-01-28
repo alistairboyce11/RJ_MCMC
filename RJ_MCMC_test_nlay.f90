@@ -109,6 +109,7 @@ program RJ_MCMC
     real log, sqrt
 
     integer i,ii,sample,ind,th,ount,k ! various indices
+    integer nlims_cur,nlims_cur_diff
     logical ier, error_flag ! error flags for dispersion curves and minos_bran
     integer npt,npt_prop,npt_iso,npt_ani ! numbers of points, isotropic, anisotropic
     logical accept,tes,birth,birtha,death,deatha,move,value,noisd_R,noisd_L,ani,change_vp !which parameter did we change?
