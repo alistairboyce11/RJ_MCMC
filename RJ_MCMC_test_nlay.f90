@@ -1235,7 +1235,7 @@ program RJ_MCMC
                         nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
                     if (error_flag) then 
                         out=0
-                        write(*,*)"INVALID PROPOSED MODEL - RAYLEIGH - minos_bran.f FAIL 005"
+                        write(*,*)"INVALID PROPOSED MODEL - RAYLEIGH MODE: ",numharm_R(iharm)," - minos_bran.f FAIL 005"
                         goto 1142
                     endif
                     
@@ -1249,13 +1249,13 @@ program RJ_MCMC
                     
                     if (ier) then 
                         out=0
-                        write(*,*)"INVALID PROPOSED MODEL - RAYLEIGH..."
+                        write(*,*)"INVALID PROPOSED MODEL - RAYLEIGH MODE: ",numharm_R(iharm)
                         goto 1142
                     endif
                     
                     if (maxval(abs(rq_R(:ndatad_R_tmp)))>maxrq*eps) then
                         out=0
-                        write(*,*)"BAD UNDERTAINTIES - RAYLEIGH..."
+                        write(*,*)"BAD UNCERTAINTIES - RAYLEIGH MODE: ",numharm_R(iharm)
                         goto 1142
                     endif
                 enddo
@@ -1272,7 +1272,7 @@ program RJ_MCMC
                         nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
                     if (error_flag) then 
                         out=0
-                        write(*,*)"INVALID PROPOSED MODEL - LOVE - minos_bran.f FAIL 006"
+                        write(*,*)"INVALID PROPOSED MODEL - LOVE MODE: ",numharm_L(iharm)," - minos_bran.f FAIL 006"
                         goto 1142
                     endif
                     
@@ -1286,13 +1286,13 @@ program RJ_MCMC
                     
                     if (ier) then 
                         out=0
-                        write(*,*)"INVALID PROPOSED MODEL - LOVE..."
+                        write(*,*)"INVALID PROPOSED MODEL - LOVE MODE: ",numharm_L(iharm)
                         goto 1142
                     endif
                     
                     if (maxval(abs(rq_L(:ndatad_L_tmp)))>maxrq*eps) then
                         out=0
-                        write(*,*)"BAD UNDERTAINTIES - LOVE..."
+                        write(*,*)"BAD UNCERTAINTIES - LOVE MODE: ",numharm_L(iharm)
                         goto 1142
                     endif
                 enddo
