@@ -556,8 +556,8 @@ program RJ_MCMC
                 call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
                     peri_L_tmp,n_L_tmp,d_cL_tmp,rq_L,ndatad_L_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
                 d_cL(nlims_L(1,iharm):nlims_L(2,iharm))=d_cL_tmp
-                if (ier) stop "ier INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
-                if (maxval(abs(rq_L(:ndatad_L_tmp)))>maxrq*eps) stop "rq INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
+                if (ier) stop "INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
+                if (maxval(abs(rq_L(:ndatad_L_tmp)))>maxrq*eps) stop "INVALID INITIAL MODEL - LOVE - CHANGE PERIODS or MODEL"
             enddo
         endif
 
@@ -1235,7 +1235,7 @@ program RJ_MCMC
                         nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
                     if (error_flag) then 
                         out=0
-                        write(*,*)"INVALID PROPOSED MODEL - RAYLEIGH - minos_bran.f FAIL 005"
+                        write(*,*)"INVALID PROPOSED MODEL - RAYLEIGH MODE: ",numharm_R(iharm)," - minos_bran.f FAIL 005"
                         goto 1142
                     endif
                     
@@ -1249,13 +1249,13 @@ program RJ_MCMC
                     
                     if (ier) then 
                         out=0
-                        write(*,*)"INVALID PROPOSED MODEL - RAYLEIGH..."
+                        write(*,*)"INVALID PROPOSED MODEL - RAYLEIGH MODE: ",numharm_R(iharm)
                         goto 1142
                     endif
                     
                     if (maxval(abs(rq_R(:ndatad_R_tmp)))>maxrq*eps) then
                         out=0
-                        write(*,*)"BAD UNDERTAINTIES - RAYLEIGH..."
+                        write(*,*)"BAD UNCERTAINTIES - RAYLEIGH MODE: ",numharm_R(iharm)
                         goto 1142
                     endif
                 enddo
@@ -1272,7 +1272,7 @@ program RJ_MCMC
                         nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
                     if (error_flag) then 
                         out=0
-                        write(*,*)"INVALID PROPOSED MODEL - LOVE - minos_bran.f FAIL 006"
+                        write(*,*)"INVALID PROPOSED MODEL - LOVE MODE: ",numharm_L(iharm)," - minos_bran.f FAIL 006"
                         goto 1142
                     endif
                     
@@ -1286,13 +1286,13 @@ program RJ_MCMC
                     
                     if (ier) then 
                         out=0
-                        write(*,*)"INVALID PROPOSED MODEL - LOVE..."
+                        write(*,*)"INVALID PROPOSED MODEL - LOVE MODE: ",numharm_L(iharm)
                         goto 1142
                     endif
                     
                     if (maxval(abs(rq_L(:ndatad_L_tmp)))>maxrq*eps) then
                         out=0
-                        write(*,*)"BAD UNDERTAINTIES - LOVE..."
+                        write(*,*)"BAD UNCERTAINTIES - LOVE MODE: ",numharm_L(iharm)
                         goto 1142
                     endif
                 enddo

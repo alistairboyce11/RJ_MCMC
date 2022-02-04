@@ -32,7 +32,8 @@ subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
 
     !voro(i,:)=[thickness,vsv,(vsh/vsv)**2,vp/vsv]
     do i=1,npt
-        depth(i)=rearth-float(int(voro2(i,1)*1000))
+        ! depth(i)=rearth-float(int(voro2(i,1)*1000)) ! Round to nearest meter
+        depth(i)=rearth-float(int(voro2(i,1))*1000) ! Round to nearest km
     end do
     depth(npt+1)=rearth-d_max*1000
     
