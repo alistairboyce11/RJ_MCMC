@@ -149,6 +149,7 @@ program RJ_MCMC
     real alphamax_prop(numdis_max),alpharefmax_prop
     real alphamax_props(numdis_max),alpharefmax_props
     real alphaall(nsample/thin,numdis_max)
+    real lat(numdis_max), lon(numdis_max)
     
     character filebycore*15
 
@@ -203,6 +204,8 @@ program RJ_MCMC
     nlims_cur=1
     open(65,file=dirname//'/dispersion.in',status='old')! 65: name of the opened file in memory (unit identifier)
     read(65,*,IOSTAT=io)numdis
+    read(65,*,IOSTAT=io)lat(:numdis)
+    read(65,*,IOSTAT=io)lon(:numdis)
     read(65,*,IOSTAT=io)ndatad_R
     read(65,*,IOSTAT=io)nharm_R
     do k=1,nharm_R
@@ -2118,6 +2121,13 @@ program RJ_MCMC
         do i=1,num_logalpha
             write(56,*)logalpharefhists(i)
         enddo
+        close(56)
+        
+        open(56,file=dirname//'/parameters.out',status='replace')
+        write(56,*)'burn-in',burn_in
+        write(56,*)'nsample',nsample
+        write(56,*)'nsample_widening',nsample_widening
+        write(56,*)'burn-in_widening',burn_in_widening
         close(56)
 
 

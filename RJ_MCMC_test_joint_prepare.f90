@@ -102,6 +102,7 @@ program RJ_MCMC
     real alphamax_prop(numdis_max),alpharefmax_prop
     real alphamax_props(numdis_max),alpharefmax_props
     real alphaall(nsample_widening/thin,numdis_max)
+    real lat(numdis_max), lon(numdis_max)
     
     character filebycore*15
     integer outputfile
@@ -466,6 +467,8 @@ program RJ_MCMC
         d_obsdcLe_alt(:,1)=d_obsdcLe
         
         ! create synthetic model
+        lat(1)=45
+        lon(1)=45
         npt=0
         
         voro(1,1)=1 !depth of interface
@@ -585,6 +588,8 @@ program RJ_MCMC
         d_obsdcLe_alt(:,2)=d_obsdcLe
         
         ! create synthetic model
+        lat(2)=0
+        lon(2)=0
         npt=0
         
         voro(1,1)=1 !depth of interface
@@ -703,6 +708,8 @@ program RJ_MCMC
         
         open(65,file=dirname//'/dispersion.in',status='replace')
         write(65,*)numdis
+        write(65,*)lat(:numdis)
+        write(65,*)lon(:numdis)
         write(65,*)ndatad_R
         write(65,*)nharm_R
         do k=1,nharm_R
@@ -732,6 +739,13 @@ program RJ_MCMC
         enddo
         close(65)
         
+        open(56,file=dirname//'/parameters.out',status='replace')
+        write(56,*)'burn-in',burn_in
+        write(56,*)'nsample',nsample
+        write(56,*)'nsample_widening',nsample_widening
+        write(56,*)'burn-in_widening',burn_in_widening
+        close(56)
+        
         
         write(*,*)'DONE INITIALIZING'
     
@@ -740,6 +754,8 @@ program RJ_MCMC
         nlims_cur=1
         open(65,file=dirname//'/dispersion.in',status='old')! 65: name of the opened file in memory (unit identifier)
         read(65,*,IOSTAT=io)numdis
+        read(65,*,IOSTAT=io)lat(:numdis)
+        read(65,*,IOSTAT=io)lon(:numdis)
         read(65,*,IOSTAT=io)ndatad_R
         read(65,*,IOSTAT=io)nharm_R
         do k=1,nharm_R
@@ -1951,7 +1967,7 @@ program RJ_MCMC
                 enddo
             enddo
             
-            call MPI_REDUCE(alphahist,alphahists,num_logalpha*numdis_max*n_w,MPI_Real,MPI_MAX,&
+            call MPI_REDUCE(alphahist,alphahists,num_logalpha*numdis_max*n_w,MPI_Real,MPI_SUM,&
                  0,MPI_COMM_small,ierror)
             
             !write(*,*)'rank=',ran,'th=',th

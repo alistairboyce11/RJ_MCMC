@@ -8,7 +8,7 @@ Created on Mon Oct 11 14:06:13 2021
 import matplotlib.pyplot as plt
 import numpy as np
 
-directory='OUT_ALLJOINT2'
+directory='OUT_TESTJOINT2'
 
 
 ##################
@@ -1323,12 +1323,32 @@ for i,line in enumerate(lines[2:]):
         num_dis=0
         num_wide+=1
 
+
+file=open(directory+'/'+'mean_prop.out','r')
+lines=file.readlines()
+file.close()
+
+data=lines[0].split()
+widening_start=float(data[0])
+widening_step=float(data[1])
+n_w=int(float(data[2]))
+numdis=int(float(data[3]))
+
+means=np.zeros((n_w,numdis))
+
+num_wide=0
+num_dis=0
+for i,line in enumerate(lines[1:]):
+    for j,data in enumerate(line.split()):
+        means[i,j]=float(data)
+
 for i in range(n_w):
     
     plt.figure('alpha histograms '+str(widenings[i]))
     plt.xlabel('alpha')
     for j in range(numdis):
         plt.plot(alpha_range,alphas[:,i,j],label=str(j+1))
+        plt.axvline(means[i,j])
 
     plt.legend()
     plt.title('alpha histograms '+str(widenings[i]))
