@@ -11,6 +11,7 @@ matplotlib.rcParams['font.family'] = 'sans-serif'
 matplotlib.rcParams['font.sans-serif'] = ['Arial']
 matplotlib.rcParams['font.size'] = 10
 import os, sys
+import matplotlib.patches as patches
 
 
 print('Required :       Script.py test_directory')
@@ -20,8 +21,8 @@ print('Options [1] :     RJ_MCMC_Tests/XYZ_test/OUT_TEST')
 
 num_args=len(sys.argv)
 if num_args < 2:
-   print('Number of arguments (' + str(num_args) +') too low... exit')
-   exit('exiting....')
+    print('Number of arguments (' + str(num_args) +') too low... exit')
+    exit('exiting....')
     
 directory = str(sys.argv[1])
 print('Plotting results for: ' +str(directory))
@@ -40,6 +41,7 @@ Posterior       = True
 Sigmad          = True
 Dispersion      = True
 Convergence     = True
+PsPp_Fit        = True
 
 ########## histogram of number of layers
 if Layer_Hist:
@@ -59,7 +61,7 @@ if Layer_Hist:
     plt.ylabel('Frequency')
     
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Layer_hist.pdf')
+    plt.savefig(directory+'/PLOTS/'+'Layer_hist.png',dpi=200)
     plt.close()
 
 
@@ -92,7 +94,7 @@ if Layers_Aniso_Tr:
     plt.colorbar()
     plt.plot([0, nlay], [0, nlay], '--r', linewidth=1)
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Layers_Aniso_Tr.pdf')
+    plt.savefig(directory+'/PLOTS/'+'Layers_Aniso_Tr.png',dpi=200)
     plt.close()
 
 
@@ -116,15 +118,15 @@ if Posterior:
     xid=np.zeros((disd,disv))
     vpd=np.zeros((disd,disv))
 
-    vsvs=np.linspace(vref_min,vref_max,disv+1)
-    xis=np.linspace(xi_min,xi_max,disv+1)
-    vps=np.linspace(vp_min,vp_max,disv+1)
-    depths=np.linspace(0,prof,disd+1)
+    vsvs=np.linspace(vref_min,vref_max,disv)
+    xis=np.linspace(xi_min,xi_max,disv)
+    vps=np.linspace(vp_min,vp_max,disv)
+    depths=np.linspace(0,prof,disd)
 
     i=0
     j=0
 
-    depth=[]
+    # depth=[]
 
     for line in lines[2:]:
         [vsvd[i,j],xid[i,j],vpd[i,j]]=[float(i) for i in line.split()]
@@ -133,18 +135,255 @@ if Posterior:
         if j==disv:
             j=0
             i+=1
-    xid[:,disv//2-1]=0 # else the isotropic layers dominate the anisotropy density plot
+    # xid[:,disv//2-1]=0 # else the isotropic layers dominate the anisotropy density plot
+    xid[:,disv//2-1]=xid[:,disv//2] # else the isotropic layers dominate the anisotropy density plot
 
-    # for i in range(np.shape(vsvd)[0]): # normalisation by depth, not strictly necessary
-    #     s=np.amax(vsvd[i,:])
-    #     vsvd[i,:]=vsvd[i,:]/s
+    for i in range(np.shape(vsvd)[0]): # normalisation by depth, not strictly necessary
+        s=np.amax(vsvd[i,:])
+        vsvd[i,:]=vsvd[i,:]/s
+    vsvd[-1,:]=0.0
 
-    # for i in range(np.shape(vpd)[0]): # normalisation by depth, not strictly necessary
-    #     s=np.amax(vpd[i,:])
-    #     vpd[i,:]=vpd[i,:]/s
+    for i in range(np.shape(vpd)[0]): # normalisation by depth, not strictly necessary
+        s=np.amax(vpd[i,:])
+        vpd[i,:]=vpd[i,:]/s
+    vpd[-1,:]=0.0
+    for i in range(np.shape(xid)[0]): # normalisation by depth, not strictly necessary
+        s=np.amax(xid[i,:])
+        xid[i,:]=xid[i,:]/s
+    xid[-1,:]=0.0
+
+
+    ################# Average distribution ABOVE depth
+
+    dep_val=200
+    ind=np.where(depths<=dep_val)[0]
+    splice_vsvd_a=vsvd[ind,:]
+    splice_xid_a=xid[ind,:]
+    splice_vpd_a=vpd[ind,:]
+
+    above_splice_vsvd=np.mean(splice_vsvd_a, axis=0)
+    above_splice_xid=np.mean(splice_xid_a, axis=0)
+    above_splice_vpd=np.mean(splice_vpd_a, axis=0)
+
+    ################# Average distribution BELOW depth
+
+    ind2=np.where(depths>=dep_val)[0]
+    splice_vsvd_b=vsvd[ind2,:]
+    splice_xid_b=xid[ind2,:]
+    splice_vpd_b=vpd[ind2,:]
+
+    below_splice_vsvd=np.mean(splice_vsvd_b, axis=0)
+    below_splice_xid=np.mean(splice_xid_b, axis=0)
+    below_splice_vpd=np.mean(splice_vpd_b, axis=0)
+
+    ################# Average distribution AT depth
+
+    ind3=np.where(abs(depths-dep_val)==np.min(np.abs(depths-dep_val)))[0][0]
+    splice_vsvd=vsvd[ind3,:]
+    splice_xid=xid[ind3,:]
+    splice_vpd=vpd[ind3,:]
+
+
+    ### STATS ###
+
+    dist_vsvs=[]
+    dist_vsvs_b=[]
+    dist_vsvs_a=[]
+    for i in range(len(vsvs)):
+        for j in range(int(1000*splice_vsvd[i])):
+            dist_vsvs.append(vsvs[i])
+        for k in range(int(1000*below_splice_vsvd[i])):
+            dist_vsvs_b.append(vsvs[i])
+        for l in range(int(1000*above_splice_vsvd[i])):
+            dist_vsvs_a.append(vsvs[i])
+
+    std_vsvs=np.std(dist_vsvs,axis=0)
+    mean_vsvs=np.mean(dist_vsvs,axis=0)
+    std_vsvs_a=np.std(dist_vsvs_a,axis=0)
+    mean_vsvs_a=np.mean(dist_vsvs_a,axis=0)
+    std_vsvs_b=np.std(dist_vsvs_b,axis=0)
+    mean_vsvs_b=np.mean(dist_vsvs_b,axis=0)
+
+    # print(mean_vsvs_a,std_vsvs_a,mean_vsvs,std_vsvs,mean_vsvs_b,std_vsvs_b)
+
+    dist_xis=[]
+    dist_xis_a=[]
+    dist_xis_b=[]
+    for i in range(len(xis)):
+        for j in range(int(1000*splice_xid[i])):
+            dist_xis.append(xis[i])
+        for k in range(int(1000*above_splice_xid[i])):
+            dist_xis_a.append(xis[i])
+        for l in range(int(1000*below_splice_xid[i])):
+            dist_xis_b.append(xis[i])
+
+    std_xis=np.std(dist_xis,axis=0)
+    mean_xis=np.mean(dist_xis,axis=0)
+    std_xis_a=np.std(dist_xis_a,axis=0)
+    mean_xis_a=np.mean(dist_xis_a,axis=0)
+    std_xis_b=np.std(dist_xis_b,axis=0)
+    mean_xis_b=np.mean(dist_xis_b,axis=0)
+
+    # print(mean_xis_a,std_xis_a,mean_xis,std_xis,mean_xis_b,std_xis_b)
+
+    dist_vps=[]
+    dist_vps_a=[]
+    dist_vps_b=[]
+    for i in range(len(vps)):
+        for j in range(int(1000*splice_vpd[i])):
+            dist_vps.append(vps[i])
+        for k in range(int(1000*below_splice_vpd[i])):
+            dist_vps_b.append(vps[i])
+        for l in range(int(1000*above_splice_vpd[i])):
+            dist_vps_a.append(vps[i])
+
+    std_vps=np.std(dist_vps,axis=0)
+    mean_vps=np.mean(dist_vps,axis=0)
+    std_vps_b=np.std(dist_vps_b,axis=0)
+    mean_vps_b=np.mean(dist_vps_b,axis=0)
+    std_vps_a=np.std(dist_vps_a,axis=0)
+    mean_vps_a=np.mean(dist_vps_a,axis=0)
+
+    # print(mean_vps_a,std_vps_a,mean_vps,std_vps,mean_vps_b,std_vps_b)
+
+
+    fig, ((ax1, ax2, ax3), (ax4, ax5, ax6), (ax7, ax8, ax9)) = plt.subplots(3, 3, figsize=(9, 9), sharey=True)
+
+    rect = patches.Rectangle((mean_vsvs_a , 0), std_vsvs_a, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
+    rect2 = patches.Rectangle((mean_vsvs_a-std_vsvs_a , 0), std_vsvs_a, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
+    ax1.add_patch(rect)
+    ax1.add_patch(rect2)
+
+
+    rect3 = patches.Rectangle((mean_vsvs , 0), std_vsvs, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
+    rect4 = patches.Rectangle((mean_vsvs-std_vsvs , 0), std_vsvs, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
+    ax4.add_patch(rect3)
+    ax4.add_patch(rect4)
+
+    rect5 = patches.Rectangle((mean_vsvs_b , 0), std_vsvs_b, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
+    rect6 = patches.Rectangle((mean_vsvs_b-std_vsvs_b , 0), std_vsvs_b, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
+    ax7.add_patch(rect5)
+    ax7.add_patch(rect6)
+
+
+
+
+    rect = patches.Rectangle((mean_xis_a , 0), std_xis_a, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
+    rect2 = patches.Rectangle((mean_xis_a-std_xis_a , 0), std_xis_a, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
+    ax2.add_patch(rect)
+    ax2.add_patch(rect2)
+
+
+    rect3 = patches.Rectangle((mean_xis , 0), std_xis, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
+    rect4 = patches.Rectangle((mean_xis-std_xis , 0), std_xis, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
+    ax5.add_patch(rect3)
+    ax5.add_patch(rect4)
+
+    rect5 = patches.Rectangle((mean_xis_b , 0), std_xis_b, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
+    rect6 = patches.Rectangle((mean_xis_b-std_xis_b , 0), std_xis_b, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
+    ax8.add_patch(rect5)
+    ax8.add_patch(rect6)
+
+    rect = patches.Rectangle((mean_vps_a , 0), std_vps_a, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
+    rect2 = patches.Rectangle((mean_vps_a-std_vps_a , 0), std_vps_a, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
+    ax3.add_patch(rect)
+    ax3.add_patch(rect2)
+
+
+    rect3 = patches.Rectangle((mean_vps , 0), std_vps, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
+    rect4 = patches.Rectangle((mean_vps-std_vps , 0), std_vps, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
+    ax6.add_patch(rect3)
+    ax6.add_patch(rect4)
+
+    rect5 = patches.Rectangle((mean_vps_b , 0), std_vps_b, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
+    rect6 = patches.Rectangle((mean_vps_b-std_vps_b , 0), std_vps_b, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
+    ax9.add_patch(rect5)
+    ax9.add_patch(rect6)
+
+    ax1.plot([mean_vsvs_a,mean_vsvs_a],[0,1],c='red',linewidth=1,alpha=1)
+    ax2.plot([mean_xis_a,mean_xis_a],[0,1],c='red',linewidth=1,alpha=1)
+    ax3.plot([mean_vps_a,mean_vps_a],[0,1],c='red',linewidth=1,alpha=1)
+
+    ax4.plot([mean_vsvs,mean_vsvs],[0,1],c='red',linewidth=1,alpha=1)
+    ax5.plot([mean_xis,mean_xis],[0,1],c='red',linewidth=1,alpha=1)
+    ax6.plot([mean_vps,mean_vps],[0,1],c='red',linewidth=1,alpha=1)
+
+    ax7.plot([mean_vsvs_b,mean_vsvs_b],[0,1],c='red',linewidth=1,alpha=1)
+    ax8.plot([mean_xis_b,mean_xis_b],[0,1],c='red',linewidth=1,alpha=1)
+    ax9.plot([mean_vps_b,mean_vps_b],[0,1],c='red',linewidth=1,alpha=1)
+
+
+    ax1.plot(vsvs,above_splice_vsvd,c='black',linewidth=1,alpha=1)
+    ax2.plot(xis,above_splice_xid,c='black',linewidth=1,alpha=1)
+    ax3.plot(vps,above_splice_vpd,c='black',linewidth=1,alpha=1)
+
+    ax4.plot(vsvs,splice_vsvd,c='black',linewidth=1,alpha=1)
+    ax5.plot(xis,splice_xid,c='black',linewidth=1,alpha=1)
+    ax6.plot(vps,splice_vpd,c='black',linewidth=1,alpha=1)
+
+    ax7.plot(vsvs,below_splice_vsvd,c='black',linewidth=1,alpha=1)
+    ax8.plot(xis,below_splice_xid,c='black',linewidth=1,alpha=1)
+    ax9.plot(vps,below_splice_vpd,c='black',linewidth=1,alpha=1)
+
+    ax1.set_title('S-vel above '+str(dep_val)+'km')
+    ax1.set_xlabel('Vsv (km/s)', fontsize=10)
+    ax1.set_ylabel('Probability',fontsize=10)
+    ax1.set_xlim([vref_min,vref_max])
+    ax1.set_ylim([0.0,1.0])
+
+    ax2.set_title('Rad Anis. above '+str(dep_val)+'km')
+    ax2.set_xlabel(r'Xi',fontsize=10)
+    ax2.set_xlim([xi_min,xi_max])
+
+    ax3.set_title('Vp/Vs above '+str(dep_val)+'km')
+    ax3.set_xlim([vp_min,vp_max])
+    ax3.set_xlabel(r'VpVs*(1+X)',fontsize=10)
+
+    ax4.set_title('S-vel at '+str(dep_val)+'km')
+    ax4.set_xlabel('Vsv (km/s)', fontsize=10)
+    ax4.set_ylabel('Probability',fontsize=10)
+    ax4.set_xlim([vref_min,vref_max])
+    ax4.set_ylim([0.0,1.0])
+
+    ax5.set_title('Rad Anis. at '+str(dep_val)+'km')
+    ax5.set_xlabel(r'Xi',fontsize=10)
+    ax5.set_xlim([xi_min,xi_max])
+
+    ax6.set_title('Vp/Vs at '+str(dep_val)+'km')
+    ax6.set_xlim([vp_min,vp_max])
+    ax6.set_xlabel(r'VpVs*(1+X)',fontsize=10)
+
+    ax7.set_title('S-vel below '+str(dep_val)+'km')
+    ax7.set_xlabel('Vsv (km/s)', fontsize=10)
+    ax7.set_ylabel('Probability',fontsize=10)
+    ax7.set_xlim([vref_min,vref_max])
+    ax7.set_ylim([0.0,1.0])
+
+    ax8.set_title('Rad Anis. below '+str(dep_val)+'km')
+    ax8.set_xlabel(r'Xi',fontsize=10)
+    ax8.set_xlim([xi_min,xi_max])
+
+    ax9.set_title('Vp/Vs below '+str(dep_val)+'km')
+    ax9.set_xlim([vp_min,vp_max])
+    ax9.set_xlabel(r'VpVs*(1+X)',fontsize=10)
+
+
+
+
+    plt.subplots_adjust(wspace=0.35,hspace=0.35)
+
+    # plt.show()
+    plt.savefig(directory+'/PLOTS/'+'Hist_dist_'+str(dep_val)+'.png',dpi=200)
+    plt.close()
+
 
     fig, (ax0, ax1, ax2, ax4, ax5) = plt.subplots(nrows=1, ncols=5, sharey=True,
                                         figsize=(12, 6))
+
+    vsvs=np.linspace(vref_min,vref_max,disv+1)
+    xis=np.linspace(xi_min,xi_max,disv+1)
+    vps=np.linspace(vp_min,vp_max,disv+1)
+    depths=np.linspace(0,prof,disd+1)
 
 
     ax0.invert_yaxis()
@@ -154,14 +393,15 @@ if Posterior:
     ax1.set_ylim([prof,0.])
     ax1.set_xlabel(r'xi',fontsize=10)
     ax1.set_xlim([xi_min,xi_max])
+    # ax1.set_xlim([0.5, 1.5])
     ax1.set_title('Radial Anisotropy')
-    ax2.set_xlabel(r'Vp (km/s)',fontsize=10)
     ax2.set_xlim([vp_min,vp_max])
+    # ax2.set_xlim([-0.5,0.5])
     ax0.set_ylabel('Depth (km)',fontsize=10)
-    ax2.set_xlabel(r'Vp, (km/s)',fontsize=10)
-    ax2.set_title('P-wave velocity')
-    ax1.pcolormesh(xis,depths[:-1],xid[:-1,:],cmap='magma_r')
-    ax0.pcolormesh(vsvs,depths[:-1],vsvd[:-1,:],cmap='magma_r')
+    ax2.set_xlabel(r'VpVs*(1+X)',fontsize=10)
+    ax2.set_title('Vp/Vs deviation')
+    ax1.pcolormesh(xis,depths,xid,cmap='viridis')
+    ax0.pcolormesh(vsvs,depths,vsvd,cmap='viridis')
 
     # true model overlaid on the posterior (only for synthetic tests)
     file=open(directory+'/'+'true_model.out','r')
@@ -172,25 +412,28 @@ if Posterior:
     true_vsv=[]
     true_xi=[]
     true_vpvs=[]
-    for line in lines:
+    for line in lines[1:]:
         data=line.split()
         true_depth.append(float(data[0]))
         true_vsv.append(float(data[1]))
         try:
             true_xi.append(float(data[2]))
             true_vpvs.append(float(data[3]))
+            # pass
         except:
             pass
 
-
-    ax0.plot(true_vsv,true_depth,c='c',linewidth=3)
+    # True models in cyan.
+    true,=ax0.plot(true_vsv,true_depth,c='white',linewidth=1)
     try:
-        ax1.plot(true_xi,true_depth,c='c',linewidth=3)
-        ax2.plot(true_vpvs,true_depth,c='c',linewidth=3)
+        ax1.plot(true_xi,true_depth,c='white',linewidth=1,alpha=1,marker='o',markersize=2,mfc='k')
+        # ax1.plot(true_xi,true_depth,c='magenta',linewidth=2,alpha=1,marker='o',markersize=2,mfc='k')
+        
+        ax2.plot(true_vpvs,true_depth,c='white',linewidth=1)
     except:
         pass
 
-    ax2.pcolormesh(vps,depths[:-1],vpd[:-1,:],cmap='magma_r')
+    ax2.pcolormesh(vps,depths,vpd,cmap='viridis')
     plt.setp(ax2.get_yticklabels(), visible=False)
 
 
@@ -228,20 +471,23 @@ if Posterior:
         average_xi.append(float(data[2]))
         average_vpvs.append(float(data[3]))
         average_probani.append(float(data[4]))
-
-    ax0.plot(average_vs,depths,c='r',linewidth=3)
-    ax1.plot(average_xi,depths,c='r',linewidth=3)
-    ax2.plot(average_vpvs,depths,c='r',linewidth=3)
-    ax4.plot(average_probani,depths,c='k',linewidth=3)
+    
+    # Average models in red.
+    ave,=ax0.plot(average_vs,depths,c='r',linewidth=1)
+    ax1.plot(average_xi,depths,c='r',linewidth=1)
+    ax2.plot(average_vpvs,depths,c='r',linewidth=1)
+    ax4.plot(average_probani,depths,c='k',linewidth=1)
     ax4.set_xlabel('Probability',fontsize=10)
     ax4.set_title('Anisotropy')
 
     ax4.set_xlim([0,100])
 
+    plt.legend([true, ave], ['true', 'ave'])
+
     fig.suptitle('Posterior and Averages')
 
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Posterior.pdf')
+    plt.savefig(directory+'/PLOTS/'+'Posterior.png',dpi=200)
     plt.close()
 
 
@@ -272,7 +518,7 @@ if Sigmad:
     plt.ylabel('Frequency')
     plt.plot(d,sigmad_R)
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Sigmad_R.pdf')
+    plt.savefig(directory+'/PLOTS/'+'Sigmad_R.png',dpi=200)
     # histogram of love uncertainty parameter
     file=open(directory+'/'+'Sigmad_L.out','r')
     lines=file.readlines()
@@ -297,8 +543,37 @@ if Sigmad:
     plt.ylabel('Frequency')
     plt.plot(d,sigmad_L)
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Sigmad_L.pdf')
+    plt.savefig(directory+'/PLOTS/'+'Sigmad_L.png',dpi=200)
     plt.close()
+
+    if os.path.isfile(directory+'/'+'Sigmad_PsPp.out'):
+        # histogram of PsPp uncertainty parameter
+        file=open(directory+'/'+'Sigmad_PsPp.out','r')
+        lines=file.readlines()
+        file.close()
+
+        data_init=lines[0].split()
+        ad_PsPp_min=float(data_init[0])
+        ad_PsPp_max=float(data_init[1])
+        disa=int(float(data_init[2]))
+
+        d=[]
+        sigmad_PsPp=[]
+        for line in lines[1:]:
+            data=line.split()
+            d.append(float(data[0]))
+            sigmad_PsPp.append(float(data[1]))
+
+        plt.figure('sigmad_PsPp')
+        plt.title('sigmad_PsPp')
+        plt.xlim([ad_PsPp_min, ad_PsPp_max])
+        plt.xlabel('PsPp uncertainty parameter')
+        plt.ylabel('Frequency')
+        plt.plot(d,sigmad_PsPp)
+        # plt.show()
+        plt.savefig(directory+'/PLOTS/'+'Sigmad_PsPp.png',dpi=200)
+        plt.close()
+
 
 #################################### CONVERGENCE #################################
 
@@ -315,12 +590,21 @@ if Convergence:
     conv_R=[]
     conv_L_one=[]
     conv_L=[]
+    conv_PsPp_one=[]
+    conv_PsPp=[]
     for line in lines[1:]:
         data=line.split()
         conv_R_one.append(float(data[0]))
         conv_R.append(float(data[1]))
         conv_L_one.append(float(data[2]))
         conv_L.append(float(data[3]))
+        try:
+            conv_PsPp_one.append(float(data[4]))
+            conv_PsPp.append(float(data[5]))
+        except:
+            pass        
+            
+
 
     plt.figure('convergence_misfit')
     plt.title('Misfit Convergence')
@@ -329,12 +613,17 @@ if Convergence:
     plt.plot(conv_R[burn_in:],label='Rayleigh, all cores')
     plt.plot(conv_L_one[burn_in:],label='Love, one core')
     plt.plot(conv_L[burn_in:],label='Love, all cores')
+    try:
+        plt.plot(conv_PsPp_one[burn_in:],label='PsPp, one core')
+        plt.plot(conv_PsPp[burn_in:],label='PsPp, all cores')
+    except:
+        pass
     plt.xlim([0,nsample])
     plt.xlabel('Iteration number')
     plt.ylabel('Misfit')
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_misfit.pdf')
+    plt.savefig(directory+'/PLOTS/'+'Convergence_misfit.png',dpi=200)
     plt.close()
     
     ############### number of layers over time, for one core and average over all cores ###############
@@ -361,7 +650,7 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_layers.pdf')
+    plt.savefig(directory+'/PLOTS/'+'Convergence_layers.png',dpi=200)
     plt.close()
 
 
@@ -385,11 +674,11 @@ if Convergence:
     plt.plot(conv_sigmaR_one[burn_in:],label='sigmaR, one core')
     plt.plot(conv_sigmaR[burn_in:],label='sigmaR, all cores')
     plt.xlabel('Iteration number')
-    plt.ylabel('XXX')
+    plt.ylabel('sigmaR')
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_sigma_R.pdf')
+    plt.savefig(directory+'/PLOTS/'+'Convergence_sigma_R.png',dpi=200)
     plt.close()
 
     ################ love uncertainty parameter over time, for one core and average over all cores ###############
@@ -412,11 +701,11 @@ if Convergence:
     plt.plot(conv_sigmaL_one[burn_in:],label='sigmaL, one core')
     plt.plot(conv_sigmaL[burn_in:],label='sigmaL, all cores')
     plt.xlabel('Iteration number')
-    plt.ylabel('XXX')
+    plt.ylabel('sigmaL')
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_sigma_L.pdf')
+    plt.savefig(directory+'/PLOTS/'+'Convergence_sigma_L.png',dpi=200)
     plt.close()
 
     ################ acceptance rates for birth of isotropic and anisotropic layers over time, for one core and average over all cores ###############
@@ -449,7 +738,7 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_Birth.pdf')
+    plt.savefig(directory+'/PLOTS/'+'Convergence_Birth.png',dpi=200)
     plt.close()
 
     ################ acceptance rates for death of isotropic and anisotropic layers over time, for one core and average over all cores ###############
@@ -482,7 +771,7 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_Death.pdf')
+    plt.savefig(directory+'/PLOTS/'+'Convergence_Death.png',dpi=200)
     plt.close()
 
     ################ acceptance rates for change in anisotropy over time, for one core and average over all cores ###############
@@ -509,7 +798,7 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_xi.pdf')
+    plt.savefig(directory+'/PLOTS/'+'Convergence_xi.png',dpi=200)
     plt.close()
 
     ################ acceptance rates for change in vp/vsv over time, for one core and average over all cores ###############
@@ -536,8 +825,10 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_vp.pdf')
+    plt.savefig(directory+'/PLOTS/'+'Convergence_vp.png',dpi=200)
     plt.close()
+
+
     
     ################ acceptance rates for change in vsv (upper half) over time, for one core and average over all cores ###############
     file=open(directory+'/'+'Convergence_vs1.out','r')
@@ -563,7 +854,7 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_vs1.pdf')
+    plt.savefig(directory+'/PLOTS/'+'Convergence_vs1.png',dpi=200)
     plt.close()
     
     ################ acceptance rates for change in vsv (lower half) over time, for one core and average over all cores ###############
@@ -590,7 +881,7 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_vs2.pdf')
+    plt.savefig(directory+'/PLOTS/'+'Convergence_vs2.png',dpi=200)
     plt.close()
     
     ################ acceptance rates for change in depth (upper half) over time, for one core and average over all cores ###############
@@ -617,7 +908,7 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_dp1.pdf')
+    plt.savefig(directory+'/PLOTS/'+'Convergence_dp1.png',dpi=200)
     plt.close()
     
     ################ acceptance rates for change in depth (lower half) over time, for one core and average over all cores ###############
@@ -644,8 +935,39 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_dp2.pdf')
+    plt.savefig(directory+'/PLOTS/'+'Convergence_dp2.png',dpi=200)
     plt.close()
+
+
+    if os.path.isfile(directory+'/'+'Convergence_sigma_PsPp.out'):
+
+        ################ love uncertainty parameter over time, for one core and average over all cores ###############
+        file=open(directory+'/'+'Convergence_sigma_PsPp.out','r')
+        lines=file.readlines()
+        file.close()
+
+        burn_in=int(lines[0].split()[0])
+        nsample=int(lines[0].split()[1])
+
+        conv_sigmaPsPp_one=[]
+        conv_sigmaPsPp=[]
+        for line in lines[1:]:
+            data=line.split()
+            conv_sigmaPsPp_one.append(float(data[0]))
+            conv_sigmaPsPp.append(float(data[1]))
+
+        plt.figure('convergence_sigmaPsPp')
+        plt.title('sigmaPsPp convergence')
+        plt.plot(conv_sigmaPsPp_one[burn_in:],label='sigmaPsPp, one core')
+        plt.plot(conv_sigmaPsPp[burn_in:],label='sigmaPsPp, all cores')
+        plt.xlabel('Iteration number')
+        plt.ylabel('sigma_PsPp')
+        plt.xlim([0,nsample])
+        plt.legend()
+        # plt.show()
+        plt.savefig(directory+'/PLOTS/'+'Convergence_sigma_PsPp.png',dpi=200)
+        plt.close()
+
 
 ################################# Average dispersion curves ################################################
 if Dispersion:
@@ -713,21 +1035,23 @@ if Dispersion:
 
     plt.figure('dispersion')
 
-    for R_mode in Modes_R:
-        ave_R='ave_R_'+str(R_mode)
-        obs_R='obs_R_'+str(R_mode)
-        # print(ave_R)
-        ind=np.where(n_R==R_mode)
-        ave_R=plt.errorbar(np.array(period_R)[ind[0]],np.array(c_R)[ind[0]],yerr=np.array(dc_R)[ind[0]],marker='o',zorder=0,label='Rayleigh average',mfc='blue',mec='blue', c='blue')
-        obs_R=plt.errorbar(np.array(period_R_obs)[ind[0]]-0.1,np.array(c_R_obs)[ind[0]],yerr=np.array(dc_R_obs)[ind[0]],marker='o',zorder=0,label='Rayleigh observed',mfc='limegreen',mec='limegreen', c='limegreen')
+    if len(Modes_R)>0:
+        for R_mode in Modes_R:
+            ave_R='ave_R_'+str(R_mode)
+            obs_R='obs_R_'+str(R_mode)
+            # print(ave_R)
+            ind=np.where(n_R==R_mode)
+            ave_R=plt.errorbar(np.array(period_R)[ind[0]],np.array(c_R)[ind[0]],yerr=np.array(dc_R)[ind[0]],marker='o',zorder=0,label='Rayleigh average',mfc='blue',mec='blue', c='blue')
+            obs_R=plt.errorbar(np.array(period_R_obs)[ind[0]]-0.1,np.array(c_R_obs)[ind[0]],yerr=np.array(dc_R_obs)[ind[0]],marker='o',zorder=0,label='Rayleigh observed',mfc='limegreen',mec='limegreen', c='limegreen')
 
-    for L_mode in Modes_L:
-        ave_L='ave_L_'+str(L_mode)
-        obs_L='obs_L_'+str(L_mode)
-        # print(ave_L)
-        ind=np.where(n_L==L_mode)
-        ave_L=plt.errorbar(np.array(period_L)[ind[0]]+0.1,np.array(c_L)[ind[0]],yerr=np.array(dc_L)[ind[0]],marker='o',zorder=0,label='Love average',mfc='orange',mec='orange', c='orange')
-        obs_L=plt.errorbar(np.array(period_L_obs)[ind[0]]+0.2,np.array(c_L_obs)[ind[0]],yerr=np.array(dc_L_obs)[ind[0]],marker='o',zorder=0,label='Love observed',mfc='red',mec='red', c='red')
+    if len(Modes_L)>0:
+        for L_mode in Modes_L:
+            ave_L='ave_L_'+str(L_mode)
+            obs_L='obs_L_'+str(L_mode)
+            # print(ave_L)
+            ind=np.where(n_L==L_mode)
+            ave_L=plt.errorbar(np.array(period_L)[ind[0]]+0.1,np.array(c_L)[ind[0]],yerr=np.array(dc_L)[ind[0]],marker='o',zorder=0,label='Love average',mfc='orange',mec='orange', c='orange')
+            obs_L=plt.errorbar(np.array(period_L_obs)[ind[0]]+0.2,np.array(c_L_obs)[ind[0]],yerr=np.array(dc_L_obs)[ind[0]],marker='o',zorder=0,label='Love observed',mfc='red',mec='red', c='red')
 
 
     # plt.errorbar(np.array(period_R),c_R,yerr=dc_R,marker='o',zorder=0,label='Rayleigh average')
@@ -736,7 +1060,16 @@ if Dispersion:
     # plt.errorbar(np.array(period_L_obs)+0.2,c_L_obs,yerr=dc_L_obs,marker='o',zorder=0,label='Love observed')
     # plt.legend()
     
-    plt.legend([ave_R, obs_R, ave_L, obs_L], ['Rayleigh average', 'Rayleigh observed', 'Love average', 'Love observed'])
+    if len(Modes_R)>0 and len(Modes_L)>0:
+        plt.legend([ave_R, obs_R, ave_L, obs_L], ['Rayleigh average', 'Rayleigh observed', 'Love average', 'Love observed'])
+    elif len(Modes_R)>0 and len(Modes_L)==0:
+        plt.legend([ave_R, obs_R], ['Rayleigh average', 'Rayleigh observed'])
+    elif len(Modes_R)==0 and len(Modes_L)>0:
+        plt.legend([ave_L, obs_L], ['Love average', 'Love observed'])
+
+    
+    # plt.xlim([40,360])
+    plt.ylim([2.5,9.5])
     plt.xlabel('Period (s)')
     plt.ylabel('Phase Velocity (km/s)')
     plt.title('Compare Dispersion Curves')
@@ -744,7 +1077,77 @@ if Dispersion:
     plt.xlim([np.min(period_R+period_L),np.max(period_R+period_L)])
 
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Dispersion.pdf')
+    plt.savefig(directory+'/PLOTS/'+'Dispersion.png',dpi=200)
     plt.close()
 
-plt.show()
+
+################################# Average PsPp Fit ################################################
+if PsPp_Fit:
+    if os.path.isfile(directory+'/'+'PsPp_mean.out'):
+        file=open(directory+'/'+'PsPp_mean.out','r')
+        lines=file.readlines()
+        file.close()
+
+        nrays=int(lines[0].split()[0])
+
+        rayp=[]
+        d_PsPp=[]
+        d_PsPpe=[]
+        for line in lines[1:nrays+1]:
+            data=line.split()
+            rayp.append(float(data[0]))
+            d_PsPp.append(float(data[1]))
+            d_PsPpe.append(float(data[2]))
+
+        rayp=np.array(rayp)
+        d_PsPp=np.array(d_PsPp)
+        d_PsPpe=np.array(d_PsPpe)
+
+        mean=np.zeros((nrays,3))
+        mean[:,0]=rayp[:]
+        mean[:,1]=d_PsPp[:]
+        mean[:,2]=d_PsPpe[:]
+        sorted_mean = mean[np.argsort(mean[:, 0])]
+
+        # true dispersion curves (data)
+        file=open(directory+'/'+'PsPp_obs.out','r')
+        lines=file.readlines()
+        file.close()
+
+        nrays=int(lines[0].split()[0])
+
+        rayp_obs=[]
+        d_obsPsPp=[]
+        d_obsPsPpe=[]
+        for line in lines[1:nrays+1]:
+            data=line.split()
+            rayp_obs.append(float(data[0]))
+            d_obsPsPp.append(float(data[1]))
+            d_obsPsPpe.append(float(data[2]))
+
+        rayp_obs=np.array(rayp_obs)
+        d_obsPsPp=np.array(d_obsPsPp)
+        d_obsPsPpe=np.array(d_obsPsPpe)
+
+        obs=np.zeros((nrays,3))
+        obs[:,0]=rayp_obs[:]
+        obs[:,1]=d_obsPsPp[:]
+        obs[:,2]=d_obsPsPpe[:]
+        sorted_obs = obs[np.argsort(obs[:, 0])]
+
+        plt.figure('PsPp_Fit')
+
+        ave_PsPp=plt.errorbar(sorted_mean[:,0],sorted_mean[:,1],yerr=sorted_mean[:,2],marker='o',markersize=3,zorder=0,label='PsPp average',mfc='blue',mec='blue', c='blue')
+        obs_PsPp=plt.errorbar(sorted_obs[:,0] ,sorted_obs[:,1], yerr=sorted_obs[:,2], marker='o',markersize=3,zorder=0,label='PsPp observed',mfc='limegreen',mec='limegreen', c='limegreen')
+        
+        plt.legend([ave_PsPp, obs_PsPp], ['PsPp average', 'PsPp observed'])
+
+        plt.xlabel('Ray Parameter (s/deg)')
+        plt.ylabel('PsPp TT (s)')
+        plt.title('Compare PsPp Fit')
+
+        plt.xlim([np.min(rayp_obs),np.max(rayp_obs)])
+        
+        # plt.show()
+        plt.savefig(directory+'/PLOTS/'+'PsPp_Fit.png',dpi=200)
+        plt.close()

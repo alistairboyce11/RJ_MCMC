@@ -44,23 +44,23 @@ all  :  obj global
 # 	$(F77) -o run test_dispersion_minos.f90 \
 # 	-L./ -lroutines -lm
 #
-joint: params.h data_params.h
+joint: params.h 
 	$(F77) -o run RJ_MCMC_test_joint.f90 \
 	-L./ -lroutines -lm
 
-joint_prepare: params.h data_params.h
+joint_prepare: params.h 
 	$(F77) -o run RJ_MCMC_test_joint_prepare.f90 \
 	-L./ -lroutines -lm
 
-joint_invert: params.h data_params.h
+joint_invert: params.h 
 	$(F77) -o run2 RJ_MCMC_test_joint_invert.f90 \
 	-L./ -lroutines -lm
 
-global: params.h data_params.h
+global: params.h 
 	$(F77) -o run RJ_MCMC_test_nlay.f90 \
 	-L./ -lroutines -lm
 
-obj: params.h data_params.h
+obj: params.h 
 	$(F77) -c src/whichcell_d.f90
 	$(F77) -c src/combine.f90
 	$(F77) -c src/minos_bran.f
