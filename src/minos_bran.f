@@ -375,7 +375,7 @@ c*** find roots by spline interpolation ***
 c     ------ Al Edits ------ 
       integer :: count, count_max
       logical :: error_flag
-      parameter (count_max=2500000)
+      parameter (count_max=500000)
       data tol/1.d-9/,itmax/15/,kchar/' s',' t',' s',' c'/
 c     ------ Al Edits ------ 
       count = 1
