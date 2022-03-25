@@ -127,7 +127,8 @@ program RJ_MCMC
     integer nlims_R(2,nharmo_max),nlims_L(2,nharmo_max),numharm_count,numharm_R(nharmo_max),numharm_L(nharmo_max)
     real PrB,AcB,PrD,AcD,Prnd_R,Acnd_R,Prnd_L,Acnd_L,&
         Acba,Prba,Acda,Prda,out,Prxi,Acxi,Pr_vp,&
-        Ac_vp,PrP(2),PrV(2),AcP(2),AcV(2) ! to adjust acceptance rates for all different parameters
+        Ac_vp !,PrP(2),PrV(2),AcP(2),AcV(2) ! to adjust acceptance rates for all different parameters
+    real PrP,PrV,AcP,AcV
     real lsd_L,lsd_L_prop,lsd_L_min,lsd_R,lsd_R_prop,lsd_R_min !logprob without uncertainties
     real logprob_vsv,logprob_vpvs !for reversible jump
     real convAd_R(nsample+burn_in),convAd_Rs(nsample+burn_in),convAd_L(nsample+burn_in),convAd_Ls(nsample+burn_in) !variations of uncertainty parameters
@@ -906,17 +907,17 @@ program RJ_MCMC
             if ((Acnd_L/(Prnd_L+1))>0.54) pAd_L=pAd_L*(1+perturb) ! for love waves
             if ((Acnd_L/(Prnd_L+1))<0.34) pAd_L=pAd_L*(1-perturb)
       
-            if ((Acv(1)/(Prv(1)+1))>0.54) pv1=pv1*(1+perturb) ! 2 layers for vsv
-            if ((Acv(1)/(Prv(1)+1))<0.34) pv1=pv1*(1-perturb)
+            if ((Acv/(Prv+1))>0.54) pv1=pv1*(1+perturb) ! 2 layers for vsv
+            if ((Acv/(Prv+1))<0.34) pv1=pv1*(1-perturb)
       
-            if ((Acv(2)/(Prv(2)+1))>0.54) pv2=pv2*(1+perturb) 
-            if ((Acv(2)/(Prv(2)+1))<0.34) pv2=pv2*(1-perturb)
+            ! if ((Acv(2)/(Prv(2)+1))>0.54) pv2=pv2*(1+perturb) 
+            ! if ((Acv(2)/(Prv(2)+1))<0.34) pv2=pv2*(1-perturb)
       
-            if ((Acp(1)/(Prp(1)+1))>0.54) pd1=pd1*(1+perturb) ! 2 layers for changing depth
-            if ((Acp(1)/(Prp(1)+1))<0.34) pd1=pd1*(1-perturb)
+            if ((Acp/(Prp+1))>0.54) pd1=pd1*(1+perturb) ! 2 layers for changing depth
+            if ((Acp/(Prp+1))<0.34) pd1=pd1*(1-perturb)
        
-            if ((Acp(2)/(Prp(2)+1))>0.54) pd2=pd2*(1+perturb)
-            if ((Acp(2)/(Prp(2)+1))<0.34) pd2=pd2*(1-perturb)
+            ! if ((Acp(2)/(Prp(2)+1))>0.54) pd2=pd2*(1+perturb)
+            ! if ((Acp(2)/(Prp(2)+1))<0.34) pd2=pd2*(1-perturb)
             !------------------------------------------------
             ! UPDATE SIGMAV & SIGMAVPVS
 
@@ -1125,15 +1126,16 @@ program RJ_MCMC
 
             ind=1+ceiling(ran3(ra)*(npt-1))
             if (ind==1) ind=2
- 
+            PrP=PrP+1
+            voro_prop(ind,1)=voro(ind,1)+gasdev(ra)*pd1
             !if (ount.GT.burn_in) then 
-            if (voro(ind,1)<(d_max/2)) then
-                PrP(1)=PrP(1)+1
-                voro_prop(ind,1)=voro(ind,1)+gasdev(ra)*pd1
-            else
-                PrP(2)=PrP(2)+1
-                voro_prop(ind,1)=voro(ind,1)+gasdev(ra)*pd2
-            endif
+            ! if (voro(ind,1)<(d_max/2)) then
+            !     PrP(1)=PrP(1)+1
+            !     voro_prop(ind,1)=voro(ind,1)+gasdev(ra)*pd1
+            ! else
+            !     PrP(2)=PrP(2)+1
+            !     voro_prop(ind,1)=voro(ind,1)+gasdev(ra)*pd2
+            ! endif
             !endif
  
             if ((voro_prop(ind,1)<=d_min).or.(voro_prop(ind,1)>=d_max)) then
@@ -1172,13 +1174,16 @@ program RJ_MCMC
                 stop "763"
             endif
             
-            if (voro(ind,1)<(d_max/2)) then
-                PrV(1)=PrV(1)+1
-                voro_prop(ind,2)=voro(ind,2)+gasdev(ra)*pv1
-            else
-                PrV(2)=PrV(2)+1
-                voro_prop(ind,2)=voro(ind,2)+gasdev(ra)*pv2
-            endif
+            PrV=PrV+1
+            voro_prop(ind,2)=voro(ind,2)+gasdev(ra)*pv1
+
+            ! if (voro(ind,1)<(d_max/2)) then
+            !     PrV(1)=PrV(1)+1
+            !     voro_prop(ind,2)=voro(ind,2)+gasdev(ra)*pv1
+            ! else
+            !     PrV(2)=PrV(2)+1
+            !     voro_prop(ind,2)=voro(ind,2)+gasdev(ra)*pv2
+            ! endif
 
             
             !Check if oustide bounds of prior, width relates to vsv.
@@ -1444,17 +1449,19 @@ program RJ_MCMC
                 if (ind>malayv) stop  '1082'
                 accept=.true.
                 if (value) then
-                    if (voro(ind,1)<(d_max/2)) then
-                        AcV(1)=AcV(1)+1
-                    else
-                        AcV(2)=AcV(2)+1
-                    endif
+                    AcV=AcV+1
+                    ! if (voro(ind,1)<(d_max/2)) then
+                    !     AcV(1)=AcV(1)+1
+                    ! else
+                    !     AcV(2)=AcV(2)+1
+                    ! endif
                 elseif (move) then
-                    if (voro(ind,1)<(d_max/2)) then
-                        AcP(1)=AcP(1)+1
-                    else
-                        AcP(2)=AcP(2)+1
-                    endif
+                    AcP=AcP+1
+                    ! if (voro(ind,1)<(d_max/2)) then
+                    !     AcP(1)=AcP(1)+1
+                    ! else
+                    !     AcP(2)=AcP(2)+1
+                    ! endif
                 elseif(ani)then
                     Acxi=Acxi+1
                 elseif(change_vp)then
@@ -1648,10 +1655,14 @@ program RJ_MCMC
             convB(ount)=100*AcB/PrB
             convDa(ount)=100*AcDa/PrDa
             convD(ount)=100*AcD/PrD
-            convvs1(ount)=100*Acv(1)/Prv(1)
-            convvs2(ount)=100*Acv(2)/Prv(2)
-            convdp1(ount)=100*Acp(1)/Prp(1)
-            convdp2(ount)=100*Acp(2)/Prp(2)
+            ! convvs1(ount)=100*Acv(1)/Prv(1)
+            ! convvs2(ount)=100*Acv(2)/Prv(2)
+            ! convdp1(ount)=100*Acp(1)/Prp(1)
+            ! convdp2(ount)=100*Acp(2)/Prp(2)
+
+            convvs1(ount)=100*Acv/Prv
+            convdp1(ount)=100*Acp/Prp
+
             convvp(ount)=100*Ac_vp/Pr_vp
             convxi(ount)=100*Acxi/Prxi
             convd_R(ount)=lsd_R
@@ -1687,8 +1698,10 @@ program RJ_MCMC
             write(*,*)'number of cells:',npt
             write(*,*)'Ad_R',Ad_R,'Ad_L',Ad_L
             write(*,*)'Acceptance rates'
-            write(*,*)'AR_move',100*AcP(1)/PrP(1),100*AcP(2)/PrP(2)
-            write(*,*)'AR_value',100*AcV(1)/PrV(1),100*AcV(2)/PrV(2)
+            ! write(*,*)'AR_move',100*AcP(1)/PrP(1),100*AcP(2)/PrP(2)
+            ! write(*,*)'AR_value',100*AcV(1)/PrV(1),100*AcV(2)/PrV(2)
+            write(*,*)'AR_move',100*AcP/PrP
+            write(*,*)'AR_value',100*AcV/PrV
             write(*,*)'AR_Birth',100*AcB/PrB,'AR_Death',100*AcD/PrD,'sigmav',sigmav,'sigmavpvs',sigmavpvs
             write(*,*)'AR_Birtha',100*AcBa/PrBa,'AR_Deatha',100*AcDa/PrDa
             write(*,*)'AR_xi',100*Acxi/Prxi,'pxi',pxi
@@ -1781,9 +1794,9 @@ program RJ_MCMC
         call MPI_REDUCE(convDa,convDas,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(convD,convDs,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(convvs1,convvs1s,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-        call MPI_REDUCE(convvs2,convvs2s,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        ! call MPI_REDUCE(convvs2,convvs2s,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(convdp1,convdp1s,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-        call MPI_REDUCE(convdp2,convdp2s,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        ! call MPI_REDUCE(convdp2,convdp2s,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(convvp,convvps,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(convxi,convxis,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(histoch,histochs,disd,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
@@ -1824,9 +1837,9 @@ program RJ_MCMC
         convDs=convDs/j
         convDas=convDas/j
         convvs1s=convvs1s/j
-        convvs2s=convvs2s/j
+        ! convvs2s=convvs2s/j
         convdp1s=convdp1s/j
-        convdp2s=convdp2s/j
+        ! convdp2s=convdp2s/j
         convvps=convvps/j
         convxis=convxis/j
  
@@ -1980,12 +1993,12 @@ program RJ_MCMC
         enddo
         close(54)
         
-        open(54,file=dirname//'/Convergence_vs2.out',status='replace')
-        write(54,*)burn_in,nsample,burn_in,nsample
-        do i=1,nsample+burn_in
-            write(54,*)convvs2(i),convvs2s(i)
-        enddo
-        close(54)
+        ! open(54,file=dirname//'/Convergence_vs2.out',status='replace')
+        ! write(54,*)burn_in,nsample,burn_in,nsample
+        ! do i=1,nsample+burn_in
+        !     write(54,*)convvs2(i),convvs2s(i)
+        ! enddo
+        ! close(54)
         
         open(54,file=dirname//'/Convergence_dp1.out',status='replace')
         write(54,*)burn_in,nsample,burn_in,nsample
@@ -1994,12 +2007,12 @@ program RJ_MCMC
         enddo
         close(54)
         
-        open(54,file=dirname//'/Convergence_dp2.out',status='replace')
-        write(54,*)burn_in,nsample,burn_in,nsample
-        do i=1,nsample+burn_in
-            write(54,*)convdp2(i),convdp2s(i)
-        enddo
-        close(54)
+        ! open(54,file=dirname//'/Convergence_dp2.out',status='replace')
+        ! write(54,*)burn_in,nsample,burn_in,nsample
+        ! do i=1,nsample+burn_in
+        !     write(54,*)convdp2(i),convdp2s(i)
+        ! enddo
+        ! close(54)
         
         open(54,file=dirname//'/Convergence_vp.out',status='replace')
         write(54,*)burn_in,nsample,burn_in,nsample
