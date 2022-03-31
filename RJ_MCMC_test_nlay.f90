@@ -25,10 +25,11 @@ program RJ_MCMC
     !-----------------------------------------
 
 
-    character (len=*), parameter :: dirname = 'OUT_REAL_100' ! This is where output info files are saved and input data files are taken.
+
+    character (len=*), parameter :: dirname = 'OUT_TEST' ! This is where output info files are saved and input data files are taken.
     character*8, parameter :: storename = 'STORFFC1'     ! This is where output models are saved
-    integer, parameter :: burn_in = 20000 ! 9000! 55000 !Burn-in period
-    integer, parameter :: nsample = 100000 ! 10000! 50000!Post burn-in
+    integer, parameter :: burn_in = 200000 ! 55000 !Burn-in period
+    integer, parameter :: nsample = 200000 ! 50000!Post burn-in
     integer, parameter :: thin = 50    !Thinning of the chain 
 
     integer, parameter :: Scratch = 1     ! 0: Start from Stored model 1: Start from scratch
@@ -186,7 +187,8 @@ program RJ_MCMC
     logical :: stuck
     integer :: nharm_R,nharm_L,iharm
     real :: dummy_d_obsdcR(ndatadmax), dummy_d_obsdcL(ndatadmax)
-
+    real :: lat,lon
+    
     ! todo: implement a test with raylquo
 1000 format(I4)
 
@@ -219,7 +221,6 @@ program RJ_MCMC
     sigmavpvs=0.15     ! proposal for vpvs when creating a new layer
       
     testing=.true.
-
     if (testing) write(*,*)'testing with synthetic model'
     write(*,*)'testing',maxrq
     ra=rank !seed for RNG
