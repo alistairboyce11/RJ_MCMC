@@ -25,6 +25,7 @@ program RJ_MCMC
     !-----------------------------------------
 
 
+
     character (len=*), parameter :: dirname = 'OUT_TEST' ! This is where output info files are saved and input data files are taken.
     character*8, parameter :: storename = 'STORFFC1'     ! This is where output models are saved
     integer, parameter :: burn_in = 200000 ! 55000 !Burn-in period
