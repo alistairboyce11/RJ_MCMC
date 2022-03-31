@@ -18,14 +18,14 @@ print('Arguments:      ',sys.argv)
 print('Options [1] :     RJ_MCMC_Tests/XYZ_test/OUT_TEST')
 # python plot_test_results.py ./OUT_TEST2
 
-num_args=len(sys.argv)
-if num_args < 2:
-   print('Number of arguments (' + str(num_args) +') too low... exit')
-   exit('exiting....')
+#num_args=len(sys.argv)
+#if num_args < 2:
+#   print('Number of arguments (' + str(num_args) +') too low... exit')
+#   exit('exiting....')
     
-directory = str(sys.argv[1])
-print('Plotting results for: ' +str(directory))
-
+#directory = str(sys.argv[1])
+#print('Plotting results for: ' +str(directory))
+directory='OUT_SYNTH1'
 
 ####################### SET PARAMS ############################################
 # input directory, contains all the outputs from the MCMC code
@@ -40,6 +40,7 @@ Posterior       = True
 Sigmad          = True
 Dispersion      = True
 Convergence     = True
+True_model      = True
 
 ########## histogram of number of layers
 if Layer_Hist:
@@ -162,33 +163,34 @@ if Posterior:
     ax2.set_title('P-wave velocity')
     ax1.pcolormesh(xis,depths[:-1],xid[:-1,:],cmap='magma_r')
     ax0.pcolormesh(vsvs,depths[:-1],vsvd[:-1,:],cmap='magma_r')
-
-    # true model overlaid on the posterior (only for synthetic tests)
-    file=open(directory+'/'+'true_model.out','r')
-    lines=file.readlines()
-    file.close()
-
-    true_depth=[]
-    true_vsv=[]
-    true_xi=[]
-    true_vpvs=[]
-    for line in lines:
-        data=line.split()
-        true_depth.append(float(data[0]))
-        true_vsv.append(float(data[1]))
+    
+    if True_model:
+        # true model overlaid on the posterior (only for synthetic tests)
+        file=open(directory+'/'+'true_model_01.out','r')
+        lines=file.readlines()
+        file.close()
+    
+        true_depth=[]
+        true_vsv=[]
+        true_xi=[]
+        true_vpvs=[]
+        for line in lines:
+            data=line.split()
+            true_depth.append(float(data[0]))
+            true_vsv.append(float(data[1]))
+            try:
+                true_xi.append(float(data[2]))
+                true_vpvs.append(float(data[3]))
+            except:
+                pass
+    
+    
+        ax0.plot(true_vsv,true_depth,c='c',linewidth=3)
         try:
-            true_xi.append(float(data[2]))
-            true_vpvs.append(float(data[3]))
+            ax1.plot(true_xi,true_depth,c='c',linewidth=3)
+            ax2.plot(true_vpvs,true_depth,c='c',linewidth=3)
         except:
             pass
-
-
-    ax0.plot(true_vsv,true_depth,c='c',linewidth=3)
-    try:
-        ax1.plot(true_xi,true_depth,c='c',linewidth=3)
-        ax2.plot(true_vpvs,true_depth,c='c',linewidth=3)
-    except:
-        pass
 
     ax2.pcolormesh(vps,depths[:-1],vpd[:-1,:],cmap='magma_r')
     plt.setp(ax2.get_yticklabels(), visible=False)

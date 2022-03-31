@@ -44,7 +44,7 @@ program RJ_MCMC
 
     real PrB,AcB,PrD,AcD,Prnd_R,Acnd_R,Prnd_L,Acnd_L,&
         Acba,Prba,Acda,Prda,out,Prxi,Acxi,Pr_vp,&
-        Ac_vp,PrP(2),PrV(2),AcP(2),AcV(2) ! to adjust acceptance rates for all different parameters
+        Ac_vp,PrP,PrV,AcP,AcV ! to adjust acceptance rates for all different parameters
     real lsd_L,lsd_L_prop,lsd_L_min,lsd_R,lsd_R_prop,lsd_R_min !logprob without uncertainties
     real logprob_vsv,logprob_vp !for reversible jump
     real convAd_R(nsample+burn_in),convAd_Rs(nsample+burn_in),convAd_L(nsample+burn_in),convAd_Ls(nsample+burn_in) !variations of uncertainty parameters
@@ -61,13 +61,13 @@ program RJ_MCMC
     real d_obsdcR(ndatadmax),d_obsdcL(ndatadmax),d_obsdcRe(ndatadmax),d_obsdcLe(ndatadmax) !observed data
     integer inorout(21000),inorouts(21000),members(21000),io ! mpi related variables
     integer ndatad_R,ndatad_L,ndatad_R_tmp,ndatad_L_tmp !number of observed data points
-    real pxi,p_vp,pd1,pv1,pd2,pv2,pAd_R,pAd_L ! related to observed data for azimuthal anisotropy
+    real pxi,p_vp,pd,pv,pAd_R,pAd_L ! related to observed data for azimuthal anisotropy
     ! Geometry parameters
     ! Traces
     integer nptref,malayv ! number of points in reference model, number of layers in voro
     real convBs(nsample+burn_in),convB(nsample+burn_in),convPs(nsample+burn_in),convP(nsample+burn_in) ! birth rates, vp change rates
-    real convvs1(nsample+burn_in),convvs1s(nsample+burn_in),convvs2(nsample+burn_in),convvs2s(nsample+burn_in)
-    real convdp1(nsample+burn_in),convdp1s(nsample+burn_in),convdp2(nsample+burn_in),convdp2s(nsample+burn_in)
+    real convvs(nsample+burn_in),convvss(nsample+burn_in)
+    real convdp(nsample+burn_in),convdps(nsample+burn_in)
     real convvp(nsample+burn_in),convvps(nsample+burn_in),convxis(nsample+burn_in),convxi(nsample+burn_in)
     real convBas(nsample+burn_in),convBa(nsample+burn_in) ! anisotropic birth rates
     real convDs(nsample+burn_in),convD(nsample+burn_in),convDas(nsample+burn_in),convDa(nsample+burn_in)
@@ -149,7 +149,7 @@ program RJ_MCMC
     real alphamax_prop(numdis_max),alpharefmax_prop
     real alphamax_props(numdis_max),alpharefmax_props
     real alphaall(nsample/thin,numdis_max)
-    real lat(numdis_max), lon(numdis_max)
+    real, dimension(:), allocatable :: lat, lon
     
     character filebycore*15
 
@@ -171,9 +171,9 @@ program RJ_MCMC
     !-!
     
     
-    
-    testing=.true.
-    if (testing) write(*,*)'testing with synthetic model'
+    getting_old=.true.
+    !testing=.true.
+    !if (testing) write(*,*)'testing with synthetic model'
     
     ra=0
     
@@ -201,11 +201,73 @@ program RJ_MCMC
     vpref_max=maxval(model_ref(j:nptref,4)*vpvs*(1+vpvsv_max/100.)*(1+width))
     
     ! GET SWD DATA ---------------------------------------------------------------- 
+!     nlims_cur=1
+!     open(65,file=dirname//'/dispersion.in',status='old')! 65: name of the opened file in memory (unit identifier)
+!     read(65,*,IOSTAT=io)numdis
+!     read(65,*,IOSTAT=io)lat(:numdis)
+!     read(65,*,IOSTAT=io)lon(:numdis)
+!     read(65,*,IOSTAT=io)ndatad_R
+!     read(65,*,IOSTAT=io)nharm_R
+!     do k=1,nharm_R
+!         read(65,*,IOSTAT=io)numharm_R(k)
+!         read(65,*,IOSTAT=io)nlims_cur_diff
+!         nlims_R(1,k)=nlims_cur
+!         nlims_R(2,k)=nlims_R(1,k)+nlims_cur_diff
+!         !read(65,*,IOSTAT=io)wmin_R(k),wmax_R(k)
+!         do i=nlims_cur,nlims_cur+nlims_cur_diff
+!             read(65,*,IOSTAT=io)n_R(i),peri_R(i),d_obsdcR(i),d_obsdCRe(i)
+!             do j=1,numdis
+!                 read(65,*,IOSTAT=io)d_obsdcR_alt(i,j),d_obsdCRe_alt(i,j)
+!             enddo
+!         enddo
+!         nlims_cur=nlims_R(2,k)+1
+!     enddo
+!     
+!     
+!     nlims_cur=1
+!     read(65,*,IOSTAT=io)ndatad_L
+!     read(65,*,IOSTAT=io)nharm_L
+!     do k=1,nharm_L
+!         read(65,*,IOSTAT=io)numharm_L(k)
+!         read(65,*,IOSTAT=io)nlims_cur_diff
+!         nlims_L(1,k)=nlims_cur
+!         nlims_L(2,k)=nlims_L(1,k)+nlims_cur_diff
+!         !read(65,*,IOSTAT=io)wmin_L(k),wmax_L(k)
+!         do i=nlims_cur,nlims_cur+nlims_cur_diff
+!             read(65,*,IOSTAT=io)n_L(i),peri_L(i),d_obsdcL(i),d_obsdCLe(i)
+!             do j=1,numdis
+!                 read(65,*,IOSTAT=io)d_obsdcL_alt(i,j),d_obsdCLe_alt(i,j)
+!             enddo
+!         enddo
+!         nlims_cur=nlims_L(2,k)+1
+!     enddo
+!     close(65)
+!     
+!     do k=1,nharm_R
+!         wmin_R(k)=1000./(maxval(peri_R(nlims_R(1,k):nlims_R(2,k)))+20)
+!         wmax_R(k)=1000./(minval(peri_R(nlims_R(1,k):nlims_R(2,k)))-2)
+!     enddo
+!     
+!     do k=1,nharm_L
+!         wmin_L(k)=1000./(maxval(peri_L(nlims_L(1,k):nlims_L(2,k)))+20)
+!         wmax_L(k)=1000./(minval(peri_L(nlims_L(1,k):nlims_L(2,k)))-2)
+!     enddo
+!     
+!     nmin_R=minval(n_R(:ndatad_R))
+!     nmax_R=maxval(n_R(:ndatad_R))
+!     
+!     nmin_L=minval(n_L(:ndatad_L))
+!     nmax_L=maxval(n_L(:ndatad_L))
+!     
+!     if (ndatad_R>=ndatad_L) tref=sum(peri_R(:ndatad_R))/ndatad_R
+!     if (ndatad_L>ndatad_R) tref=sum(peri_L(:ndatad_L))/ndatad_L
     nlims_cur=1
     open(65,file=dirname//'/dispersion.in',status='old')! 65: name of the opened file in memory (unit identifier)
     read(65,*,IOSTAT=io)numdis
-    read(65,*,IOSTAT=io)lat(:numdis)
-    read(65,*,IOSTAT=io)lon(:numdis)
+    allocate(lat(numdis))
+    read(65,*,IOSTAT=io)lat
+    allocate(lon(numdis))
+    read(65,*,IOSTAT=io)lon
     read(65,*,IOSTAT=io)ndatad_R
     read(65,*,IOSTAT=io)nharm_R
     do k=1,nharm_R
@@ -222,7 +284,6 @@ program RJ_MCMC
         enddo
         nlims_cur=nlims_R(2,k)+1
     enddo
-    
     
     nlims_cur=1
     read(65,*,IOSTAT=io)ndatad_L
@@ -262,6 +323,8 @@ program RJ_MCMC
     if (ndatad_R>=ndatad_L) tref=sum(peri_R(:ndatad_R))/ndatad_R
     if (ndatad_L>ndatad_R) tref=sum(peri_L(:ndatad_L))/ndatad_L
     
+    write(*,*)'DONE INITIALIZING'
+    
 !**************************************************************
 
     !    Draw the first model randomly from the prior distribution
@@ -292,10 +355,8 @@ program RJ_MCMC
     
     pxi = 0.4             ! proposal for change in xi
     p_vp = 0.1           ! proposal for change in vp/vsv
-    pd1 = 10!0.2         ! proposal on change in position  
-    pv1 = 0.1!0.04     ! proposal on velocity
-    pd2 = 10!0.25        ! proposal on change in position 
-    pv2 = 0.1!0.04     ! proposal on velocity
+    pd = 10!0.2         ! proposal on change in position  
+    pv = 0.1!0.04     ! proposal on velocity
     pAd_R = 0.5        ! proposal for change in R noise
     pAd_L = 0.5        ! proposal for change in L noise
     sigmav=0.15         ! proposal for vsv when creating a new layer
@@ -354,14 +415,10 @@ program RJ_MCMC
     convBas=0
     convD=0
     convDs=0
-    convvs1=0
-    convvs1s=0
-    convvs2=0
-    convvs2s=0
-    convdp1=0
-    convdp1s=0
-    convdp2=0
-    convdp2s=0
+    convvs=0
+    convvss=0
+    convdp=0
+    convdps=0
     convDa=0
     convDas=0
     convP=0
@@ -457,16 +514,15 @@ program RJ_MCMC
             read(65,*,IOSTAT=io)p_vp
             read(65,*,IOSTAT=io)pAd_R
             read(65,*,IOSTAT=io)pAd_L
-            read(65,*,IOSTAT=io)pv1
-            read(65,*,IOSTAT=io)pv2
-            read(65,*,IOSTAT=io)pd1
-            read(65,*,IOSTAT=io)pd2
+            read(65,*,IOSTAT=io)pv
+            read(65,*,IOSTAT=io)pd
             read(65,*,IOSTAT=io)sigmav
             read(65,*,IOSTAT=io)npt
             do i=1,npt
                 read(65,*,IOSTAT=io)voro(i,1),voro(i,2),voro(i,3),voro(i,4)
             enddo
             close(65)
+            j=j+1
         else
         
             ! create a starting model randomly
@@ -557,6 +613,8 @@ program RJ_MCMC
         endif
         
         if (j>250) stop "CAN'T INITIALIZE MODEL" ! if it doesn't work after 250 tries, give up
+        
+        if (.not.tes) getting_old=.false.
 
     enddo
 
@@ -658,17 +716,12 @@ program RJ_MCMC
             if ((Acnd_L/(Prnd_L+1))>0.54) pAd_L=pAd_L*(1+perturb) ! for love waves
             if ((Acnd_L/(Prnd_L+1))<0.34) pAd_L=pAd_L*(1-perturb)
       
-            if ((Acv(1)/(Prv(1)+1))>0.54) pv1=pv1*(1+perturb) ! 2 layers for vsv
-            if ((Acv(1)/(Prv(1)+1))<0.34) pv1=pv1*(1-perturb)
-      
-            if ((Acv(2)/(Prv(2)+1))>0.54) pv2=pv2*(1+perturb) 
-            if ((Acv(2)/(Prv(2)+1))<0.34) pv2=pv2*(1-perturb)
-      
-            if ((Acp(1)/(Prp(1)+1))>0.54) pd1=pd1*(1+perturb) ! 2 layers for changing depth
-            if ((Acp(1)/(Prp(1)+1))<0.34) pd1=pd1*(1-perturb)
+            if ((Acv/(Prv+1))>0.54) pv=pv*(1+perturb) ! 2 layers for vsv
+            if ((Acv/(Prv+1))<0.34) pv=pv*(1-perturb)
+            
+            if ((Acp/(Prp+1))>0.54) pd=pd*(1+perturb) ! 2 layers for changing depth
+            if ((Acp/(Prp+1))<0.34) pd=pd*(1-perturb)
        
-            if ((Acp(2)/(Prp(2)+1))>0.54) pd2=pd2*(1+perturb)
-            if ((Acp(2)/(Prp(2)+1))<0.34) pd2=pd2*(1-perturb)
             !------------------------------------------------
             ! UPDATE SIGMAV
 
@@ -704,15 +757,15 @@ program RJ_MCMC
                 AcD=0
             endif
             
-            if ((Ac_vp/(Pr_vp+1))<0.01) then 
-                write(filenamemax,"('/stuck_',I3.3,'.out')") rank    
-                open(56,file=dirname//filenamemax,status='replace')
-                write(56,*) npt
-                do i=1,npt
-                    write(56,*)voro(i,1),voro(i,2),voro(i,3),voro(i,4)
-                enddo
-                close(56)
-            endif
+!             if ((Ac_vp/(Pr_vp+1))<0.01) then 
+!                 write(filenamemax,"('/stuck_',I3.3,'.out')") rank    
+!                 open(56,file=dirname//filenamemax,status='replace')
+!                 write(56,*) npt
+!                 do i=1,npt
+!                     write(56,*)voro(i,1),voro(i,2),voro(i,3),voro(i,4)
+!                 enddo
+!                 close(56)
+!             endif
             
             !-----------------------------------------------
 
@@ -838,13 +891,8 @@ program RJ_MCMC
             !write(*,*)ind
  
             !if (ount.GT.burn_in) then 
-            if (voro(ind,1)<(d_max/2)) then
-                PrP(1)=PrP(1)+1
-                voro_prop(ind,1)=voro(ind,1)+gasdev(ra)*pd1
-            else
-                PrP(2)=PrP(2)+1
-                voro_prop(ind,1)=voro(ind,1)+gasdev(ra)*pd2
-            endif
+            PrP=PrP+1
+            voro_prop(ind,1)=voro(ind,1)+gasdev(ra)*pd
         
             if ((voro_prop(ind,1)<=d_min).or.(voro_prop(ind,1)>=d_max)) then
                 out=0
@@ -879,13 +927,9 @@ program RJ_MCMC
             
             !if (ount.GT.burn_in) then 
             !write(*,*)voro(ind,1),d_max/2
-            if (voro(ind,1)<(d_max/2)) then
-                PrV(1)=PrV(1)+1
-                voro_prop(ind,2)=voro(ind,2)+gasdev(ra)*pv1
-            else
-                PrV(2)=PrV(2)+1
-                voro_prop(ind,2)=voro(ind,2)+gasdev(ra)*pv2
-            endif
+            PrV=PrV+1
+            voro_prop(ind,2)=voro(ind,2)+gasdev(ra)*pv
+            
             if (ind>npt) then
                 write(*,*)npt,ind
                 stop "763"
@@ -1116,6 +1160,9 @@ program RJ_MCMC
         like_prop=(liked_R_prop+liked_L_prop) !log-likelihood of the proposed model
         like_prop_w=like_prop/widening
         
+        !like_prop=1
+        !like_prop_w=like_prop/widening
+        
    1142 Accept = .false.
         
         ! now check if we accept the new model - different treatement depending on the change
@@ -1156,17 +1203,9 @@ program RJ_MCMC
                 if (ind>malayv) stop  '1082'
                 accept=.true.
                 if (value) then
-                    if (voro(ind,1)<(d_max/2)) then
-                        AcV(1)=AcV(1)+1
-                    else
-                        AcV(2)=AcV(2)+1
-                    endif
+                    AcV=AcV+1
                 elseif (move) then
-                    if (voro(ind,1)<(d_max/2)) then
-                        AcP(1)=AcP(1)+1
-                    else
-                        AcP(2)=AcP(2)+1
-                    endif
+                    AcP=AcP+1
                 elseif(ani)then
                     Acxi=Acxi+1
                 elseif(change_vp)then
@@ -1237,6 +1276,7 @@ program RJ_MCMC
             +ndatad_L*(1/widening-1)*log(Ad_L)&
             +like/widening-like&
             -alpharefmax
+            logalpharef=min(logalpharef,0.)
             !+logcratioref
             !-(1/widening-1)*(ndatad_R+ndatad_L)/2&
             !
@@ -1269,6 +1309,7 @@ program RJ_MCMC
                 +ndatad_L*(1/widening-1)*log(Ad_L)&
                 +like/widening-like_alt& 
                 -alphamax(idis)
+                logalpha(idis)=min(logalpha(idis),0.)
 
             enddo
             
@@ -1491,10 +1532,8 @@ program RJ_MCMC
             convDa(ount)=100*AcDa/PrDa
             convD(ount)=100*AcD/PrD
             convvp(ount)=100*Ac_vp/Pr_vp
-            convvs1(ount)=100*Acv(1)/Prv(1)
-            convvs2(ount)=100*Acv(2)/Prv(2)
-            convdp1(ount)=100*Acp(1)/Prp(1)
-            convdp2(ount)=100*Acp(2)/Prp(2)
+            convvs(ount)=100*Acv/Prv
+            convdp(ount)=100*Acp/Prp
             convxi(ount)=100*Acxi/Prxi
             convd_R(ount)=lsd_R
             convd_L(ount)=lsd_L
@@ -1522,8 +1561,8 @@ program RJ_MCMC
             write(*,*)'number of cells:',npt
             write(*,*)'Ad_R',Ad_R,'Ad_L',Ad_L
             write(*,*)'Acceptance rates'
-            write(*,*)'AR_move',100*AcP(1)/PrP(1),100*AcP(2)/PrP(2)
-            write(*,*)'AR_value',100*AcV(1)/PrV(1),100*AcV(2)/PrV(2)
+            write(*,*)'AR_move',100*AcP/PrP
+            write(*,*)'AR_value',100*AcV/PrV
 
             write(*,*)'AR_Birth',100*AcB/PrB,'AR_Death',100*AcD/PrD,'sigmav',sigmav
             write(*,*)'AR_Birtha',100*AcBa/PrBa,'AR_Deatha',100*AcDa/PrDa
@@ -1649,10 +1688,8 @@ program RJ_MCMC
         call MPI_REDUCE(convDa,convDas,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(convD,convDs,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(convvp,convvps,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-        call MPI_REDUCE(convvs1,convvs1s,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-        call MPI_REDUCE(convvs2,convvs2s,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-        call MPI_REDUCE(convdp1,convdp1s,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-        call MPI_REDUCE(convdp2,convdp2s,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(convvs,convvss,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(convdp,convdps,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(convxi,convxis,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(histoch,histochs,disd,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(histoch_alt,histoch_alts,disd*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
@@ -1742,10 +1779,8 @@ program RJ_MCMC
         convDs=convDs/j
         convDas=convDas/j
         convvps=convvps/j
-        convvs1s=convvs1s/j
-        convvs2s=convvs2s/j
-        convdp1s=convdp1s/j
-        convdp2s=convdp2s/j
+        convvss=convvss/j
+        convdps=convdps/j
         convxis=convxis/j
  
         probanis=probanis/j
@@ -1799,7 +1834,7 @@ program RJ_MCMC
         write(65,*)numdis
         do i=1,disd
             d=d_min+(i-0.5)*prof/real(disd)
-            write(65,*)d,histoch_alts(i,:)
+            write(65,*)d,histoch_alts(i,:numdis)
         enddo
         close(65)
 
@@ -2071,31 +2106,17 @@ program RJ_MCMC
         enddo
         close(54)
         
-        open(54,file=dirname//'/Convergence_vs1.out',status='replace')
+        open(54,file=dirname//'/Convergence_vs.out',status='replace')
         write(54,*)burn_in,nsample,burn_in,nsample
         do i=1,nsample+burn_in
-            write(54,*)convvs1(i),convvs1s(i)
+            write(54,*)convvs(i),convvss(i)
         enddo
         close(54)
         
-        open(54,file=dirname//'/Convergence_vs2.out',status='replace')
+        open(54,file=dirname//'/Convergence_dp.out',status='replace')
         write(54,*)burn_in,nsample,burn_in,nsample
         do i=1,nsample+burn_in
-            write(54,*)convvs2(i),convvs2s(i)
-        enddo
-        close(54)
-        
-        open(54,file=dirname//'/Convergence_dp1.out',status='replace')
-        write(54,*)burn_in,nsample,burn_in,nsample
-        do i=1,nsample+burn_in
-            write(54,*)convdp1(i),convdp1s(i)
-        enddo
-        close(54)
-        
-        open(54,file=dirname//'/Convergence_dp2.out',status='replace')
-        write(54,*)burn_in,nsample,burn_in,nsample
-        do i=1,nsample+burn_in
-            write(54,*)convdp2(i),convdp2s(i)
+            write(54,*)convdp(i),convdps(i)
         enddo
         close(54)
         

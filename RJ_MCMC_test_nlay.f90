@@ -25,10 +25,10 @@ program RJ_MCMC
     !-----------------------------------------
 
 
-    character (len=*), parameter :: dirname = 'OUT_FINDSTUCK5' ! This is where output info files are saved and input data files are taken.
+    character (len=*), parameter :: dirname = 'OUT_REAL_100' ! This is where output info files are saved and input data files are taken.
     character*8, parameter :: storename = 'STORFFC1'     ! This is where output models are saved
-    integer, parameter :: burn_in = 90000 ! 9000! 55000 !Burn-in period
-    integer, parameter :: nsample = 300000 ! 10000! 50000!Post burn-in
+    integer, parameter :: burn_in = 20000 ! 9000! 55000 !Burn-in period
+    integer, parameter :: nsample = 100000 ! 10000! 50000!Post burn-in
     integer, parameter :: thin = 50    !Thinning of the chain 
 
     integer, parameter :: Scratch = 1     ! 0: Start from Stored model 1: Start from scratch
@@ -42,7 +42,7 @@ program RJ_MCMC
 
     !depth
     real, parameter :: d_min = 0   ! depth bounds  
-    real, parameter :: d_max = 660 
+    real, parameter :: d_max = 700 
       
     real, parameter :: width = 0.4 ! width of the prior in vsv
     
@@ -92,7 +92,7 @@ program RJ_MCMC
     real, parameter :: prof = d_max!100
     
     !parameters for minos
-    real, parameter :: eps=1e-5 !precision of runge-kutta, as high as possible for speed
+    real, parameter :: eps=1e-3 !precision of runge-kutta, as high as possible for speed
     real, parameter :: wgrav=1  !minimal frequency for gravitational effects, very low for speed
     integer, parameter :: lmin=1 !min and max mode numbers (constrained by periods anyway) 
     integer, parameter :: lmax=6000
@@ -182,6 +182,7 @@ program RJ_MCMC
     integer :: recalculated !counts the number of times we need to improve eps
     logical :: stuck
     integer :: nharm_R,nharm_L,iharm
+    real :: lat,lon
     
     ! todo: implement a test with raylquo
 1000 format(I4)
@@ -213,7 +214,7 @@ program RJ_MCMC
     pAd_L = 0.5        ! proposal for change in L noise
     sigmav=0.15         ! proposal for vsv when creating a new layer
   
-    testing=.true.
+    testing=.false.
     if (testing) write(*,*)'testing with synthetic model'
     write(*,*)'testing',maxrq
     ra=rank !seed for RNG
@@ -604,6 +605,8 @@ program RJ_MCMC
         ! GET SWD DATA ---------------------------------------------------------------- 
         nlims_cur=1
         open(65,file=dirname//'/dispersion.in',status='old')! 65: name of the opened file in memory (unit identifier)
+        read(65,*,IOSTAT=io)lat
+        read(65,*,IOSTAT=io)lon
         read(65,*,IOSTAT=io)ndatad_R ! number of Rayleigh modes
         read(65,*,IOSTAT=io)nharm_R ! number of harmonics
         do k=1,nharm_R

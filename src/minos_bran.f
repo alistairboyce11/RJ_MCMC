@@ -776,7 +776,7 @@ c***    print *,'detqn:  POS: 006'
       is=max(ls,nocp1)
       if(is.eq.ls) call spsm(ls,nvesm,ass)
 c*** propagate through mantle ***
-c***  print *,'detqn:  POS: 007'
+c***  print *,'detqn:  POS: 007'-01
       call sprpmn(is,nsl,ass,vf,nvesm,iexp)
       if(nsl.eq.n) then
 c***    print *,'detqn:  POS: 008'
