@@ -32,9 +32,9 @@ all  :  obj global
 # 	$(F77) -o run RJ_MCMC_store_2.f90 \
 # 	-L./ -lroutines -lm
 #
-# test_combine: params.h data_params.h
-# 	$(F77) -o run test_combine.f90 \
-# 	-L./ -lroutines -lm
+test_combine: params.h data_params.h
+	$(F77) -o run test_combine.f90 \
+	-L./ -lroutines -lm
 #
 # test_new_mineos: params.h data_params.h
 # 	$(F77) -o run test_new_mineos.f90 \
@@ -60,12 +60,29 @@ global: params.h
 	$(F77) -o run RJ_MCMC_test_nlay.f90 \
 	-L./ -lroutines -lm
 
-obj: params.h 
+test_stuck: params.h data_params.h
+	$(F77) -o run test_stuck_models.f90 \
+	-L./ -lroutines -lm
+
+test_timing: params.h data_params.h
+	$(F77) -o run test_timing.f90 \
+	-L./ -lroutines -lm
+
+detail_stuck: params.h data_params.h
+	$(F77) -o run detail_stuck_models.f90 \
+	-L./ -lroutines -lm
+
+synth: params.h data_params.h
+	$(F77) -o run synth_profile.f90 \
+	-L./ -lroutines -lm
+
+obj: params.h
 	$(F77) -c src/whichcell_d.f90
 	$(F77) -c src/combine.f90
 	$(F77) -c src/minos_bran.f
 	$(F77) -c src/dispersion_minos.f90
 	$(F77) -c src/interp.f90
+	$(F77) -c src/combine_linear.f90
 #
 #	# FOR ANIREC
 #	$(F77) -c src/forward_anirec.f
@@ -79,7 +96,7 @@ obj: params.h
 #	matrixops.o readwrite.o spheror.o buildmod.o 
 #	\rm ./*.o
 
-	ar -r libroutines.a  whichcell_d.o minos_bran.o combine.o dispersion_minos.o interp.o
+	ar -r libroutines.a  whichcell_d.o minos_bran.o combine.o dispersion_minos.o interp.o combine_linear.o
 	\rm ./*.o
 
 #

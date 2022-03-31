@@ -25,10 +25,17 @@ program RJ_MCMC
     !-----------------------------------------
 
 
+<<<<<<< HEAD
     character (len=*), parameter :: dirname = 'OUT_TEST' ! This is where output info files are saved and input data files are taken.
     character*8, parameter :: storename = 'STORFFC1'     ! This is where output models are saved
     integer, parameter :: burn_in = 200000 ! 55000 !Burn-in period
     integer, parameter :: nsample = 200000 ! 50000!Post burn-in
+=======
+    character (len=*), parameter :: dirname = 'OUT_REAL_100' ! This is where output info files are saved and input data files are taken.
+    character*8, parameter :: storename = 'STORFFC1'     ! This is where output models are saved
+    integer, parameter :: burn_in = 20000 ! 9000! 55000 !Burn-in period
+    integer, parameter :: nsample = 100000 ! 10000! 50000!Post burn-in
+>>>>>>> joint
     integer, parameter :: thin = 50    !Thinning of the chain 
 
     integer, parameter :: Scratch = 1     ! 0: Start from Stored model 1: Start from scratch
@@ -185,7 +192,13 @@ program RJ_MCMC
     integer :: recalculated !counts the number of times we need to improve eps
     logical :: stuck
     integer :: nharm_R,nharm_L,iharm
+<<<<<<< HEAD
     real :: dummy_d_obsdcR(ndatadmax), dummy_d_obsdcL(ndatadmax)
+=======
+    real :: lat,lon
+    
+    ! todo: implement a test with raylquo
+>>>>>>> joint
 1000 format(I4)
 
 
@@ -213,10 +226,16 @@ program RJ_MCMC
     pv2 = 0.1! 0.04     ! proposal on velocity
     pAd_R = 0.5        ! proposal for change in R noise
     pAd_L = 0.5        ! proposal for change in L noise
+<<<<<<< HEAD
     sigmav=0.15        ! proposal for vsv when creating a new layer
     sigmavpvs=0.15     ! proposal for vpvs when creating a new layer
       
     testing=.true.
+=======
+    sigmav=0.15         ! proposal for vsv when creating a new layer
+  
+    testing=.false.
+>>>>>>> joint
     if (testing) write(*,*)'testing with synthetic model'
     write(*,*)'testing',maxrq
     ra=rank !seed for RNG
@@ -655,7 +674,13 @@ program RJ_MCMC
     else ! real data , untested , unedited, will probably need a little work to get working
         ! GET SWD DATA ---------------------------------------------------------------- 
         nlims_cur=1
+<<<<<<< HEAD
         open(65,file=dirname//'/real_dispersion.in',status='old')! 65: name of the opened file in memory (unit identifier)
+=======
+        open(65,file=dirname//'/dispersion.in',status='old')! 65: name of the opened file in memory (unit identifier)
+        read(65,*,IOSTAT=io)lat
+        read(65,*,IOSTAT=io)lon
+>>>>>>> joint
         read(65,*,IOSTAT=io)ndatad_R ! number of Rayleigh modes
         read(65,*,IOSTAT=io)nharm_R ! number of harmonics
         do k=1,nharm_R

@@ -41,7 +41,7 @@ program RJ_MCMC
 
     real PrB,AcB,PrD,AcD,Prnd_R,Acnd_R,Prnd_L,Acnd_L,&
         Acba,Prba,Acda,Prda,out,Prxi,Acxi,Pr_vp,&
-        Ac_vp,PrP(2),PrV(2),AcP(2),AcV(2) ! to adjust acceptance rates for all different parameters
+        Ac_vp,PrP,PrV,AcP,AcV ! to adjust acceptance rates for all different parameters
     real lsd_L,lsd_L_prop,lsd_L_min,lsd_R,lsd_R_prop,lsd_R_min !logprob without uncertainties
     real logprob_vsv,logprob_vp !for reversible jump
     real voro(malay,4),vsref_min,vsref_max,vpref_min,vpref_max !the model with its bounds
@@ -54,7 +54,7 @@ program RJ_MCMC
     real d_obsdcR(ndatadmax),d_obsdcL(ndatadmax),d_obsdcRe(ndatadmax),d_obsdcLe(ndatadmax) !observed data
     integer inorout(21000),inorouts(21000),members(21000),io ! mpi related variables
     integer ndatad_R,ndatad_L,ndatad_R_tmp,ndatad_L_tmp !number of observed data points
-    real pxi,p_vp,pd1,pv1,pd2,pv2,pAd_R,pAd_L ! related to observed data for azimuthal anisotropy
+    real pxi,p_vp,pd,pv,pAd_R,pAd_L ! related to observed data for azimuthal anisotropy
     ! Geometry parameters
     ! Traces
     integer nptref,malayv ! number of points in reference model, number of layers in voro
@@ -98,10 +98,18 @@ program RJ_MCMC
     real widening_prop,widening
     real mean_best(numdis_max),mean_prop(numdis_max),mean_props(numdis_max),meandiff_hist(n_w,numdis_max)
     real alphahist(num_logalpha,numdis_max,n_w),alphahists(num_logalpha,numdis_max,n_w)
+    real alpharefhist(num_logalpha,n_w),alpharefhists(num_logalpha,n_w)
+    real alphamax_hist(n_w,numdis_max),alphamaxref_hist(n_w)
     real alphamax(numdis_max),alpharefmax
+    real alphamax_true(n_w,numdis_max),alpharefmax_true(n_w)
     real alphamax_prop(numdis_max),alpharefmax_prop
     real alphamax_props(numdis_max),alpharefmax_props
     real alphaall(nsample_widening/thin,numdis_max)
+    real alpharefall(nsample_widening/thin)
+    real, dimension(:), allocatable :: lat, lon
+    !real lat(numdis_max),lon(numdis_max)
+    integer isum
+    real totsum,sum_tmp
     
     character filebycore*15
     integer outputfile
@@ -113,6 +121,37 @@ program RJ_MCMC
     integer best_current_npt
     real best_current_voro(malay,4)
     logical burnin_in_progress
+    
+    real ncell(n_w*(burn_in_widening+nsample_widening)+burn_in)
+    real ncells(n_w*(burn_in_widening+nsample_widening)+burn_in)
+    real convBs(n_w*(burn_in_widening+nsample_widening)+burn_in)
+    real convB(n_w*(burn_in_widening+nsample_widening)+burn_in)
+    real convPs(n_w*(burn_in_widening+nsample_widening)+burn_in)
+    real convP(n_w*(burn_in_widening+nsample_widening)+burn_in) ! birth rates, vp change rates
+    real convvs(n_w*(burn_in_widening+nsample_widening)+burn_in)
+    real convvss(n_w*(burn_in_widening+nsample_widening)+burn_in)
+    real convdp(n_w*(burn_in_widening+nsample_widening)+burn_in)
+    real convdps(n_w*(burn_in_widening+nsample_widening)+burn_in)
+    real convvp(n_w*(burn_in_widening+nsample_widening)+burn_in)
+    real convvps(n_w*(burn_in_widening+nsample_widening)+burn_in)
+    real convxis(n_w*(burn_in_widening+nsample_widening)+burn_in)
+    real convxi(n_w*(burn_in_widening+nsample_widening)+burn_in)
+    real convBas(n_w*(burn_in_widening+nsample_widening)+burn_in)
+    real convBa(n_w*(burn_in_widening+nsample_widening)+burn_in) ! anisotropic birth rates
+    real convDs(n_w*(burn_in_widening+nsample_widening)+burn_in)
+    real convD(n_w*(burn_in_widening+nsample_widening)+burn_in)
+    real convDas(n_w*(burn_in_widening+nsample_widening)+burn_in)
+    real convDa(n_w*(burn_in_widening+nsample_widening)+burn_in)
+    real convd_R(n_w*(burn_in_widening+nsample_widening)+burn_in)
+    real convd_L(n_w*(burn_in_widening+nsample_widening)+burn_in)
+    real convd_Rs(n_w*(burn_in_widening+nsample_widening)+burn_in)
+    real convd_Ls(n_w*(burn_in_widening+nsample_widening)+burn_in) ! the proposed model, history of lsd
+    real convAd_R(n_w*(burn_in_widening+nsample_widening)+burn_in)
+    real convAd_Rs(n_w*(burn_in_widening+nsample_widening)+burn_in)
+    real convAd_L(n_w*(burn_in_widening+nsample_widening)+burn_in)
+    real convAd_Ls(n_w*(burn_in_widening+nsample_widening)+burn_in) !variations of uncertainty parameters
+    
+    integer i_opt,num_prop(numdis_max),num_props(numdis_max)
 
     ! todo: implement a test with raylquo
 1000 format(I4)
@@ -135,7 +174,7 @@ program RJ_MCMC
     
     
     
-    testing=.true.
+    testing=.false.
     if (testing) write(*,*)'testing with synthetic model'
     
     ra=rank
@@ -461,11 +500,15 @@ program RJ_MCMC
         enddo
         close(65)
         
+        allocate(lat(numdis_max))
+        allocate(lon(numdis_max))
         ! make small deviations for joint inversion
         d_obsdcRe_alt(:,1)=d_obsdcRe
         d_obsdcLe_alt(:,1)=d_obsdcLe
         
         ! create synthetic model
+        lat(1)=45
+        lon(1)=45
         npt=0
         
         voro(1,1)=1 !depth of interface
@@ -585,6 +628,8 @@ program RJ_MCMC
         d_obsdcLe_alt(:,2)=d_obsdcLe
         
         ! create synthetic model
+        lat(2)=0
+        lon(2)=0
         npt=0
         
         voro(1,1)=1 !depth of interface
@@ -703,6 +748,8 @@ program RJ_MCMC
         
         open(65,file=dirname//'/dispersion.in',status='replace')
         write(65,*)numdis
+        write(65,*)lat(:numdis)
+        write(65,*)lon(:numdis)
         write(65,*)ndatad_R
         write(65,*)nharm_R
         do k=1,nharm_R
@@ -732,7 +779,6 @@ program RJ_MCMC
         enddo
         close(65)
         
-        
         write(*,*)'DONE INITIALIZING'
     
     else ! real data , untested , unedited, will probably need a little work to get working
@@ -740,6 +786,10 @@ program RJ_MCMC
         nlims_cur=1
         open(65,file=dirname//'/dispersion.in',status='old')! 65: name of the opened file in memory (unit identifier)
         read(65,*,IOSTAT=io)numdis
+        allocate(lat(numdis))
+        read(65,*,IOSTAT=io)lat
+        allocate(lon(numdis))
+        read(65,*,IOSTAT=io)lon
         read(65,*,IOSTAT=io)ndatad_R
         read(65,*,IOSTAT=io)nharm_R
         do k=1,nharm_R
@@ -756,7 +806,6 @@ program RJ_MCMC
             enddo
             nlims_cur=nlims_R(2,k)+1
         enddo
-        
         
         nlims_cur=1
         read(65,*,IOSTAT=io)ndatad_L
@@ -796,7 +845,15 @@ program RJ_MCMC
         if (ndatad_R>=ndatad_L) tref=sum(peri_R(:ndatad_R))/ndatad_R
         if (ndatad_L>ndatad_R) tref=sum(peri_L(:ndatad_L))/ndatad_L
         
+        write(*,*)'DONE INITIALIZING'
     endif
+    
+    open(56,file=dirname//'/parameters.out',status='replace')
+    write(56,*)'burn-in',burn_in
+    write(56,*)'nsample',nsample
+    write(56,*)'nsample_widening',nsample_widening
+    write(56,*)'burn-in_widening',burn_in_widening
+    close(56)
     !***************************************************
     !***************************************************
     
@@ -824,10 +881,8 @@ program RJ_MCMC
     
     pxi = 0.4             ! proposal for change in xi
     p_vp = 0.1           ! proposal for change in vp/vsv
-    pd1 = 10!0.2         ! proposal on change in position  
-    pv1 = 0.1!0.04     ! proposal on velocity
-    pd2 = 10!0.25        ! proposal on change in position 
-    pv2 = 0.1!0.04     ! proposal on velocity
+    pd = 10!0.2         ! proposal on change in position  
+    pv = 0.1!0.04     ! proposal on velocity
     pAd_R = 0.5        ! proposal for change in R noise
     pAd_L = 0.5        ! proposal for change in L noise
     sigmav=0.15         ! proposal for vsv when creating a new layer
@@ -1008,6 +1063,31 @@ program RJ_MCMC
     sigmav_old=0
     Ar_birth_old=0   
     
+    ncell=0
+    ncells=0
+    convd_R=0
+    convd_L=0
+    convd_Rs=0
+    convd_Ls=0
+    convB=0
+    convBs=0
+    convBa=0
+    convBas=0
+    convD=0
+    convDs=0
+    convvs=0
+    convvss=0
+    convdp=0
+    convdps=0
+    convDa=0
+    convDas=0
+    convP=0
+    convPs=0
+    convAd_R=0
+    convAd_Rs=0
+    convAd_L=0
+    convAd_Ls=0
+    
     
     burnin_in_progress=.true.
     do i_w=1,n_w
@@ -1020,6 +1100,8 @@ program RJ_MCMC
         alpharefmax_props=-1000000
         mean_prop=0
         mean_props=0
+        num_prop=0
+        num_props=0
         
       
         
@@ -1191,18 +1273,12 @@ program RJ_MCMC
                 if ((Acnd_L/(Prnd_L+1))>0.54) pAd_L=pAd_L*(1+perturb) ! for love waves
                 if ((Acnd_L/(Prnd_L+1))<0.34) pAd_L=pAd_L*(1-perturb)
           
-                if ((Acv(1)/(Prv(1)+1))>0.54) pv1=pv1*(1+perturb) ! 2 layers for vsv
-                if ((Acv(1)/(Prv(1)+1))<0.34) pv1=pv1*(1-perturb)
+                if ((Acv/(Prv+1))>0.54) pv=pv*(1+perturb) ! 2 layers for vsv
+                if ((Acv/(Prv+1))<0.34) pv=pv*(1-perturb)
           
-                if ((Acv(2)/(Prv(2)+1))>0.54) pv2=pv2*(1+perturb) 
-                if ((Acv(2)/(Prv(2)+1))<0.34) pv2=pv2*(1-perturb)
-          
-                if ((Acp(1)/(Prp(1)+1))>0.54) pd1=pd1*(1+perturb) ! 2 layers for changing depth
-                if ((Acp(1)/(Prp(1)+1))<0.34) pd1=pd1*(1-perturb)
+                if ((Acp/(Prp+1))>0.54) pd=pd*(1+perturb) ! 2 layers for changing depth
+                if ((Acp/(Prp+1))<0.34) pd=pd*(1-perturb)
            
-                if ((Acp(2)/(Prp(2)+1))>0.54) pd2=pd2*(1+perturb)
-                if ((Acp(2)/(Prp(2)+1))<0.34) pd2=pd2*(1-perturb)
-                
                 ! UPDATE SIGMAV
                 if ((abs((AcB/PrB)-Ar_birth_old)>2*abs((AcB/PrB)-(AcD/PrD))).and.&
                     (AcB.ne.0)) then !special treatement for adding/removing layers
@@ -1231,15 +1307,15 @@ program RJ_MCMC
                     AcD=0
                 endif
                 
-                if ((Ac_vp/(Pr_vp+1))<0.01) then 
-                    write(filenamemax,"('/stuck_',I3.3,'.out')") rank    
-                    open(56,file=dirname//filenamemax,status='replace')
-                    write(56,*) npt
-                    do i=1,npt
-                        write(56,*)voro(i,1),voro(i,2),voro(i,3),voro(i,4)
-                    enddo
-                    close(56)
-                endif
+!                 if ((Ac_vp/(Pr_vp+1))<0.001).and. then 
+!                     write(filenamemax,"('/stuck_',I3.3,'.out')") rank    
+!                     open(56,file=dirname//filenamemax,status='replace')
+!                     write(56,*) npt
+!                     do i=1,npt
+!                         write(56,*)voro(i,1),voro(i,2),voro(i,3),voro(i,4)
+!                     enddo
+!                     close(56)
+!                 endif
                 
                 !-----------------------------------------------
     
@@ -1364,13 +1440,8 @@ program RJ_MCMC
                 ind=1+ceiling(ran3(ra)*(npt-1))
                 if (ind==1) ind=2
      
-                if (voro(ind,1)<(d_max/2)) then
-                    PrP(1)=PrP(1)+1
-                    voro_prop(ind,1)=voro(ind,1)+gasdev(ra)*pd1
-                else
-                    PrP(2)=PrP(2)+1
-                    voro_prop(ind,1)=voro(ind,1)+gasdev(ra)*pd2
-                endif
+                PrP=PrP+1
+                voro_prop(ind,1)=voro(ind,1)+gasdev(ra)*pd
             
                 if ((voro_prop(ind,1)<=d_min).or.(voro_prop(ind,1)>=d_max)) then
                     out=0
@@ -1406,13 +1477,10 @@ program RJ_MCMC
                     write(*,*)npt,ind
                     stop "763"
                 endif
-                if (voro(ind,1)<(d_max/2)) then
-                    PrV(1)=PrV(1)+1
-                    voro_prop(ind,2)=voro(ind,2)+gasdev(ra)*pv1
-                else
-                    PrV(2)=PrV(2)+1
-                    voro_prop(ind,2)=voro(ind,2)+gasdev(ra)*pv2
-                endif
+                
+                PrV=PrV+1
+                voro_prop(ind,2)=voro(ind,2)+gasdev(ra)*pv
+                
                 !voro_prop(ind,2) = -width+2*width*ran3(ra)
                 
                 !Check if oustide bounds of prior
@@ -1678,17 +1746,11 @@ program RJ_MCMC
                     if (ind>malayv) stop  '1082'
                     accept=.true.
                     if (value) then
-                        if (voro(ind,1)<(d_max/2)) then
-                            AcV(1)=AcV(1)+1
-                        else
-                            AcV(2)=AcV(2)+1
-                        endif
+                        AcV=AcV+1
+                        
                     elseif (move) then
-                        if (voro(ind,1)<(d_max/2)) then
-                            AcP(1)=AcP(1)+1
-                        else
-                            AcP(2)=AcP(2)+1
-                        endif
+                        AcP=AcP+1
+                        
                     elseif(ani)then
                         Acxi=Acxi+1
                     elseif(change_vp)then
@@ -1759,11 +1821,8 @@ program RJ_MCMC
             
             ! check for burnin
             if (burnin_in_progress) then
-                ount=ount+1
-                if (ount>burn_in) then
-                    burnin_in_progress=.false.
-                    ount=0
-                endif
+                !ount=ount+1
+                
                 
                 IF ((mod(ount,display).EQ.0)) THEN !.and.(mod(ran,10).EQ.0)
 
@@ -1773,8 +1832,8 @@ program RJ_MCMC
                     write(*,*)'number of cells:',npt
                     write(*,*)'Ad_R',Ad_R,'Ad_L',Ad_L
                     write(*,*)'Acceptance rates'
-                    write(*,*)'AR_move',100*AcP(1)/PrP(1),100*AcP(2)/PrP(2)
-                    write(*,*)'AR_value',100*AcV(1)/PrV(1),100*AcV(2)/PrV(2)
+                    write(*,*)'AR_move',100*AcP/PrP
+                    write(*,*)'AR_value',100*AcV/PrV
 
                     write(*,*)'AR_Birth',100*AcB/PrB,'AR_Death',100*AcD/PrD,'sigmav',sigmav
                     write(*,*)'AR_Birtha',100*AcBa/PrBa,'AR_Deatha',100*AcDa/PrDa
@@ -1792,7 +1851,26 @@ program RJ_MCMC
                     
                 END IF
                 
-                cycle
+                convBa(ount)=100*AcBa/PrBa ! acceptance rates in percent
+                convB(ount)=100*AcB/PrB
+                convDa(ount)=100*AcDa/PrDa
+                convD(ount)=100*AcD/PrD
+                convvp(ount)=100*Ac_vp/Pr_vp
+                convvs(ount)=100*Acv/Prv
+                convdp(ount)=100*Acp/Prp
+                convxi(ount)=100*Acxi/Prxi
+                convd_R(ount)=lsd_R
+                convd_L(ount)=lsd_L
+                ncell(ount)=npt
+                convAd_R(ount)=Ad_R
+                convAd_L(ount)=Ad_L
+                
+                if (ount>burn_in) then
+                    burnin_in_progress=.false.
+                    ount=0
+                endif
+                
+                cycle ! continue the loop skipping anything below
             endif
             
             !****************************************************************
@@ -1822,13 +1900,15 @@ program RJ_MCMC
                     endif
                 enddo
                 
+                
+                
                 if (logalpharef>alpharefmax_prop) then
                     alpharefmax_prop=logalpharef
                 endif
                 
                 IF (mod(ount,thin)==0) THEN
                     
-                    mean_prop=mean_prop+logalpha
+                    !mean_prop=mean_prop+logalpha
                     th = th + 1
                     
                     alpha=exp(logalpha)
@@ -1837,16 +1917,51 @@ program RJ_MCMC
                     
                     
                     alphaall(th,:)=logalpha
-                    do idis=1,numdis
-                        i_al=ceiling((logalpha(idis)-logalpha_min)/(logalpha_max-logalpha_min)*num_logalpha)
-                        if (i_al<logalpha_min) i_al=1
-                        if (i_al>logalpha_max) i_al=num_logalpha
-                        alphahist(i_al,idis,i_w)=alphahist(i_al,idis,i_w)+1
-                    enddo
+                    alpharefall(th)=logalpharef
+!                     do idis=1,numdis
+!                         i_al=ceiling((logalpha(idis)-logalpha_min)/(logalpha_max-logalpha_min)*num_logalpha)
+!                         if (i_al<logalpha_min) i_al=1
+!                         if (i_al>logalpha_max) i_al=num_logalpha
+!                         !alphahist(i_al,idis,i_w)=alphahist(i_al,idis,i_w)+1
+!                     enddo
 
                 endif
     
             endif
+            
+            
+!             if (burnin_in_progress) then
+!                 convBa(ount)=100*AcBa/PrBa ! acceptance rates in percent
+!                 convB(ount)=100*AcB/PrB
+!                 convDa(ount)=100*AcDa/PrDa
+!                 convD(ount)=100*AcD/PrD
+!                 convvp(ount)=100*Ac_vp/Pr_vp
+!                 convvs1(ount)=100*Acv(1)/Prv(1)
+!                 convvs2(ount)=100*Acv(2)/Prv(2)
+!                 convdp1(ount)=100*Acp(1)/Prp(1)
+!                 convdp2(ount)=100*Acp(2)/Prp(2)
+!                 convxi(ount)=100*Acxi/Prxi
+!                 convd_R(ount)=lsd_R
+!                 convd_L(ount)=lsd_L
+!                 ncell(ount)=npt
+!                 convAd_R(ount)=Ad_R
+!                 convAd_L(ount)=Ad_L
+!             else
+            convBa(burn_in+ount+(nsample_widening+burn_in_widening)*(i_w-1))=100*AcBa/PrBa ! acceptance rates in percent
+            convB(burn_in+ount+(nsample_widening+burn_in_widening)*(i_w-1))=100*AcB/PrB
+            convDa(burn_in+ount+(nsample_widening+burn_in_widening)*(i_w-1))=100*AcDa/PrDa
+            convD(burn_in+ount+(nsample_widening+burn_in_widening)*(i_w-1))=100*AcD/PrD
+            convvp(burn_in+ount+(nsample_widening+burn_in_widening)*(i_w-1))=100*Ac_vp/Pr_vp
+            convvs(burn_in+ount+(nsample_widening+burn_in_widening)*(i_w-1))=100*Acv/Prv
+            convdp(burn_in+ount+(nsample_widening+burn_in_widening)*(i_w-1))=100*Acp/Prp
+            convxi(burn_in+ount+(nsample_widening+burn_in_widening)*(i_w-1))=100*Acxi/Prxi
+            convd_R(burn_in+ount+(nsample_widening+burn_in_widening)*(i_w-1))=lsd_R
+            convd_L(burn_in+ount+(nsample_widening+burn_in_widening)*(i_w-1))=lsd_L
+            ncell(burn_in+ount+(nsample_widening+burn_in_widening)*(i_w-1))=npt
+            convAd_R(burn_in+ount+(nsample_widening+burn_in_widening)*(i_w-1))=Ad_R
+            convAd_L(burn_in+ount+(nsample_widening+burn_in_widening)*(i_w-1))=Ad_L
+!             endif
+            
             IF ((mod(ount,display).EQ.0)) THEN !.and.(mod(ran,10).EQ.0)
 
                 write(*,*)'processor number',ran+1,'/',nbproc
@@ -1875,10 +1990,16 @@ program RJ_MCMC
             END IF
         end do !End Markov chain
         
+        !write(*,*)'alphamax1',alphamax_prop(:numdis)
+        
+        !alphamax_prop=maxval(alphaall,1)
+        
+        !write(*,*)'alphamax2',alphamax_prop(:numdis)
+        
         k=0
         if (th.ne.0) then !normalize averages
             
-            mean_prop=mean_prop/th
+            !mean_prop=mean_prop/th
             
             inorout(ran+1)=1
             k=k+1
@@ -1890,6 +2011,7 @@ program RJ_MCMC
         do i=1,nbproc
             call MPI_REDUCE(inorout,inorouts,21000,MPI_Integer,MPI_Sum,i-1,MPI_COMM_WORLD,ierror)
         enddo
+        
 
         !write(*,*)'rank=',ran,'th=',th
 
@@ -1913,55 +2035,102 @@ program RJ_MCMC
         do i=1,j
             if (ran==members(i)) flag=1
         enddo
-        
-        !write(*,*)'alphamax_prop',alphamax_prop
-
 
         call MPI_Group_incl(group_world, j, members, good_group, ierror)
         call MPI_Comm_create(MPI_COMM_WORLD, good_group, MPI_COMM_small, ierror)
+        
 
         if (flag==1) then
             
-            call MPI_REDUCE(alphamax_prop,alphamax_props,numdis_max,MPI_Real,MPI_MAX,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(alpharefmax_prop,alpharefmax_props,1,MPI_Real,MPI_MAX,0,MPI_COMM_small,ierror)
-            call MPI_REDUCE(mean_prop,mean_props,numdis_max,MPI_Real,MPI_sum,0,MPI_COMM_small,ierror)
+            ! reduce alphamax to get the max over the cores, send it to each core
             
+            call MPI_ALLREDUCE(alphamax_prop,alphamax_props,numdis_max,MPI_Real,MPI_MAX,MPI_COMM_small,ierror)
+            call MPI_ALLREDUCE(alpharefmax_prop,alpharefmax_props,1,MPI_Real,MPI_MAX,MPI_COMM_small,ierror)
             
-            do idis=1,numdis
-            enddo
-        
-            IF (ran==0) THEN
-                do i=1,j
-                    if (members(i)>0) then 
-                        call MPI_SEND(alphamax_props, numdis_max, MPI_Real, members(i), 1, MPI_COMM_small, ierror)
-                        call MPI_SEND(alpharefmax_props, 1, MPI_Real, members(i), 1, MPI_COMM_small, ierror)
-                    endif
-                enddo
-            elseif (flag==1) then
-                call MPI_RECV(alphamax_props, numdis_max, MPI_Real, 0, 1, MPI_COMM_small, MPI_STATUS_IGNORE, ierror)
-                call MPI_RECV(alpharefmax_props, 1, MPI_Real, 0, 1, MPI_COMM_small, MPI_STATUS_IGNORE, ierror)
-            endif
+            ! make alpha histogram
+            
             do idis=1,numdis
                 
                 do i=1,th
-                    i_al=ceiling((alphaall(i,idis)-alphamax_props(idis)-logalpha_min)/(logalpha_max-logalpha_min)*num_logalpha)
-                    if (i_al<logalpha_min) i_al=1
-                    if (i_al>logalpha_max) i_al=num_logalpha
+                    i_al=ceiling(((alphaall(i,idis)-alphamax_props(idis))-logalpha_min)/(logalpha_max-logalpha_min)*num_logalpha)
+                    if (i_al<1) i_al=1
+                    if (i_al>num_logalpha) i_al=num_logalpha
                     alphahist(i_al,idis,i_w)=alphahist(i_al,idis,i_w)+1
+                    
                 enddo
             enddo
             
-            call MPI_REDUCE(alphahist,alphahists,num_logalpha*numdis_max*n_w,MPI_Real,MPI_MAX,&
-                 0,MPI_COMM_small,ierror)
+            do i=1,th
+                i_al=ceiling(((alpharefall(i)-alpharefmax_props)-logalpha_min)/(logalpha_max-logalpha_min)*num_logalpha)
+                if (i_al<1) i_al=1
+                if (i_al>num_logalpha) i_al=num_logalpha
+                alpharefhist(i_al,i_w)=alpharefhist(i_al,i_w)+1
+            enddo
             
-            !write(*,*)'rank=',ran,'th=',th
+            call MPI_ALLREDUCE(alphahist,alphahists,num_logalpha*numdis_max*n_w,MPI_Real,MPI_SUM,&
+                 MPI_COMM_small,ierror)
+            
+            call MPI_ALLREDUCE(alpharefhist,alpharefhists,num_logalpha*n_w,MPI_Real,MPI_SUM,&
+                 MPI_COMM_small,ierror)
+            
+            ! get new alphamax as to cap at 1% to whatever is over -15
+            
+            alphamax_true(i_w,:)=alphamax_props
+            alpharefmax_true(i_w)=alpharefmax_props
+            
+            i_opt=int((-15-logalpha_min)/(logalpha_max-logalpha_min)*num_logalpha)
+            
+            do idis=1,numdis
+                
+                sum_tmp=0
+                isum=num_logalpha+1
+                
+                i_opt=isum-int((15)/(logalpha_max-logalpha_min)*num_logalpha)
+                totsum=sum(alphahists(i_opt:,idis,i_w))
+                do while ((sum_tmp<0.05*totsum).or.(totsum==0))
+                    isum=isum-1
+                    sum_tmp=sum_tmp+alphahists(isum,idis,i_w)
+                    i_opt=i_opt-1
+                    totsum=sum(alphahists(i_opt:,idis,i_w))
+                enddo
+                alphamax_props(idis)=alphamax_props(idis)+(logalpha_min+isum*((logalpha_max-logalpha_min)/num_logalpha))
+            enddo
+            
+            sum_tmp=0
+            isum=num_logalpha+1
+            i_opt=isum-int((15)/(logalpha_max-logalpha_min)*num_logalpha)
+            totsum=sum(alpharefhists(i_opt:,i_w))
+            do while ((sum_tmp<0.05*totsum).or.(totsum==0))
+                isum=isum-1
+                sum_tmp=sum_tmp+alpharefhists(isum,i_w)
+                i_opt=i_opt-1
+                totsum=sum(alpharefhists(i_opt:,i_w))
+            enddo
+            alpharefmax_props=alpharefmax_props+(logalpha_min+isum*((logalpha_max-logalpha_min)/num_logalpha))
+            
+            do idis=1,numdis
+                
+                do i=1,th
+                    if ((alphaall(i,idis)-alphamax_props(idis))>-15) then
+                        mean_prop(idis)=mean_prop(idis)+min(0.,alphaall(i,idis)-alphamax_props(idis))
+                        num_prop(idis)=num_prop(idis)+1
+                    endif
+                enddo
+            enddo
+            
+            call MPI_ALLREDUCE(mean_prop,mean_props,numdis_max,MPI_Real,MPI_sum,MPI_COMM_small,ierror)
+            call MPI_ALLREDUCE(num_prop,num_props,numdis_max,MPI_Real,MPI_sum,MPI_COMM_small,ierror)
             
             call MPI_Group_free(good_group, ierror)
             call MPI_Comm_free(MPI_COMM_small, ierror)
             call MPI_BARRIER(MPI_COMM_WORLD, ierror)
             
-            mean_props=mean_props/j-alphamax_props
+            write(*,*)ierror
+            
+            mean_props=mean_props/num_props!-alphamax_props
             meandiff_hist(i_w,:)=mean_props
+            alphamax_hist(i_w,:)=alphamax_props
+            alphamaxref_hist(i_w)=alpharefmax_props
             if (minval(mean_props(:numdis))>minval(mean_best(:numdis))) then
                 mean_best=mean_props
                 widening=widening_prop
@@ -1974,10 +2143,8 @@ program RJ_MCMC
                 best_current_p_vp=p_vp
                 best_current_pAd_R=pAd_R
                 best_current_pAd_L=pAd_L
-                best_current_pv1=pv1
-                best_current_pv2=pv2
-                best_current_pd1=pd1
-                best_current_pd2=pd2
+                best_current_pv=pv
+                best_current_pd=pd
                 best_current_sigmav=sigmav
                 best_current_npt=npt
                 best_current_voro=voro
@@ -1986,13 +2153,105 @@ program RJ_MCMC
             IF (ran==members(1)) THEN
                 write(*,*)'New widening tested: '
                 write(*,*)i_w,widening_prop,widening,'best',mean_best(:numdis),'props',mean_props(:numdis)
-                write(*,*)'alphamax',alphamax_props
+                write(*,*)'alphamax',alphamax_props(:numdis)
             endif
             widening_prop=widening_prop+widening_step
             
             
         endif
     enddo
+    
+    IF (ran==members(1)) THEN
+        write(*,*)'Best widening: '
+        write(*,*)'widening',widening
+        write(*,*)'mean',mean_best(:numdis)
+        write(*,*)'alphamax',alphamax(:numdis)
+    endif
+    
+    do i=1,nbproc
+        call MPI_REDUCE(inorout,inorouts,21000,MPI_Integer,MPI_Sum,i-1,MPI_COMM_WORLD,ierror)
+    enddo
+
+    !write(*,*)'rank=',ran,'th=',th
+
+    j=0
+    k=0
+    do i=1,nbproc
+        j=j+inorouts(i)
+        if (inorouts(i).ne.0) then
+            k=k+1
+            members(k)=i-1
+        endif
+    enddo
+
+    !IF (ran==0) write(*,*) 'k',k,'nbproc',nbproc
+    !***************************************************************************
+
+    ! Collect information from all the chains and average everything
+
+    !***************************************************************************
+    flag=0
+    do i=1,j
+        if (ran==members(i)) flag=1
+    enddo
+    
+    !write(*,*)'alphamax_prop',alphamax_prop
+
+
+    call MPI_Group_incl(group_world, j, members, good_group, ierror)
+    call MPI_Comm_create(MPI_COMM_WORLD, good_group, MPI_COMM_small, ierror)
+    
+    if (flag==1) then
+        
+        call MPI_REDUCE(convBa,convBas,n_w*(burn_in_widening+nsample_widening)+burn_in,&
+        MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(convB,convBs,n_w*(burn_in_widening+nsample_widening)+burn_in,&
+        MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(convDa,convDas,n_w*(burn_in_widening+nsample_widening)+burn_in,&
+        MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(convD,convDs,n_w*(burn_in_widening+nsample_widening)+burn_in,&
+        MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(convvp,convvps,n_w*(burn_in_widening+nsample_widening)+burn_in,&
+        MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(convvs,convvss,n_w*(burn_in_widening+nsample_widening)+burn_in,&
+        MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(convdp,convdps,n_w*(burn_in_widening+nsample_widening)+burn_in,&
+        MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(convxi,convxis,n_w*(burn_in_widening+nsample_widening)+burn_in,&
+        MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(convd_R,convd_Rs,n_w*(burn_in_widening+nsample_widening)+burn_in,&
+        MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(convd_L,convd_Ls,n_w*(burn_in_widening+nsample_widening)+burn_in,&
+        MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(convAd_R,convAd_Rs,n_w*(burn_in_widening+nsample_widening)+burn_in,&
+        MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(convAd_L,convAd_Ls,n_w*(burn_in_widening+nsample_widening)+burn_in,&
+        MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(ncell,ncells,n_w*(burn_in_widening+nsample_widening)+burn_in,&
+        MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+
+        
+        convPs=convPs/j
+        convBs=convBs/j
+        convBas=convBas/j
+        convDs=convDs/j
+        convDas=convDas/j
+        convvps=convvps/j
+        convvs1s=convvs1s/j
+        convvs2s=convvs2s/j
+        convdp1s=convdp1s/j
+        convdp2s=convdp2s/j
+        convxis=convxis/j
+        convd_Rs=convd_Rs/j
+        convd_Ls=convd_Ls/j
+        convAd_Rs=convAd_Rs/j
+        convAd_Ls=convAd_Ls/j
+        ncells=ncells/j
+    endif
+    
+    call MPI_Group_free(good_group, ierror)
+    call MPI_Comm_free(MPI_COMM_small, ierror)
+    call MPI_BARRIER(MPI_COMM_WORLD, ierror)
     
     write(*,*)'writing outputs of widening tests'
     
@@ -2006,10 +2265,8 @@ program RJ_MCMC
     write(65,*)best_current_p_vp
     write(65,*)best_current_pAd_R
     write(65,*)best_current_pAd_L
-    write(65,*)best_current_pv1
-    write(65,*)best_current_pv2
-    write(65,*)best_current_pd1
-    write(65,*)best_current_pd2
+    write(65,*)best_current_pv
+    write(65,*)best_current_pd
     write(65,*)best_current_sigmav
     write(65,*)best_current_npt
     do i=1,best_current_npt
@@ -2022,7 +2279,11 @@ program RJ_MCMC
         open(65,file=dirname//'/mean_prop.out',status='replace')
         write(65,*)widening_start,widening_step,n_w,numdis
         do i=1,n_w
-            write(65,*)meandiff_hist(i,:)
+            write(65,*)widening_start+(i-1)*widening_step,alphamaxref_hist(i),&
+            alpharefmax_true(i)
+            write(65,*)meandiff_hist(i,:numdis)
+            write(65,*)alphamax_hist(i,:numdis)
+            write(65,*)alphamax_true(i,:numdis)
         enddo
         close(65)
         
@@ -2045,7 +2306,77 @@ program RJ_MCMC
         write(65,*)mean_best(:numdis)
         close(65)
         
-        write(*,*)'final alphamax',alpharefmax,alphamax
+        !write(*,*)'final alphamax',alpharefmax,alphamax(:numdis)
+        
+        open(54,file=dirname//'/Convergence_Birth_prep.out',status='replace')
+        write(54,*)burn_in,n_w,burn_in_widening,nsample_widening
+        do i=1,n_w*(burn_in_widening+nsample_widening)+burn_in
+            write(54,*)convB(i),convBs(i),convBa(i),convBas(i)
+        enddo
+        close(54)
+        
+        open(54,file=dirname//'/Convergence_Death_prep.out',status='replace')
+        write(54,*)burn_in,n_w,burn_in_widening,nsample_widening
+        do i=1,n_w*(burn_in_widening+nsample_widening)+burn_in
+            write(54,*)convD(i),convDs(i),convDa(i),convDas(i)
+        enddo
+        close(54)
+        
+        open(54,file=dirname//'/Convergence_vp_prep.out',status='replace')
+        write(54,*)burn_in,n_w,burn_in_widening,nsample_widening
+        do i=1,n_w*(burn_in_widening+nsample_widening)+burn_in
+            write(54,*)convvp(i),convvps(i)
+        enddo
+        close(54)
+        
+        open(54,file=dirname//'/Convergence_vs_prep.out',status='replace')
+        write(54,*)burn_in,n_w,burn_in_widening,nsample_widening
+        do i=1,n_w*(burn_in_widening+nsample_widening)+burn_in
+            write(54,*)convvs(i),convvss(i)
+        enddo
+        close(54)
+        
+        open(54,file=dirname//'/Convergence_dp_prep.out',status='replace')
+        write(54,*)burn_in,n_w,burn_in_widening,nsample_widening
+        do i=1,n_w*(burn_in_widening+nsample_widening)+burn_in
+            write(54,*)convdp(i),convdps(i)
+        enddo
+        close(54)
+        
+        open(54,file=dirname//'/Convergence_xi_prep.out',status='replace')
+        write(54,*)burn_in,n_w,burn_in_widening,nsample_widening
+        do i=1,n_w*(burn_in_widening+nsample_widening)+burn_in
+            write(54,*)convxi(i),convxis(i)
+        enddo
+        close(54)
+        
+        open(54,file=dirname//'/Convergence_misfit_prep.out',status='replace')
+        write(54,*)burn_in,n_w,burn_in_widening,nsample_widening
+        do i=1,n_w*(burn_in_widening+nsample_widening)+burn_in
+            write(54,*)convd_R(i),convd_Rs(i),convd_L(i),convd_Ls(i)
+        enddo
+        close(54)
+
+        open(53,file=dirname//'/Convergence_nb_layers_prep.out',status='replace')
+        write(53,*)burn_in,n_w,burn_in_widening,nsample_widening
+        do i=1,n_w*(burn_in_widening+nsample_widening)+burn_in
+            write(53,*)ncell(i),ncells(i)
+        enddo
+        close(53)
+
+        open(52,file=dirname//'/Convergence_sigma_R_prep.out',status='replace')
+        write(52,*)burn_in,n_w,burn_in_widening,nsample_widening
+        do i=1,n_w*(burn_in_widening+nsample_widening)+burn_in
+            write(52,*)convAd_R(i),convAd_Rs(i)
+        enddo
+        close(52)
+
+        open(53,file=dirname//'/Convergence_sigma_L_prep.out',status='replace')
+        write(53,*)burn_in,n_w,burn_in_widening,nsample_widening
+        do i=1,n_w*(burn_in_widening+nsample_widening)+burn_in
+            write(53,*)convAd_L(i),convAd_Ls(i)
+        enddo
+        close(53)
     ENDIF
     
     CALL cpu_time(t2)
