@@ -76,7 +76,7 @@ synth: params.h data_params.h
 	$(F77) -o run synth_profile.f90 \
 	-L./ -lroutines -lm
 
-obj: params.h data_params.h
+obj: params.h
 	$(F77) -c src/whichcell_d.f90
 	$(F77) -c src/combine.f90
 	$(F77) -c src/minos_bran.f
