@@ -188,7 +188,6 @@ program RJ_MCMC
     real :: dummy_d_obsdcR(ndatadmax), dummy_d_obsdcL(ndatadmax)
 
     ! todo: implement a test with raylquo
->>>>>>> joint
 1000 format(I4)
 
 
