@@ -2,9 +2,10 @@
 # -*- coding: utf-8 -*-
 
 ###################################### RUN IMPORTS ############################
+# from asyncio import coroutines
 import matplotlib.pyplot as plt
 import numpy as np
-
+import math
 import matplotlib
 from matplotlib import rcParams
 matplotlib.rcParams['font.family'] = 'sans-serif'
@@ -12,47 +13,111 @@ matplotlib.rcParams['font.sans-serif'] = ['Arial']
 matplotlib.rcParams['font.size'] = 10
 import os, sys
 import matplotlib.patches as patches
+from matplotlib.ticker import NullFormatter, LinearLocator
+from scipy import stats
+import json
+from scipy import stats
+import pandas
+from numpy import unravel_index
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
-
-print('Required :       Script.py test_directory')
-print('Arguments:      ',sys.argv)
-print('Options [1] :     RJ_MCMC_Tests/XYZ_test/OUT_TEST')
-# python plot_test_results.py ./OUT_TEST2
-
-<<<<<<< HEAD
-num_args=len(sys.argv)
-if num_args < 2:
-    print('Number of arguments (' + str(num_args) +') too low... exit')
-    exit('exiting....')
-=======
-#num_args=len(sys.argv)
-#if num_args < 2:
-#   print('Number of arguments (' + str(num_args) +') too low... exit')
-#   exit('exiting....')
->>>>>>> joint
-    
-#directory = str(sys.argv[1])
-#print('Plotting results for: ' +str(directory))
-directory='OUT_SYNTH1'
+# Make it work for Python 2+3 and with Unicode
+import io
+try:
+    to_unicode = unicode
+except NameError:
+    to_unicode = str
 
 ####################### SET PARAMS ############################################
 # input directory, contains all the outputs from the MCMC code
-# directory='OUT_TEST2'
-if not os.path.exists(directory+'/PLOTS/'):
-    os.mkdir(directory+'/PLOTS/')
-maxnlay = 80
 
 Layer_Hist      = True
 Layers_Aniso_Tr = True
 Posterior       = True
+Posterior2      = False
 Sigmad          = True
 Dispersion      = True
 Convergence     = True
-<<<<<<< HEAD
 PsPp_Fit        = True
-=======
-True_model      = True
->>>>>>> joint
+Corr_Hist      = True
+
+
+
+# python plot_test_results.py ./OUT_TEST2
+
+num_args=len(sys.argv)
+
+if Corr_Hist:
+    if num_args < 8:
+        print('Required :       Script.py <dir> <av_int> <dis> <p1> <av_u_dep1> <p2> <av_u_dep2>')
+        print('Arguments:      ',sys.argv)
+        print('Options [1] :     RJ_MCMC_Tests/XYZ_test/OUT_TEST')
+        print('Options [2] :     Averaging interval, 50,100,200')
+        print('Options [3] :     hist discretisation, 50,100,200')
+        print('Options [4] :     Parameter 1, vph, vsv')
+        print('Options [5] :     Parameter 1, av_u_dep: 100, 200 ....')
+        print('Options [6] :     Parameter 2, vsv, xi')
+        print('Options [7] :     Parameter 2, av_u_dep: 100, 200 ....')
+        print('Number of arguments (' + str(num_args) +') too low... exit')
+        exit('exiting....')
+    
+    av_int = int(sys.argv[2])
+    if av_int!=50 and av_int!=100 and av_int!=200:
+        print('Bad av_int supplied...')
+        print('Options [2] :     Averaging interval, 50,100,200')
+        exit('exiting....')
+
+    dh=int(sys.argv[3])
+    if dh!=50 and dh!=100 and dh!=200:
+        print('Bad histogram discretization supplied...')
+        print('Options [3] :     hist discretisation, 50,100,200')
+        exit('exiting....')
+
+    p1=str(sys.argv[4])
+    if p1!='vph' and p1!='vsv':
+        print('Bad Parameter 1 supplied...')
+        print('Options [4] :     Parameter 1, vph, vsv')
+        exit('exiting....')
+    p1_u_dep=int(sys.argv[5])
+
+    p2=str(sys.argv[6])
+    if p2!='vsv' and p2!='xi':
+        print('Bad Parameter 2 supplied...')
+        print('Options [6] :     Parameter 2, vsv, xi')
+        exit('exiting....')
+    p2_u_dep=int(sys.argv[7])
+
+
+
+else:
+    if num_args < 2:
+        print('Required :       Script.py test_directory')
+        print('Arguments:      ',sys.argv)
+        print('Options [1] :     RJ_MCMC_Tests/XYZ_test/OUT_TEST')
+        print('Number of arguments (' + str(num_args) +') too low... exit')
+        exit('exiting....')
+
+directory = str(sys.argv[1])
+print('Plotting results for: ' +str(directory))
+
+if not os.path.exists(directory+'/PLOTS/'):
+    os.mkdir(directory+'/PLOTS/')
+maxnlay = 80
+
+
+
+def weighted_avg_and_std(values, weights):
+    """
+    Return the weighted average and standard deviation.
+
+    values, weights -- Numpy ndarrays with the same shape.
+    """
+    average = np.average(values, weights=weights)
+    # Fast and numerically precise:
+    variance = np.average((values-average)**2, weights=weights)
+    return (average, math.sqrt(variance))
+
+# std = np.sqrt(np.cov(values, aweights=weights))
 
 ########## histogram of number of layers
 if Layer_Hist:
@@ -74,7 +139,6 @@ if Layer_Hist:
     # plt.show()
     plt.savefig(directory+'/PLOTS/'+'Layer_hist.png',dpi=200)
     plt.close()
-
 
 ########## matrix containing number of layers and number of anisotropic layers
 if Layers_Aniso_Tr:
@@ -108,11 +172,15 @@ if Layers_Aniso_Tr:
     plt.savefig(directory+'/PLOTS/'+'Layers_Aniso_Tr.png',dpi=200)
     plt.close()
 
-
 ############ Posterior #######################
 if Posterior:
-    file=open(directory+'/'+'Posterior.out','r')
-    depthplot=60
+
+    if os.path.isfile(directory+'/'+'Proc_Posterior.out'):
+        # Use the Output of Process_MCMC_output.py from transcale.
+        file=open(directory+'/'+'Proc_Posterior.out','r')
+    else:
+        # Use with Original Posterior output from Fortran
+        file=open(directory+'/'+'Posterior.out','r')
 
     lines=file.readlines()
 
@@ -122,6 +190,14 @@ if Posterior:
     data0=lines[0].split()
     prof=float(data0[0])
     disd=int(data0[1]) # Depth discretisation
+    dmax=float(data0[2])
+
+    burn_in=int(float(data0[3]))
+    nsample=int(float(data0[4]))
+    thinning=int(float(data0[5]))
+    cores=int(float(data0[6]))
+
+
     [vref_min,vref_max,disv,width,xi_min,xi_max,vp_min,vp_max]=[float(i) for i in lines[1].split()]
     disv=int(disv) # Velocity/aniso discretisation
 
@@ -137,17 +213,12 @@ if Posterior:
     i=0
     j=0
 
-    # depth=[]
-
     for line in lines[2:]:
         [vsvd[i,j],xid[i,j],vpd[i,j]]=[float(i) for i in line.split()]
-
         j+=1
         if j==disv:
             j=0
             i+=1
-    # xid[:,disv//2-1]=0 # else the isotropic layers dominate the anisotropy density plot
-    xid[:,disv//2-1]=xid[:,disv//2] # else the isotropic layers dominate the anisotropy density plot
 
     for i in range(np.shape(vsvd)[0]): # normalisation by depth, not strictly necessary
         s=np.amax(vsvd[i,:])
@@ -158,34 +229,34 @@ if Posterior:
         s=np.amax(vpd[i,:])
         vpd[i,:]=vpd[i,:]/s
     vpd[-1,:]=0.0
+    
     for i in range(np.shape(xid)[0]): # normalisation by depth, not strictly necessary
         s=np.amax(xid[i,:])
         xid[i,:]=xid[i,:]/s
     xid[-1,:]=0.0
 
-
     ################# Average distribution ABOVE depth
 
     dep_val=200
-    ind=np.where(depths<=dep_val)[0]
+    ind=np.where(depths<dep_val)[0]
     splice_vsvd_a=vsvd[ind,:]
     splice_xid_a=xid[ind,:]
     splice_vpd_a=vpd[ind,:]
 
-    above_splice_vsvd=np.mean(splice_vsvd_a, axis=0)
-    above_splice_xid=np.mean(splice_xid_a, axis=0)
-    above_splice_vpd=np.mean(splice_vpd_a, axis=0)
+    above_splice_vsvd=np.sum(splice_vsvd_a, axis=0)/len(ind) # Normalise by num layers above
+    above_splice_xid=np.sum(splice_xid_a, axis=0)/len(ind)
+    above_splice_vpd=np.sum(splice_vpd_a, axis=0)/len(ind)
 
     ################# Average distribution BELOW depth
 
-    ind2=np.where(depths>=dep_val)[0]
+    ind2=np.where(depths>dep_val)[0]
     splice_vsvd_b=vsvd[ind2,:]
     splice_xid_b=xid[ind2,:]
     splice_vpd_b=vpd[ind2,:]
 
-    below_splice_vsvd=np.mean(splice_vsvd_b, axis=0)
-    below_splice_xid=np.mean(splice_xid_b, axis=0)
-    below_splice_vpd=np.mean(splice_vpd_b, axis=0)
+    below_splice_vsvd=np.sum(splice_vsvd_b, axis=0)/len(ind2) # Normalise by num layers below
+    below_splice_xid=np.sum(splice_xid_b, axis=0)/len(ind2) 
+    below_splice_vpd=np.sum(splice_vpd_b, axis=0)/len(ind2)
 
     ################# Average distribution AT depth
 
@@ -193,7 +264,6 @@ if Posterior:
     splice_vsvd=vsvd[ind3,:]
     splice_xid=xid[ind3,:]
     splice_vpd=vpd[ind3,:]
-
 
     ### STATS ###
 
@@ -208,14 +278,7 @@ if Posterior:
         for l in range(int(1000*above_splice_vsvd[i])):
             dist_vsvs_a.append(vsvs[i])
 
-    std_vsvs=np.std(dist_vsvs,axis=0)
-    mean_vsvs=np.mean(dist_vsvs,axis=0)
-    std_vsvs_a=np.std(dist_vsvs_a,axis=0)
-    mean_vsvs_a=np.mean(dist_vsvs_a,axis=0)
-    std_vsvs_b=np.std(dist_vsvs_b,axis=0)
-    mean_vsvs_b=np.mean(dist_vsvs_b,axis=0)
 
-    # print(mean_vsvs_a,std_vsvs_a,mean_vsvs,std_vsvs,mean_vsvs_b,std_vsvs_b)
 
     dist_xis=[]
     dist_xis_a=[]
@@ -228,14 +291,7 @@ if Posterior:
         for l in range(int(1000*below_splice_xid[i])):
             dist_xis_b.append(xis[i])
 
-    std_xis=np.std(dist_xis,axis=0)
-    mean_xis=np.mean(dist_xis,axis=0)
-    std_xis_a=np.std(dist_xis_a,axis=0)
-    mean_xis_a=np.mean(dist_xis_a,axis=0)
-    std_xis_b=np.std(dist_xis_b,axis=0)
-    mean_xis_b=np.mean(dist_xis_b,axis=0)
 
-    # print(mean_xis_a,std_xis_a,mean_xis,std_xis,mean_xis_b,std_xis_b)
 
     dist_vps=[]
     dist_vps_a=[]
@@ -248,145 +304,309 @@ if Posterior:
         for l in range(int(1000*above_splice_vpd[i])):
             dist_vps_a.append(vps[i])
 
-    std_vps=np.std(dist_vps,axis=0)
-    mean_vps=np.mean(dist_vps,axis=0)
-    std_vps_b=np.std(dist_vps_b,axis=0)
-    mean_vps_b=np.mean(dist_vps_b,axis=0)
-    std_vps_a=np.std(dist_vps_a,axis=0)
-    mean_vps_a=np.mean(dist_vps_a,axis=0)
+    std_vsvs=np.round_(np.std(dist_vsvs,axis=0),4)
+    mean_vsvs=np.round_(np.mean(dist_vsvs,axis=0),4)
+    median_vsvs=np.round_(np.median(dist_vsvs),4)
+    vsvs_975=np.round_(np.quantile(dist_vsvs, 0.975),4)
+    vsvs_825=np.round_(np.quantile(dist_vsvs, 0.825),4)
+    vsvs_175=np.round_(np.quantile(dist_vsvs, 0.175),4)
+    vsvs_025=np.round_(np.quantile(dist_vsvs, 0.025),4)
 
+    std_vsvs_a=np.round_(np.std(dist_vsvs_a,axis=0),4)
+    mean_vsvs_a=np.round_(np.mean(dist_vsvs_a,axis=0),4)
+    median_vsvs_a=np.round_(np.median(dist_vsvs_a),4)
+    vsvs_975_a=np.round_(np.quantile(dist_vsvs_a, 0.975),4)
+    vsvs_825_a=np.round_(np.quantile(dist_vsvs_a, 0.825),4)
+    vsvs_175_a=np.round_(np.quantile(dist_vsvs_a, 0.175),4)
+    vsvs_025_a=np.round_(np.quantile(dist_vsvs_a, 0.025),4)
+
+    std_vsvs_b=np.round_(np.std(dist_vsvs_b,axis=0),4)
+    mean_vsvs_b=np.round_(np.mean(dist_vsvs_b,axis=0),4)
+    median_vsvs_b=np.round_(np.median(dist_vsvs_b),4)
+    vsvs_975_b=np.round_(np.quantile(dist_vsvs_b, 0.975),4)
+    vsvs_825_b=np.round_(np.quantile(dist_vsvs_b, 0.825),4)
+    vsvs_175_b=np.round_(np.quantile(dist_vsvs_b, 0.175),4)
+    vsvs_025_b=np.round_(np.quantile(dist_vsvs_b, 0.025),4)
+
+    std_xis=np.round_(np.std(dist_xis,axis=0),4)
+    mean_xis=np.round_(np.mean(dist_xis,axis=0),4) # Mean includes zeros in xi
+    median_xis=np.round_(np.median(dist_xis),4)
+    xis_975=np.round_(np.quantile(dist_xis, 0.975),4)
+    xis_825=np.round_(np.quantile(dist_xis, 0.825),4)
+    xis_175=np.round_(np.quantile(dist_xis, 0.175),4)
+    xis_025=np.round_(np.quantile(dist_xis, 0.025),4)
+
+    std_xis_a=np.round_(np.std(dist_xis_a,axis=0),4) # Xi=1 removed later.
+    mean_xis_a=np.round_(np.mean(dist_xis_a,axis=0),4)
+    median_xis_a=np.round_(np.median(dist_xis_a),4)
+    xis_975_a=np.round_(np.quantile(dist_xis_a, 0.975),4)
+    xis_825_a=np.round_(np.quantile(dist_xis_a, 0.825),4)
+    xis_175_a=np.round_(np.quantile(dist_xis_a, 0.175),4)
+    xis_025_a=np.round_(np.quantile(dist_xis_a, 0.025),4)
+
+    std_xis_b=np.round_(np.std(dist_xis_b,axis=0),4)
+    mean_xis_b=np.round_(np.mean(dist_xis_b,axis=0),4)
+    median_xis_b=np.round_(np.median(dist_xis_b),4)
+    xis_975_b=np.round_(np.quantile(dist_xis_b, 0.975),4)
+    xis_825_b=np.round_(np.quantile(dist_xis_b, 0.825),4)
+    xis_175_b=np.round_(np.quantile(dist_xis_b, 0.175),4)
+    xis_025_b=np.round_(np.quantile(dist_xis_b, 0.025),4)
+
+    std_vps=np.round_(np.std(dist_vps,axis=0),4)
+    mean_vps=np.round_(np.mean(dist_vps,axis=0),4)
+    median_vps=np.round_(np.median(dist_vps),4)
+    vps_975=np.round_(np.quantile(dist_vps, 0.975),4)
+    vps_825=np.round_(np.quantile(dist_vps, 0.825),4)
+    vps_175=np.round_(np.quantile(dist_vps, 0.175),4)
+    vps_025=np.round_(np.quantile(dist_vps, 0.025),4)
+
+    std_vps_b=np.round_(np.std(dist_vps_b,axis=0),4)
+    mean_vps_b=np.round_(np.mean(dist_vps_b,axis=0),4)
+    median_vps_b=np.round_(np.median(dist_vps_b),4)
+    vps_975_b=np.round_(np.quantile(dist_vps_b, 0.975),4)
+    vps_825_b=np.round_(np.quantile(dist_vps_b, 0.825),4)
+    vps_175_b=np.round_(np.quantile(dist_vps_b, 0.175),4)
+    vps_025_b=np.round_(np.quantile(dist_vps_b, 0.025),4)
+
+    std_vps_a=np.round_(np.std(dist_vps_a,axis=0),4)
+    mean_vps_a=np.round_(np.mean(dist_vps_a,axis=0),4)
+    median_vps_a=np.round_(np.median(dist_vps_a),4)
+    vps_975_a=np.round_(np.quantile(dist_vps_a, 0.975),4)
+    vps_825_a=np.round_(np.quantile(dist_vps_a, 0.825),4)
+    vps_175_a=np.round_(np.quantile(dist_vps_a, 0.175),4)
+    vps_025_a=np.round_(np.quantile(dist_vps_a, 0.025),4)
+
+
+    # print(mean_vsvs_a,std_vsvs_a,mean_vsvs,std_vsvs,mean_vsvs_b,std_vsvs_b)
+    # print(mean_xis_a,std_xis_a,mean_xis,std_xis,mean_xis_b,std_xis_b)
     # print(mean_vps_a,std_vps_a,mean_vps,std_vps,mean_vps_b,std_vps_b)
 
+    fig, ((ax1, ax2, ax3), (ax4, ax5, ax6), (ax7, ax8, ax9)) = plt.subplots(3, 3, figsize=(9, 9), sharey=True) #
 
-    fig, ((ax1, ax2, ax3), (ax4, ax5, ax6), (ax7, ax8, ax9)) = plt.subplots(3, 3, figsize=(9, 9), sharey=True)
+    if os.path.isfile(directory+'/'+'Proc_Posterior.out'):
+        # When using Proc_Post the isotropic lies in the next index over
+        xid[:,disv//2]=xid[:,disv//2-1] # else the isotropic layers dominate the anisotropy density plot
+        above_splice_xid[disv//2]=above_splice_xid[disv//2-1]
+        splice_xid[disv//2]=splice_xid[disv//2-1]
+        below_splice_xid[disv//2]=below_splice_xid[disv//2-1]
 
-    rect = patches.Rectangle((mean_vsvs_a , 0), std_vsvs_a, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
-    rect2 = patches.Rectangle((mean_vsvs_a-std_vsvs_a , 0), std_vsvs_a, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
-    ax1.add_patch(rect)
-    ax1.add_patch(rect2)
+        above_splice_xid=above_splice_xid/np.max(above_splice_xid)
+        below_splice_xid=below_splice_xid/np.max(below_splice_xid)
+        splice_xid=splice_xid/np.max(splice_xid)
+
+    else:
+        # xid[:,disv//2-1]=0 # else the isotropic layers dominate the anisotropy density plot
+        xid[:,disv//2-1]=xid[:,disv//2] # else the isotropic layers dominate the anisotropy density plot
+        above_splice_xid[disv//2-1]=above_splice_xid[disv//2]
+        splice_xid[disv//2-1]=splice_xid[disv//2]
+        below_splice_xid[disv//2-1]=below_splice_xid[disv//2]
+
+    # print(np.max(above_splice_xid),np.max(splice_xid),np.max(below_splice_xid))
+
+    ax1.plot(vsvs,above_splice_vsvd, c='r', linewidth=1,alpha=1)
+    ax2.plot(xis,above_splice_xid, c='b', linewidth=1,alpha=1)
+    ax3.plot(vps,above_splice_vpd, c='darkgreen', linewidth=1,alpha=1)
+
+    ax4.plot(vsvs,splice_vsvd, c='r', linewidth=1,alpha=1)
+    ax5.plot(xis,splice_xid, c='b', linewidth=1,alpha=1)
+    ax6.plot(vps,splice_vpd, c='darkgreen', linewidth=1,alpha=1)
+
+    ax7.plot(vsvs,below_splice_vsvd, c='r', linewidth=1,alpha=1)
+    ax8.plot(xis,below_splice_xid, c='b', linewidth=1,alpha=1)
+    ax9.plot(vps,below_splice_vpd, c='darkgreen', linewidth=1,alpha=1)
+
+    ax1.fill_between(vsvs,above_splice_vsvd,0, where=above_splice_vsvd >= 0,facecolor=[1.0, 0., 0.0], rasterized=False, alpha=0.1)
+    # For 95% quantile
+    a=vsvs_025_a<=vsvs;     b=vsvs_975_a>=vsvs;     c=a==b
+    ax1.fill_between(vsvs,above_splice_vsvd,0, where=c,facecolor=[1.0, 0., 0.0], rasterized=False, alpha=0.15)
+    # For 65% quantile
+    a=vsvs_175_a<=vsvs;     b=vsvs_825_a>=vsvs;     c=a==b
+    ax1.fill_between(vsvs,above_splice_vsvd,0, where=c,facecolor=[1.0, 0., 0.0], rasterized=False, alpha=0.2)
+    #########################################################
+    ax4.fill_between(vsvs,splice_vsvd,0, where=splice_vsvd >= 0,facecolor=[1.0, 0., 0.0], rasterized=False, alpha=0.1)
+    # For 95% quantile
+    a=vsvs_025<=vsvs;     b=vsvs_975>=vsvs;     c=a==b
+    ax4.fill_between(vsvs,splice_vsvd,0, where=c,facecolor=[1.0, 0., 0.0], rasterized=False, alpha=0.15)
+    # For 65% quantile
+    a=vsvs_175<=vsvs;     b=vsvs_825>=vsvs;     c=a==b
+    ax4.fill_between(vsvs,splice_vsvd,0, where=c,facecolor=[1.0, 0., 0.0], rasterized=False, alpha=0.2)
+    ########################################################
+    ax7.fill_between(vsvs,below_splice_vsvd,0, where=below_splice_vsvd >= 0,facecolor=[1.0, 0., 0.0], rasterized=False, alpha=0.1)
+    # For 95% quantile
+    a=vsvs_025_b<=vsvs;     b=vsvs_975_b>=vsvs;     c=a==b
+    ax7.fill_between(vsvs,below_splice_vsvd,0, where=c,facecolor=[1.0, 0., 0.0], rasterized=False, alpha=0.15)
+    # For 65% quantile
+    a=vsvs_175_b<=vsvs;     b=vsvs_825_b>=vsvs;     c=a==b
+    ax7.fill_between(vsvs,below_splice_vsvd,0, where=c,facecolor=[1.0, 0., 0.0], rasterized=False, alpha=0.2)
 
 
-    rect3 = patches.Rectangle((mean_vsvs , 0), std_vsvs, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
-    rect4 = patches.Rectangle((mean_vsvs-std_vsvs , 0), std_vsvs, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
-    ax4.add_patch(rect3)
-    ax4.add_patch(rect4)
+    #########################################################
+    ax2.fill_between(xis,above_splice_xid,0, where=above_splice_xid >= 0,facecolor=[0.0, 0., 1.0], rasterized=False, alpha=0.1)
+    # For 95% quantile
+    a=xis_025_a<=xis;     b=xis_975_a>=xis;     c=a==b
+    ax2.fill_between(xis,above_splice_xid,0, where=c,facecolor=[0.0, 0., 1.0], rasterized=False, alpha=0.15)
+    # For 65% quantile
+    a=xis_175_a<=xis;     b=xis_825_a>=xis;     c=a==b
+    ax2.fill_between(xis,above_splice_xid,0, where=c,facecolor=[0.0, 0., 1.0], rasterized=False, alpha=0.2)
 
-    rect5 = patches.Rectangle((mean_vsvs_b , 0), std_vsvs_b, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
-    rect6 = patches.Rectangle((mean_vsvs_b-std_vsvs_b , 0), std_vsvs_b, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
-    ax7.add_patch(rect5)
-    ax7.add_patch(rect6)
+    #########################################################
+    ax5.fill_between(xis,splice_xid,0, where=splice_xid >= 0,facecolor=[0.0, 0., 1.0], rasterized=False, alpha=0.1)
+    # For 95% quantile
+    a=xis_025<=xis;     b=xis_975>=xis;     c=a==b
+    ax5.fill_between(xis,splice_xid,0, where=c,facecolor=[0.0, 0., 1.0], rasterized=False, alpha=0.15)
+    # For 65% quantile
+    a=xis_175<=xis;     b=xis_825>=xis;     c=a==b
+    ax5.fill_between(xis,splice_xid,0, where=c,facecolor=[0.0, 0., 1.0], rasterized=False, alpha=0.2)
 
+    #########################################################
+    ax8.fill_between(xis,below_splice_xid,0, where=below_splice_xid >= 0,facecolor=[0.0, 0., 1.0], rasterized=False, alpha=0.1)
+    # For 95% quantile
+    a=xis_025_b<=xis;     b=xis_975_b>=xis;     c=a==b
+    ax8.fill_between(xis,below_splice_xid,0, where=c,facecolor=[0.0, 0., 1.0], rasterized=False, alpha=0.15)
+    # For 65% quantile
+    a=xis_175_b<=xis;     b=xis_825_b>=xis;     c=a==b
+    ax8.fill_between(xis,below_splice_xid,0, where=c,facecolor=[0.0, 0., 1.0], rasterized=False, alpha=0.2)
 
+    #########################################################
+    ax3.fill_between(vps,above_splice_vpd,0, where=above_splice_vpd >= 0,facecolor='darkgreen', rasterized=False, alpha=0.1)
+    # For 95% quantile
+    a=vps_025_a<=vps;     b=vps_975_a>=vps;     c=a==b
+    ax3.fill_between(vps,above_splice_vpd,0, where=c,facecolor='darkgreen', rasterized=False, alpha=0.15)
+    # For 65% quantile
+    a=vps_175_a<=vps;     b=vps_825_a>=vps;     c=a==b
+    ax3.fill_between(vps,above_splice_vpd,0, where=c,facecolor='darkgreen', rasterized=False, alpha=0.2)
 
+    #########################################################
+    ax6.fill_between(vps,splice_vpd,0, where=splice_vpd >= 0,facecolor='darkgreen', rasterized=False, alpha=0.1)
+    # For 95% quantile
+    a=vps_025<=vps;     b=vps_975>=vps;     c=a==b
+    ax6.fill_between(vps,splice_vpd,0, where=c,facecolor='darkgreen', rasterized=False, alpha=0.15)
+    # For 65% quantile
+    a=vps_175<=vps;     b=vps_825>=vps;     c=a==b
+    ax6.fill_between(vps,splice_vpd,0, where=c,facecolor='darkgreen', rasterized=False, alpha=0.2)
 
-    rect = patches.Rectangle((mean_xis_a , 0), std_xis_a, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
-    rect2 = patches.Rectangle((mean_xis_a-std_xis_a , 0), std_xis_a, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
-    ax2.add_patch(rect)
-    ax2.add_patch(rect2)
+    #########################################################
+    ax9.fill_between(vps,below_splice_vpd,0, where=below_splice_vpd >= 0,facecolor='darkgreen', rasterized=False, alpha=0.1)
+    # For 95% quantile
+    a=vps_025_b<=vps;     b=vps_975_b>=vps;     c=a==b
+    ax9.fill_between(vps,below_splice_vpd,0, where=c,facecolor='darkgreen', rasterized=False, alpha=0.15)
+    # For 65% quantile
+    a=vps_175_b<=vps;     b=vps_825_b>=vps;     c=a==b
+    ax9.fill_between(vps,below_splice_vpd,0, where=c,facecolor='darkgreen', rasterized=False, alpha=0.2)
 
-
-    rect3 = patches.Rectangle((mean_xis , 0), std_xis, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
-    rect4 = patches.Rectangle((mean_xis-std_xis , 0), std_xis, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
-    ax5.add_patch(rect3)
-    ax5.add_patch(rect4)
-
-    rect5 = patches.Rectangle((mean_xis_b , 0), std_xis_b, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
-    rect6 = patches.Rectangle((mean_xis_b-std_xis_b , 0), std_xis_b, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
-    ax8.add_patch(rect5)
-    ax8.add_patch(rect6)
-
-    rect = patches.Rectangle((mean_vps_a , 0), std_vps_a, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
-    rect2 = patches.Rectangle((mean_vps_a-std_vps_a , 0), std_vps_a, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
-    ax3.add_patch(rect)
-    ax3.add_patch(rect2)
-
-
-    rect3 = patches.Rectangle((mean_vps , 0), std_vps, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
-    rect4 = patches.Rectangle((mean_vps-std_vps , 0), std_vps, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
-    ax6.add_patch(rect3)
-    ax6.add_patch(rect4)
-
-    rect5 = patches.Rectangle((mean_vps_b , 0), std_vps_b, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
-    rect6 = patches.Rectangle((mean_vps_b-std_vps_b , 0), std_vps_b, 1, fill=True, fc='b', edgecolor=None, alpha=0.5, visible=True)
-    ax9.add_patch(rect5)
-    ax9.add_patch(rect6)
 
     ax1.plot([mean_vsvs_a,mean_vsvs_a],[0,1],c='red',linewidth=1,alpha=1)
     ax2.plot([mean_xis_a,mean_xis_a],[0,1],c='red',linewidth=1,alpha=1)
     ax3.plot([mean_vps_a,mean_vps_a],[0,1],c='red',linewidth=1,alpha=1)
 
+    ax1.plot([median_vsvs_a,median_vsvs_a],[0,1],c='red', linestyle='--',linewidth=1,alpha=1)
+    ax2.plot([median_xis_a,median_xis_a],[0,1],c='red', linestyle='--',linewidth=1,alpha=1)
+    ax3.plot([median_vps_a,median_vps_a],[0,1],c='red', linestyle='--',linewidth=1,alpha=1)
+
     ax4.plot([mean_vsvs,mean_vsvs],[0,1],c='red',linewidth=1,alpha=1)
     ax5.plot([mean_xis,mean_xis],[0,1],c='red',linewidth=1,alpha=1)
     ax6.plot([mean_vps,mean_vps],[0,1],c='red',linewidth=1,alpha=1)
+
+    ax4.plot([median_vsvs,median_vsvs],[0,1],c='red', linestyle='--',linewidth=1,alpha=1)
+    ax5.plot([median_xis,median_xis],[0,1],c='red', linestyle='--',linewidth=1,alpha=1)
+    ax6.plot([median_vps,median_vps],[0,1],c='red', linestyle='--',linewidth=1,alpha=1)
 
     ax7.plot([mean_vsvs_b,mean_vsvs_b],[0,1],c='red',linewidth=1,alpha=1)
     ax8.plot([mean_xis_b,mean_xis_b],[0,1],c='red',linewidth=1,alpha=1)
     ax9.plot([mean_vps_b,mean_vps_b],[0,1],c='red',linewidth=1,alpha=1)
 
+    ax7.plot([median_vsvs_b,median_vsvs_b],[0,1],c='red', linestyle='--',linewidth=1,alpha=1)
+    ax8.plot([median_xis_b,median_xis_b],[0,1],c='red', linestyle='--',linewidth=1,alpha=1)
+    ax9.plot([median_vps_b,median_vps_b],[0,1],c='red', linestyle='--',linewidth=1,alpha=1)
 
-    ax1.plot(vsvs,above_splice_vsvd,c='black',linewidth=1,alpha=1)
-    ax2.plot(xis,above_splice_xid,c='black',linewidth=1,alpha=1)
-    ax3.plot(vps,above_splice_vpd,c='black',linewidth=1,alpha=1)
+    ax1.annotate('(a)',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=10,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
+    ax2.annotate('(b)',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=10,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
+    ax3.annotate('(c)',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=10,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
 
-    ax4.plot(vsvs,splice_vsvd,c='black',linewidth=1,alpha=1)
-    ax5.plot(xis,splice_xid,c='black',linewidth=1,alpha=1)
-    ax6.plot(vps,splice_vpd,c='black',linewidth=1,alpha=1)
+    ax4.annotate('(d)',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=10,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
+    ax5.annotate('(e)',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=10,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
+    ax6.annotate('(f)',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=10,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
 
-    ax7.plot(vsvs,below_splice_vsvd,c='black',linewidth=1,alpha=1)
-    ax8.plot(xis,below_splice_xid,c='black',linewidth=1,alpha=1)
-    ax9.plot(vps,below_splice_vpd,c='black',linewidth=1,alpha=1)
+    ax7.annotate('(g)',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=10,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
+    ax8.annotate('(h)',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=10,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
+    ax9.annotate('(i)',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=10,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
 
-    ax1.set_title('S-vel above '+str(dep_val)+'km')
-    ax1.set_xlabel('Vsv (km/s)', fontsize=10)
-    ax1.set_ylabel('Probability',fontsize=10)
+
+    ax1.annotate('median={:.2f}'.format(median_vsvs_a),(1, 1),xytext=(-5,-5),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+    ax1.annotate('mean={:.2f}'.format(mean_vsvs_a),(1, 1),xytext=(-5,-20),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+
+    ax2.annotate('median={:.2f}'.format(median_xis_a),(1, 1),xytext=(-5,-5),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+    ax2.annotate('mean={:.2f}'.format(mean_xis_a),(1, 1),xytext=(-5,-20),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+
+    ax3.annotate('median={:.2f}'.format(median_vps_a),(1, 1),xytext=(-5,-5),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+    ax3.annotate('mean={:.2f}'.format(mean_vps_a),(1, 1),xytext=(-5,-20),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+
+    ax4.annotate('median={:.2f}'.format(median_vsvs),(1, 1),xytext=(-5,-5),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+    ax4.annotate('mean={:.2f}'.format(mean_vsvs),(1, 1),xytext=(-5,-20),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+
+    ax5.annotate('median={:.2f}'.format(median_xis),(1, 1),xytext=(-5,-5),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+    ax5.annotate('mean={:.2f}'.format(mean_xis),(1, 1),xytext=(-5,-20),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+
+    ax6.annotate('median={:.2f}'.format(median_vps),(1, 1),xytext=(-5,-5),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+    ax6.annotate('mean={:.2f}'.format(mean_vps),(1, 1),xytext=(-5,-20),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+
+    ax7.annotate('median={:.2f}'.format(median_vsvs_b),(1, 1),xytext=(-5,-5),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+    ax7.annotate('mean={:.2f}'.format(mean_vsvs_b),(1, 1),xytext=(-5,-20),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+
+    ax8.annotate('median={:.2f}'.format(median_xis_b),(1, 1),xytext=(-5,-5),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+    ax8.annotate('mean={:.2f}'.format(mean_xis_b),(1, 1),xytext=(-5,-20),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+
+    ax9.annotate('median={:.2f}'.format(median_vps_b),(1, 1),xytext=(-5,-5),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+    ax9.annotate('mean={:.2f}'.format(mean_vps_b),(1, 1),xytext=(-5,-20),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+
+
+    ax1.set_title('$V_{SV}$ above '+str(dep_val)+'km')
+    ax1.set_xlabel('$V_{SV}$ (km/s)', fontsize=10)
+    ax1.set_ylabel('Norm. Probability',fontsize=10)
     ax1.set_xlim([vref_min,vref_max])
     ax1.set_ylim([0.0,1.0])
 
     ax2.set_title('Rad Anis. above '+str(dep_val)+'km')
-    ax2.set_xlabel(r'Xi',fontsize=10)
+    ax2.set_xlabel('$Xi$',fontsize=10)
     ax2.set_xlim([xi_min,xi_max])
 
-    ax3.set_title('Vp/Vs above '+str(dep_val)+'km')
+    ax3.set_title('$V_{PH}$ above '+str(dep_val)+'km')
     ax3.set_xlim([vp_min,vp_max])
-    ax3.set_xlabel(r'VpVs*(1+X)',fontsize=10)
+    ax3.set_xlabel('$V_{PH}$ (km/s)',fontsize=10)
 
-    ax4.set_title('S-vel at '+str(dep_val)+'km')
-    ax4.set_xlabel('Vsv (km/s)', fontsize=10)
-    ax4.set_ylabel('Probability',fontsize=10)
+    ax4.set_title('$V_{SV}$ at '+str(dep_val)+'km')
+    ax4.set_xlabel('$V_{SV}$ (km/s)', fontsize=10)
+    ax4.set_ylabel('Norm. Probability',fontsize=10)
     ax4.set_xlim([vref_min,vref_max])
     ax4.set_ylim([0.0,1.0])
 
     ax5.set_title('Rad Anis. at '+str(dep_val)+'km')
-    ax5.set_xlabel(r'Xi',fontsize=10)
+    ax5.set_xlabel('$Xi$',fontsize=10)
     ax5.set_xlim([xi_min,xi_max])
 
-    ax6.set_title('Vp/Vs at '+str(dep_val)+'km')
+    ax6.set_title('$V_{PH}$ at '+str(dep_val)+'km')
     ax6.set_xlim([vp_min,vp_max])
-    ax6.set_xlabel(r'VpVs*(1+X)',fontsize=10)
+    ax6.set_xlabel('$V_{PH}$ (km/s)',fontsize=10)
 
-    ax7.set_title('S-vel below '+str(dep_val)+'km')
-    ax7.set_xlabel('Vsv (km/s)', fontsize=10)
-    ax7.set_ylabel('Probability',fontsize=10)
+    ax7.set_title('$V_{SV}$ below '+str(dep_val)+'km')
+    ax7.set_xlabel('$V_{SV}$ (km/s)', fontsize=10)
+    ax7.set_ylabel('Norm. Probability',fontsize=10)
     ax7.set_xlim([vref_min,vref_max])
     ax7.set_ylim([0.0,1.0])
 
     ax8.set_title('Rad Anis. below '+str(dep_val)+'km')
-    ax8.set_xlabel(r'Xi',fontsize=10)
+    ax8.set_xlabel('$Xi$',fontsize=10)
     ax8.set_xlim([xi_min,xi_max])
 
-    ax9.set_title('Vp/Vs below '+str(dep_val)+'km')
+    ax9.set_title('$V_{PH}$ below '+str(dep_val)+'km')
     ax9.set_xlim([vp_min,vp_max])
-    ax9.set_xlabel(r'VpVs*(1+X)',fontsize=10)
-
-
-
+    ax9.set_xlabel('$V_{PH}$ (km/s)',fontsize=10)
 
     plt.subplots_adjust(wspace=0.35,hspace=0.35)
 
     # plt.show()
     plt.savefig(directory+'/PLOTS/'+'Hist_dist_'+str(dep_val)+'.png',dpi=200)
     plt.close()
-
 
     fig, (ax0, ax1, ax2, ax4, ax5) = plt.subplots(nrows=1, ncols=5, sharey=True,
                                         figsize=(12, 6))
@@ -396,22 +616,23 @@ if Posterior:
     vps=np.linspace(vp_min,vp_max,disv+1)
     depths=np.linspace(0,prof,disd+1)
 
-
     ax0.invert_yaxis()
     ax0.set_xlim([vref_min,vref_max])
-    ax0.set_xlabel('Vsv (km/s)', fontsize=10)
+    ax0.set_xlabel('$V_{SV}$ (km/s)', fontsize=10)
     ax0.set_title('S-wave velocity')
     ax1.set_ylim([prof,0.])
-    ax1.set_xlabel(r'xi',fontsize=10)
+    ax1.set_xlabel('$Xi$',fontsize=10)
     ax1.set_xlim([xi_min,xi_max])
     # ax1.set_xlim([0.5, 1.5])
     ax1.set_title('Radial Anisotropy')
     ax2.set_xlim([vp_min,vp_max])
     # ax2.set_xlim([-0.5,0.5])
     ax0.set_ylabel('Depth (km)',fontsize=10)
-<<<<<<< HEAD
-    ax2.set_xlabel(r'VpVs*(1+X)',fontsize=10)
-    ax2.set_title('Vp/Vs deviation')
+    # ax2.set_xlabel(r'VpVs*(1+X)',fontsize=10)
+    # ax2.set_title('Vp/Vs deviation')
+    ax2.set_xlabel('$V_{PH}$ (km/s)',fontsize=10)
+    ax2.set_title('P-wave velocity')
+
     ax1.pcolormesh(xis,depths,xid,cmap='viridis')
     ax0.pcolormesh(vsvs,depths,vsvd,cmap='viridis')
 
@@ -423,14 +644,14 @@ if Posterior:
     true_depth=[]
     true_vsv=[]
     true_xi=[]
-    true_vpvs=[]
+    true_vp=[]
     for line in lines[1:]:
         data=line.split()
         true_depth.append(float(data[0]))
         true_vsv.append(float(data[1]))
         try:
             true_xi.append(float(data[2]))
-            true_vpvs.append(float(data[3]))
+            true_vp.append(float(data[3]))
             # pass
         except:
             pass
@@ -439,51 +660,13 @@ if Posterior:
     true,=ax0.plot(true_vsv,true_depth,c='white',linewidth=1)
     try:
         ax1.plot(true_xi,true_depth,c='white',linewidth=1,alpha=1,marker='o',markersize=2,mfc='k')
-        # ax1.plot(true_xi,true_depth,c='magenta',linewidth=2,alpha=1,marker='o',markersize=2,mfc='k')
-        
-        ax2.plot(true_vpvs,true_depth,c='white',linewidth=1)
+        ax2.plot(true_vp,true_depth,c='white',linewidth=1)
+
     except:
         pass
 
     ax2.pcolormesh(vps,depths,vpd,cmap='viridis')
-=======
-    ax2.set_xlabel(r'Vp, (km/s)',fontsize=10)
-    ax2.set_title('P-wave velocity')
-    ax1.pcolormesh(xis,depths[:-1],xid[:-1,:],cmap='magma_r')
-    ax0.pcolormesh(vsvs,depths[:-1],vsvd[:-1,:],cmap='magma_r')
-    
-    if True_model:
-        # true model overlaid on the posterior (only for synthetic tests)
-        file=open(directory+'/'+'true_model_01.out','r')
-        lines=file.readlines()
-        file.close()
-    
-        true_depth=[]
-        true_vsv=[]
-        true_xi=[]
-        true_vpvs=[]
-        for line in lines:
-            data=line.split()
-            true_depth.append(float(data[0]))
-            true_vsv.append(float(data[1]))
-            try:
-                true_xi.append(float(data[2]))
-                true_vpvs.append(float(data[3]))
-            except:
-                pass
-    
-    
-        ax0.plot(true_vsv,true_depth,c='c',linewidth=3)
-        try:
-            ax1.plot(true_xi,true_depth,c='c',linewidth=3)
-            ax2.plot(true_vpvs,true_depth,c='c',linewidth=3)
-        except:
-            pass
-
-    ax2.pcolormesh(vps,depths[:-1],vpd[:-1,:],cmap='magma_r')
->>>>>>> joint
     plt.setp(ax2.get_yticklabels(), visible=False)
-
 
     # histogram of depths for layer boundaries
     file=open(directory+'/'+'Change_points.out','r')
@@ -510,20 +693,20 @@ if Posterior:
     depths=[]
     average_vs=[]
     average_xi=[]
-    average_vpvs=[]
+    average_vp=[]
     average_probani=[]
     for line in lines:
         data=line.split()
         depths.append(float(data[0]))
         average_vs.append(float(data[1]))
         average_xi.append(float(data[2]))
-        average_vpvs.append(float(data[3]))
+        average_vp.append(float(data[3]))
         average_probani.append(float(data[4]))
     
     # Average models in red.
     ave,=ax0.plot(average_vs,depths,c='r',linewidth=1)
     ax1.plot(average_xi,depths,c='r',linewidth=1)
-    ax2.plot(average_vpvs,depths,c='r',linewidth=1)
+    ax2.plot(average_vp,depths,c='r',linewidth=1)
     ax4.plot(average_probani,depths,c='k',linewidth=1)
     ax4.set_xlabel('Probability',fontsize=10)
     ax4.set_title('Anisotropy')
@@ -536,6 +719,250 @@ if Posterior:
 
     # plt.show()
     plt.savefig(directory+'/PLOTS/'+'Posterior.png',dpi=200)
+    plt.close()
+
+
+if Posterior2:
+
+
+    if os.path.isfile(directory+'/'+'Proc_Posterior.out'):
+        # Use the Output of Process_MCMC_output.py from transcale.
+        file=open(directory+'/'+'Proc_Posterior.out','r')
+    else:
+        # Use with Original Posterior output from Fortran
+        file=open(directory+'/'+'Posterior.out','r')
+
+    lines=file.readlines()
+
+    file.close()
+
+    nlines = len(lines)
+    data0=lines[0].split()
+    prof=float(data0[0])
+    disd=int(data0[1]) # Depth discretisation
+    dmax=float(data0[2])
+
+    burn_in=int(float(data0[3]))
+    nsample=int(float(data0[4]))
+    thinning=int(float(data0[5]))
+    cores=int(float(data0[6]))
+
+
+    [vref_min,vref_max,disv,width,xi_min,xi_max,vp_min,vp_max]=[float(i) for i in lines[1].split()]
+    disv=int(disv) # Velocity/aniso discretisation
+
+    vsvd=np.zeros((disd,disv))
+    xid=np.zeros((disd,disv))
+    vpd=np.zeros((disd,disv))
+
+    vsvs=np.linspace(vref_min,vref_max,disv)
+    xis=np.linspace(xi_min,xi_max,disv)
+    vps=np.linspace(vp_min,vp_max,disv)
+    depths=np.linspace(0,prof,disd)
+
+    i=0
+    j=0
+
+    for line in lines[2:]:
+        [vsvd[i,j],xid[i,j],vpd[i,j]]=[float(i) for i in line.split()]
+        j+=1
+        if j==disv:
+            j=0
+            i+=1
+
+    vsvd_means=[]; vsvd_medians=[]; vsvd_975=[]; vsvd_825=[]; vsvd_175=[]; vsvd_025=[]; vsvd_std=[]
+    xid_means=[]; xid_medians=[]; xid_975=[]; xid_825=[]; xid_175=[]; xid_025=[]; xid_std=[]
+    vpd_means=[]; vpd_medians=[]; vpd_975=[]; vpd_825=[]; vpd_175=[]; vpd_025=[]; vpd_std=[]
+
+    x_vals=[]; y_vals=[]; vsvd_vals=[]; xid_vals=[]; vpd_vals=[]
+    for i in range(np.shape(vsvd)[0]):
+        for j in range(np.shape(vsvd)[1]):
+            vsvd_vals.append(int(vsvd[i,j]))
+            xid_vals.append(int(vsvd[i,j]))
+            vpd_vals.append(int(vsvd[i,j]))
+            y_vals.append(depths[i])
+            x_vals.append(vsvs[j])
+
+    hist_vsvd, bins_y, bins_x=np.histogram2d(y_vals, x_vals, weights=vsvd_vals, bins=(len(depths),len(vsvs)))
+    hist_xid,  bins_y, bins_x=np.histogram2d(y_vals, x_vals, weights=xid_vals,  bins=(len(depths),len(xis)))
+    hist_vpd,  bins_y, bins_x=np.histogram2d(y_vals, x_vals, weights=vpd_vals,  bins=(len(depths),len(vps)))
+
+
+
+    for i in range(np.shape(hist_vsvd)[0]):
+        print('layer: '+str(i))
+        temp_vsvd=[]
+        temp_xid =[]
+        temp_vpd =[]
+        for j in range(np.shape(hist_vsvd)[1]):
+            val_vsvd=int(vsvd[i,j])
+            for k in range(0,val_vsvd):
+                temp_vsvd.append(vsvs[j])
+
+            val_xid=int(xid[i,j])
+            for k in range(0,val_xid):
+                temp_xid.append(xis[j])
+
+            val_vpd=int(vpd[i,j])
+            for k in range(0,val_vpd):
+                temp_vpd.append(vps[j])
+
+        # vsvd_means.append(np.round_(np.mean(temp_vsvd),4))
+        vsvd_medians.append(np.round_(np.median(temp_vsvd),4))
+        vsvd_975.append(np.round_(np.quantile(temp_vsvd, 0.975),4))
+        vsvd_825.append(np.round_(np.quantile(temp_vsvd, 0.825),4))
+        vsvd_175.append(np.round_(np.quantile(temp_vsvd, 0.175),4))
+        vsvd_025.append(np.round_(np.quantile(temp_vsvd, 0.025),4))
+        vsvd_std.append(np.round_(np.std(temp_vsvd),4))
+
+        # xid_means.append(np.round_(np.mean(temp_xid),4))
+        xid_medians.append(np.round_(np.median(temp_xid),4))
+        xid_975.append(np.round_(np.quantile(temp_xid, 0.975),4))
+        xid_825.append(np.round_(np.quantile(temp_xid, 0.825),4))
+        xid_175.append(np.round_(np.quantile(temp_xid, 0.175),4))
+        xid_025.append(np.round_(np.quantile(temp_xid, 0.025),4))
+        xid_std.append(np.round_(np.std(temp_xid),4))
+
+        # vpd_means.append(np.round_(np.mean(temp_vpd),4))
+        vpd_medians.append(np.round_(np.median(temp_vpd),4))
+        vpd_975.append(np.round_(np.quantile(temp_vpd, 0.975),4))
+        vpd_825.append(np.round_(np.quantile(temp_vpd, 0.825),4))
+        vpd_175.append(np.round_(np.quantile(temp_vpd, 0.175),4))
+        vpd_025.append(np.round_(np.quantile(temp_vpd, 0.025),4))
+        vpd_std.append(np.round_(np.std(temp_vpd),4))
+
+    fig, (ax0, ax1, ax2, ax4, ax5) = plt.subplots(nrows=1, ncols=5, sharey=True,
+                                        figsize=(12, 6))
+
+    # vsvs=np.linspace(vref_min,vref_max,disv+1)
+    # xis=np.linspace(xi_min,xi_max,disv+1)
+    # vps=np.linspace(vp_min,vp_max,disv+1)
+    # depths=np.linspace(0,prof,disd+1)
+
+    ax0.invert_yaxis()
+    ax0.set_xlim([vref_min,vref_max])
+    ax0.set_xlabel('$V_{SV}$ (km/s)', fontsize=10)
+    ax0.set_title('S-wave velocity')
+    ax1.set_ylim([prof,0.])
+    ax1.set_xlabel('$Xi$',fontsize=10)
+    ax1.set_xlim([xi_min,xi_max])
+    ax1.set_title('Radial Anisotropy')
+    ax2.set_xlim([vp_min,vp_max])
+    ax0.set_ylabel('Depth (km)',fontsize=10)
+    ax2.set_xlabel('$V_{PH}$ (km/s)',fontsize=10)
+    ax2.set_title('P-wave velocity')
+
+    # ax1.pcolormesh(xis,depths,xid,cmap='viridis')
+    # ax0.pcolormesh(vsvs,depths,vsvd,cmap='viridis')
+
+    ax0.fill_betweenx(depths,vsvd_025,vsvd_975,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.15)
+    ax0.fill_betweenx(depths,vsvd_175,vsvd_825,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.25)
+
+    ax1.fill_betweenx(depths,xid_025,xid_975,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.15)
+    ax1.fill_betweenx(depths,xid_175,xid_825,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.25)
+
+    ax2.fill_betweenx(depths,vpd_025,vpd_975,facecolor='darkgreen', rasterized=False, alpha=0.15)
+    ax2.fill_betweenx(depths,vpd_175,vpd_825,facecolor='darkgreen', rasterized=False, alpha=0.25)
+
+    # mean2,=ax0.plot(vsvd_means,depths,c='b',linewidth=1)
+    # ax1.plot(xid_means,depths,c='b',linewidth=1)
+    # ax2.plot(vpd_means,depths,c='b',linewidth=1)
+
+    median2,=ax0.plot(vsvd_medians,depths,c='b',linewidth=2)
+    ax1.plot(xid_medians,depths,c='b',linewidth=2)
+    ax2.plot(vpd_medians,depths,c='b',linewidth=2)
+
+    # true model overlaid on the posterior (only for synthetic tests)
+    file=open(directory+'/'+'true_model.out','r')
+    lines=file.readlines()
+    file.close()
+
+    true_depth=[]
+    true_vsv=[]
+    true_xi=[]
+    true_vp=[]
+    for line in lines[1:]:
+        data=line.split()
+        true_depth.append(float(data[0]))
+        true_vsv.append(float(data[1]))
+        try:
+            true_xi.append(float(data[2]))
+            true_vp.append(float(data[3]))
+            # pass
+        except:
+            pass
+
+    # True models in cyan.
+    true,=ax0.plot(true_vsv,true_depth,c='k',linewidth=1)
+    try:
+        ax1.plot(true_xi,true_depth,c='k',linewidth=1) # ,alpha=1,marker='o',markersize=2,mfc='k'
+        ax2.plot(true_vp,true_depth,c='k',linewidth=1)
+    except:
+        pass
+
+    # ax2.pcolormesh(vps,depths,vpd,cmap='viridis')
+    plt.setp(ax2.get_yticklabels(), visible=False)
+
+    # histogram of depths for layer boundaries
+    file=open(directory+'/'+'Change_points.out','r')
+    lines=file.readlines()
+    file.close()
+
+    change_depths=[]
+    change_hist=[]
+    for line in lines:
+        data=line.split()
+        change_depths.append(float(data[0]))
+        change_hist.append(float(data[1]))
+
+    ax5.plot(change_hist,change_depths)
+    ax5.set_title('Change Points')
+    ax5.set_xlabel('Frequency',fontsize=10)
+
+    # average model overlaid on the posterior (only for synthetic tests)
+    # and anisotropy probability
+    file=open(directory+'/'+'Average.out','r')
+    lines=file.readlines()
+    file.close()
+
+    depths=[]
+    average_vs=[]
+    average_xi=[]
+    average_vp=[]
+    average_probani=[]
+    for line in lines:
+        data=line.split()
+        depths.append(float(data[0]))
+        average_vs.append(float(data[1]))
+        average_xi.append(float(data[2]))
+        average_vp.append(float(data[3]))
+        average_probani.append(float(data[4]))
+    
+    # Average models in red.
+    mean,=ax0.plot(average_vs,depths,c='r',linewidth=2)
+    ax1.plot(average_xi,depths,c='r',linewidth=2)
+    ax2.plot(average_vp,depths,c='r',linewidth=2)
+    ax4.plot(average_probani,depths,c='k',linewidth=1)
+    ax4.set_xlabel('Probability',fontsize=10)
+    ax4.set_title('Anisotropy')
+
+    ax4.set_xlim([0,100])
+    # Make proxy artists to make the legend work
+    q95,=ax0.fill(np.NaN, np.NaN, 'r', alpha=0.15)
+    q65,=ax0.fill(np.NaN, np.NaN, 'r', alpha=0.25)
+
+    plt.legend([true, mean, median2, q95, (q95, q65)], ['true', 'mean', 'median', '95% mods.', '65% mods.'],loc='lower right')
+
+    ax0.annotate('(a)',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=10,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
+    ax1.annotate('(b)',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=10,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
+    ax2.annotate('(c)',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=10,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
+    ax4.annotate('(d)',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=10,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
+    ax5.annotate('(e)',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=10,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
+
+    fig.suptitle('Posterior and Averages')
+
+    # plt.show()
+    plt.savefig(directory+'/PLOTS/'+'Posterior2.png',dpi=300)
     plt.close()
 
 
@@ -879,7 +1306,7 @@ if Convergence:
 
     
     ################ acceptance rates for change in vsv (upper half) over time, for one core and average over all cores ###############
-    file=open(directory+'/'+'Convergence_vs1.out','r')
+    file=open(directory+'/'+'Convergence_vs.out','r')
     lines=file.readlines()
     file.close()
 
@@ -893,7 +1320,7 @@ if Convergence:
         convsv1_one.append(float(data[0]))
         convsv1.append(float(data[1]))
 
-    plt.figure('convergence_vs1')
+    plt.figure('convergence_vs')
     plt.title('Vsv Change Rate Convergence, upper half')
     plt.plot(convsv1_one[burn_in:],label='vsv change upper half, one core')
     plt.plot(convsv1[burn_in:],label='vsv change upper half, all cores')
@@ -902,38 +1329,39 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_vs1.png',dpi=200)
+    plt.savefig(directory+'/PLOTS/'+'Convergence_vs.png',dpi=200)
     plt.close()
     
     ################ acceptance rates for change in vsv (lower half) over time, for one core and average over all cores ###############
-    file=open(directory+'/'+'Convergence_vs2.out','r')
-    lines=file.readlines()
-    file.close()
+    if os.path.isfile(directory+'/'+'Convergence_vs2.out'):
+        file=open(directory+'/'+'Convergence_vs2.out','r')
+        lines=file.readlines()
+        file.close()
 
-    burn_in=int(lines[0].split()[0])
-    nsample=int(lines[0].split()[1])
+        burn_in=int(lines[0].split()[0])
+        nsample=int(lines[0].split()[1])
 
-    convsv2_one=[]
-    convsv2=[]
-    for line in lines[1:]:
-        data=line.split()
-        convsv2_one.append(float(data[0]))
-        convsv2.append(float(data[1]))
+        convsv2_one=[]
+        convsv2=[]
+        for line in lines[1:]:
+            data=line.split()
+            convsv2_one.append(float(data[0]))
+            convsv2.append(float(data[1]))
 
-    plt.figure('convergence_vs2')
-    plt.title('Vsv Change Rate Convergence, lower half')
-    plt.plot(convsv2_one[burn_in:],label='vsv change lower half, one core')
-    plt.plot(convsv2[burn_in:],label='vsv change lower half, all cores')
-    plt.xlabel('Iteration number')
-    plt.ylabel('XXX')
-    plt.xlim([0,nsample])
-    plt.legend()
-    # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_vs2.png',dpi=200)
-    plt.close()
+        plt.figure('convergence_vs2')
+        plt.title('Vsv Change Rate Convergence, lower half')
+        plt.plot(convsv2_one[burn_in:],label='vsv change lower half, one core')
+        plt.plot(convsv2[burn_in:],label='vsv change lower half, all cores')
+        plt.xlabel('Iteration number')
+        plt.ylabel('XXX')
+        plt.xlim([0,nsample])
+        plt.legend()
+        # plt.show()
+        plt.savefig(directory+'/PLOTS/'+'Convergence_vs2.png',dpi=200)
+        plt.close()
     
     ################ acceptance rates for change in depth (upper half) over time, for one core and average over all cores ###############
-    file=open(directory+'/'+'Convergence_dp1.out','r')
+    file=open(directory+'/'+'Convergence_dp.out','r')
     lines=file.readlines()
     file.close()
 
@@ -947,7 +1375,7 @@ if Convergence:
         condp1_one.append(float(data[0]))
         condp1.append(float(data[1]))
 
-    plt.figure('convergence_dp1')
+    plt.figure('convergence_dp')
     plt.title('Depth Change Rate Convergence, upper half')
     plt.plot(condp1_one[burn_in:],label='depth change upper half, one core')
     plt.plot(condp1[burn_in:],label='depth change upper half, all cores')
@@ -956,35 +1384,36 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_dp1.png',dpi=200)
+    plt.savefig(directory+'/PLOTS/'+'Convergence_dp.png',dpi=200)
     plt.close()
     
     ################ acceptance rates for change in depth (lower half) over time, for one core and average over all cores ###############
-    file=open(directory+'/'+'Convergence_dp2.out','r')
-    lines=file.readlines()
-    file.close()
+    if os.path.isfile(directory+'/'+'Convergence_dp2.out'):
+        file=open(directory+'/'+'Convergence_dp2.out','r')
+        lines=file.readlines()
+        file.close()
 
-    burn_in=int(lines[0].split()[0])
-    nsample=int(lines[0].split()[1])
+        burn_in=int(lines[0].split()[0])
+        nsample=int(lines[0].split()[1])
 
-    condp2_one=[]
-    condp2=[]
-    for line in lines[1:]:
-        data=line.split()
-        condp2_one.append(float(data[0]))
-        condp2.append(float(data[1]))
+        condp2_one=[]
+        condp2=[]
+        for line in lines[1:]:
+            data=line.split()
+            condp2_one.append(float(data[0]))
+            condp2.append(float(data[1]))
 
-    plt.figure('convergence_dp2')
-    plt.title('Depth Change Rate Convergence, lower half')
-    plt.plot(condp2_one[burn_in:],label='depth change lower half, one core')
-    plt.plot(condp2[burn_in:],label='depth change lower half, all cores')
-    plt.xlabel('Iteration number')
-    plt.ylabel('XXX')
-    plt.xlim([0,nsample])
-    plt.legend()
-    # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_dp2.png',dpi=200)
-    plt.close()
+        plt.figure('convergence_dp2')
+        plt.title('Depth Change Rate Convergence, lower half')
+        plt.plot(condp2_one[burn_in:],label='depth change lower half, one core')
+        plt.plot(condp2[burn_in:],label='depth change lower half, all cores')
+        plt.xlabel('Iteration number')
+        plt.ylabel('XXX')
+        plt.xlim([0,nsample])
+        plt.legend()
+        # plt.show()
+        plt.savefig(directory+'/PLOTS/'+'Convergence_dp2.png',dpi=200)
+        plt.close()
 
 
     if os.path.isfile(directory+'/'+'Convergence_sigma_PsPp.out'):
@@ -1199,3 +1628,400 @@ if PsPp_Fit:
         # plt.show()
         plt.savefig(directory+'/PLOTS/'+'PsPp_Fit.png',dpi=200)
         plt.close()
+
+
+if Corr_Hist:
+    if os.path.isfile(directory+'/'+'Posterior_corr_50.json'):
+        print('Posterior Correlation file present')
+        
+        with open(directory+'/'+'Posterior_corr_50.json') as data_file:
+            corrs = json.load(data_file)
+
+        nsample  = int(corrs['params_inversion']['nsample'])
+        thinning = int(corrs['params_inversion']['thinning'])
+        cores    = int(corrs['params_inversion']['cores'])
+        # print(nsample, thinning, cores)
+        # print(corrs['stack']['200']['50'].keys())
+
+        if not str(av_int) in corrs['nostack']:
+            print('Bad av_int supplied...')
+            print('Options [2] :     Averaging interval, 50,100,200')
+            print('Options [2] :    ',corrs['nostack'].keys())
+            exit('exiting....')
+        
+        if not p1_u_dep in corrs['nostack'][str(av_int)]['av_u_deps'] or not p2_u_dep in corrs['nostack'][str(av_int)]['av_u_deps']:
+            print('Bad upper layer depths supplied...')
+            print('Options [5/7] :     Parameter 1/2 av_u_dep: 100, 200 ....')
+            print('Options [2] :    ',corrs['nostack'][str(av_int)]['av_u_deps'])
+            exit('exiting....')
+
+        print('Plotting Corr hist for av_int: '+str(av_int)+', dh: '+str(dh)+', p1: '+str(p1)+' '+str(p1_u_dep)+'km, p2: '+str(p2)+' '+str(p2_u_dep)+'km')
+
+        # Script.py <dir> <av_int> <dis> <p1> <av_u_dep1> <p2> <av_u_dep2>
+
+        p1_u_dep_ind=np.where(np.array(corrs['nostack'][str(av_int)]['av_u_deps'])==float(p1_u_dep))[0][0]
+        p2_u_dep_ind=np.where(np.array(corrs['nostack'][str(av_int)]['av_u_deps'])==float(p2_u_dep))[0][0]
+
+        if p1 == 'vph':
+            # min_1=np.round_(float(corrs['params_inversion']['vpref_min']),2)
+            # max_1=np.round_(float(corrs['params_inversion']['vpref_max']),2)
+            min_1=np.round_(float(corrs['nostack'][str(av_int)]['av_vph_min'][p1_u_dep_ind]),2)
+            max_1=np.round_(float(corrs['nostack'][str(av_int)]['av_vph_max'][p1_u_dep_ind]),2)
+            p1_l='$V_{PH}$'
+
+        if p1 == 'vsv':
+            # min_1=np.round_(float(corrs['params_inversion']['vsref_min']),2)
+            # max_1=np.round_(float(corrs['params_inversion']['vsref_max']),2)
+            min_1=np.round_(float(corrs['nostack'][str(av_int)]['av_vsv_min'][p1_u_dep_ind]),2)
+            max_1=np.round_(float(corrs['nostack'][str(av_int)]['av_vsv_max'][p1_u_dep_ind]),2)
+
+            p1_l='$V_{SV}$'
+
+        if p2 == 'vsv':
+            # min_2=np.round_(float(corrs['params_inversion']['vsref_min']),2)
+            # max_2=np.round_(float(corrs['params_inversion']['vsref_max']),2)
+            min_2=np.round_(float(corrs['nostack'][str(av_int)]['av_vsv_min'][p2_u_dep_ind]),2)
+            max_2=np.round_(float(corrs['nostack'][str(av_int)]['av_vsv_max'][p2_u_dep_ind]),2)
+            p2_l='$V_{SV}$'
+
+        if p2 == 'xi':
+            min_2=np.round_(float(corrs['params_inversion']['xi_min']),2)
+            max_2=np.round_(float(corrs['params_inversion']['xi_max']),2)
+            p2_l='$Xi$'
+
+        p1_l_dep = p1_u_dep+av_int
+        p2_l_dep = p2_u_dep+av_int
+
+        corr_name='h_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)
+        p1_p2 = np.array(corrs['stack'][str(av_int)][str(dh)][str(corr_name)])
+
+        # Find max value.
+        max_loc_p1_p2=unravel_index(p1_p2.argmax(), p1_p2.shape)
+        # To remove the dominance of the isotropic layers.
+        print(max_loc_p1_p2)
+        # if p2 == 'xi':
+        #     p1_p2[:,max_loc_p1_p2[1]]=p1_p2[:,max_loc_p1_p2[1]-1]
+
+        vals = p1_p2 * (nsample/thinning) * cores
+
+        # print(min_1, max_1, min_2, max_2, np.shape(p1_p2))
+
+        # Define the x and y data 
+        y = np.sum(p1_p2,axis=1)
+        x = np.sum(p1_p2,axis=0)
+
+        y_array = np.linspace(min_1+(((max_1-min_1)/dh)/2), max_1-(((max_1-min_1)/dh)/2), dh) # Center of the bins
+        x_array = np.linspace(min_2+(((max_2-min_2)/dh)/2), max_2-(((max_2-min_2)/dh)/2), dh)
+
+        # print(x_array[dh//2-1])
+        # print(x_array)
+        # print(y_array)
+
+        # Generate the actual data to make stats easier
+        vals1=[]
+        vals2=[]
+
+        for i in range(0,dh):
+            for j in range(0,dh):
+                val=int(vals[i,j])
+                for k in range(0,val):
+                    vals2.append(x_array[j]) # vsv or xi
+                    vals1.append(y_array[i]) # vph or vsv
+
+        # Calculate stats
+        r,p=stats.pearsonr(vals1, vals2)
+
+        y_mean=np.round_(np.mean(vals1),4)
+        y_median=np.round_(np.median(vals1),4)
+        y_975=np.round_(np.quantile(vals1, 0.975),4)
+        y_825=np.round_(np.quantile(vals1, 0.825),4)
+        y_175=np.round_(np.quantile(vals1, 0.175),4)
+        y_025=np.round_(np.quantile(vals1, 0.025),4)
+        y_std=np.round_(np.std(vals1),4)
+        x_mean=np.round_(np.mean(vals2),4)
+        x_median=np.round_(np.median(vals2),4)
+        x_975=np.round_(np.quantile(vals2, 0.975),4)
+        x_825=np.round_(np.quantile(vals2, 0.825),4)
+        x_175=np.round_(np.quantile(vals2, 0.175),4)
+        x_025=np.round_(np.quantile(vals2, 0.025),4)
+        x_std=np.round_(np.std(vals2),4)
+
+        print('x_mean: '+str(x_mean)+', x_std: '+str(x_std)+', x_median: '+str(x_median)+', 2.5%: '+str(x_025)+', 97.5%: '+str(x_975))
+        print('y_mean: '+str(y_mean)+', y_std: '+str(y_std)+', y_median: '+str(y_median)+', 2.5%: '+str(y_025)+', 97.5%: '+str(y_975))
+        print('Pearson r: '+str(r))
+
+
+        # Normalize all max values to 1. Above all values sum to 1.0.
+        p1_p2=p1_p2/np.max(p1_p2[:,:])
+        x=x/np.max(x[:])
+        y=y/np.max(y[:])
+
+        # Set up your x and y labels
+        ylabel = str(p1_l)+' (km/s) '+str(int(p1_u_dep))+' - '+str(int(p1_l_dep))+' km'
+        if p2 == 'xi':
+            xlabel = str(p2_l)+' '+str(int(p2_u_dep))+' - '+str(int(p2_l_dep))+' km' 
+        else:
+            xlabel = str(p2_l)+' (km/s) '+str(int(p2_u_dep))+' - '+str(int(p2_l_dep))+' km' 
+        # Define the locations for the axes
+        left, width = 0.12, 0.55
+        bottom, height = 0.12, 0.55
+        bottom_h = left_h = left+width+0.05
+        
+        # Set up the geometry of the three plots
+        rect_corrxy = [left, bottom, width, height] # dimensions of temp plot
+        rect_histx = [left, bottom_h, width, 0.25] # dimensions of x-histogram
+        rect_histy = [left_h, bottom, 0.25, height] # dimensions of y-histogram
+        
+        # Set up the size of the figure
+        fig = plt.figure('Corr_hist', figsize=(10,9.5))
+        # plt.title('Correlation')
+
+        # Make the three plots
+        axCorr = fig.add_axes(rect_corrxy) # temperature plot
+        axHistx = fig.add_axes(rect_histx) # x histogram
+        axHisty = fig.add_axes(rect_histy) # y histogram
+        
+        # Remove the inner axes numbers of the histograms
+        nullfmt = NullFormatter()
+        axHistx.xaxis.set_major_formatter(nullfmt)
+        axHisty.yaxis.set_major_formatter(nullfmt)
+
+        # Set up default x and y limits
+        xlims = [0, dh]
+        ylims = [0, dh]
+            
+        # Find the min/max of the data
+        xmin = min(xlims)
+        xmax = max(xlims)
+        ymin = min(ylims)
+        ymax = max(ylims)
+        # print(xmin,xmax,ymin,ymax)
+
+
+        # option 1
+        # axCorr.imshow(p1_p2, extent=[ymin,ymax,xmin,xmax], aspect='auto',
+        #     interpolation='nearest', origin='lower')
+        # Option 2
+        # axCorr.contourf(p1_p2, extent=[ymin-1,ymax+1,xmin-1,xmax+1], origin='lower')
+        # Option 3
+        # x_vals=[]; y_vals=[]; z_vals=[]
+        # for i in range(0,dh):
+        #     for j in range(0,dh):
+        #         y_vals.append(y_array[i])
+        #         x_vals.append(x_array[j])
+        #         z_vals.append(int(vals[i,j]))
+        # hist, bins_y, bins_x=np.histogram2d(y_vals, x_vals, weights=z_vals, bins=(ymax,xmax))
+        # try:
+        #     probs=[0, 0.8, 0.90, 0.95, 0.98, 0.99, 0.995,0.998]
+        #     q = stats.mstats.mquantiles(hist,prob=probs)
+        #     m=axCorr.contourf(hist, extent=[ymin-1,ymax+1,xmin-1,xmax+1], origin='lower', levels=q, cmap='viridis')
+        # except:
+        #     try:
+        #         probs=[0, 0.85, 0.90, 0.95, 0.98, 0.99, 0.995,0.998]
+        #         q = stats.mstats.mquantiles(hist,prob=probs)
+        #         m=axCorr.contourf(hist, extent=[ymin-1,ymax+1,xmin-1,xmax+1], origin='lower', levels=q, cmap='viridis')
+        #     except:
+        #         try:
+        #             probs=[0, 0.90, 0.95, 0.98, 0.99, 0.995,0.998]
+        #             q = stats.mstats.mquantiles(hist,prob=probs)
+        #             m=axCorr.contourf(hist, extent=[ymin-1,ymax+1,xmin-1,xmax+1], origin='lower', levels=q, cmap='viridis')
+        #         except:
+        #             probs=[0, 0.95, 0.98, 0.99, 0.995,0.998]
+        #             q = stats.mstats.mquantiles(hist,prob=probs)
+        #             m=axCorr.contourf(hist, extent=[ymin-1,ymax+1,xmin-1,xmax+1], origin='lower', levels=q, cmap='viridis')
+
+        # axins1 = inset_axes(axCorr,
+        #             width="60%",  # width = 40% of parent_bbox width
+        #             height="5%",  # height : 5%
+        #             loc='lower right')
+        # cbar=plt.colorbar(m, cax=axins1,orientation="horizontal", ticks=q)
+        # cbar.ax.set_xticklabels(probs, fontsize=12, rotation=90, color='w')
+        # cbar.ax.set_title(label='Probability', color='w')
+
+        # axins1.xaxis.set_ticks_position("top")
+        # axins1.xaxis.set_label_position("top")
+        axCorr.plot(max_loc_p1_p2[1]+0.5,max_loc_p1_p2[0]+0.5,c='r',marker='x',markersize=5,linewidth=1, alpha=1) # centered using +0.5
+
+        # Option 4
+
+        xmin=np.min(vals2)
+        xmax=np.max(vals2)
+        ymax=np.max(vals1)
+        ymin=np.min(vals1)
+        print('Here.... #1')
+        values = np.vstack([vals2,vals1])
+        kernel = stats.gaussian_kde(values)
+        print('Calculated KDE  #2')
+        interval=50
+        X, Y = np.mgrid[min_2:max_2:50j, min_1:max_1:50j]
+        positions = np.vstack([X.ravel(), Y.ravel()])
+        print('Calculated meshgrid.... #3')
+        Z = np.reshape((1/np.size(positions))*kernel.evaluate(positions), X.shape)
+        max_Z=unravel_index(Z.argmax(), Z.shape)
+        print('Re-shaped Z-array.... #4')
+        m=axCorr.contourf(X,Y, Z, extent=[xmin, xmax, ymin, ymax], cmap='viridis',levels=np.linspace(0,np.max(Z),25))
+        print('Contoured Z-array.... #5')
+        print(X[max_Z],Z[max_Z])
+        axCorr.plot(X[max_Z],Y[max_Z],c='r',marker='x',markersize=5,linewidth=1, alpha=1) # centered using +0.5
+
+        axCorr.set_xlim([min_2, max_2])
+        axCorr.set_ylim([min_1, max_1])
+
+        xlabels=[ str(i) for i in np.linspace(min_2, max_2,3)]
+        ylabels=[ str(i) for i in np.linspace(min_1, max_1,3)]
+
+
+        axCorr.xaxis.set_ticks(np.linspace(min_2, max_2,3))
+        axCorr.xaxis.set_ticklabels(xlabels, fontsize=12)
+        axCorr.yaxis.set_ticks(np.linspace(min_1, max_1,3))
+        axCorr.yaxis.set_ticklabels(ylabels, fontsize=12)
+
+
+        axins1 = inset_axes(axCorr,
+                    width="40%",  # width = 40% of parent_bbox width
+                    height="5%",  # height : 5%
+                    loc='lower right')
+        cbar=plt.colorbar(m, cax=axins1, orientation="horizontal")
+        cbar.ax.locator_params(nbins=5)
+        # COLORBAR
+        fg_color = 'white'
+        # set colorbar tick color
+        cbar.ax.xaxis.set_tick_params(color=fg_color)
+        # set colorbar edgecolor 
+        cbar.outline.set_edgecolor(fg_color)
+        # set colorbar ticklabels
+        cbar.ax.xaxis.set_tick_params(color=fg_color, labelcolor=fg_color, labelsize=14)
+        cbar.ax.set_title(label='KDE - Probability', color=fg_color, fontsize=14)
+
+        axins1.xaxis.set_ticks_position("top")
+        axins1.xaxis.set_label_position("top")
+
+        axCorr.plot([min_2, max_2], [min_1, max_1], '--g', linewidth=1) # 
+
+        #Plot the axes labels
+        axCorr.set_xlabel(xlabel,fontsize=16)
+        axCorr.set_ylabel(ylabel,fontsize=16)
+
+        # xlabels=[ str(i) for i in np.linspace(min_2, max_2,5)]
+        # ylabels=[ str(i) for i in np.linspace(min_1, max_1,5)]
+        # axCorr.xaxis.set_ticks(np.linspace(0, dh, 5))
+        # axCorr.xaxis.set_ticklabels(xlabels, fontsize=12)
+        # axCorr.yaxis.set_ticks(np.linspace(0, dh, 5))
+        # axCorr.yaxis.set_ticklabels(ylabels, fontsize=12)
+        # axCorr.set_xlim( 0, dh )
+        # axCorr.set_ylim( 0, dh )
+        # This works if it is 100 but not if 200, or 50?
+        x_pos=np.linspace(0.5,len(x)-0.5, len(x))
+        y_pos=np.linspace(0.5,len(y)-0.5, len(y))
+        # # #Plot the histograms
+
+        # Interpolate for a smooth curve and continuous plotting using fill-between
+        int_arr=np.linspace(0,len(x), 10000)
+        x_int=np.interp(int_arr,x_pos,x)
+        y_int=np.interp(int_arr,y_pos,y)
+        axHistx.plot(int_arr,x_int, 'b-')
+        axHisty.plot(y_int,int_arr, 'r-')
+
+        # #Set up the histogram limits
+        axHistx.set_xlim( 0, dh )
+        axHistx.set_ylim( 0, 1 )
+
+        axHisty.set_ylim( 0, dh )
+        axHisty.set_xlim( 0, 1 )
+
+        axHistx.fill_between(int_arr,x_int,0, where=x_int >= 0,facecolor=[0.0, 0., 1.0], rasterized=False, alpha=0.1)
+        axHisty.fill_between(y_int,int_arr,0, where=y_int >= 0,facecolor=[1.0, 0., 0.], rasterized=False, alpha=0.1)
+
+        # Calculate the position of the statistics
+        x_mean_pos=(x_mean-min_2)/(max_2-min_2)*dh
+        x_std_pos=(x_std)/(max_2-min_2)*dh
+        x_median_pos=(x_median-min_2)/(max_2-min_2)*dh
+        x_025_pos=(x_025-min_2)/(max_2-min_2)*dh
+        x_175_pos=(x_175-min_2)/(max_2-min_2)*dh
+        x_825_pos=(x_825-min_2)/(max_2-min_2)*dh
+        x_975_pos=(x_975-min_2)/(max_2-min_2)*dh
+
+
+        y_mean_pos=(y_mean-min_1)/(max_1-min_1)*dh
+        y_std_pos=(y_std)/(max_1-min_1)*dh
+        y_median_pos=(y_median-min_1)/(max_1-min_1)*dh
+        y_025_pos=(y_025-min_1)/(max_1-min_1)*dh
+        y_175_pos=(y_175-min_1)/(max_1-min_1)*dh
+        y_825_pos=(y_825-min_1)/(max_1-min_1)*dh
+        y_975_pos=(y_975-min_1)/(max_1-min_1)*dh
+
+        ############### Lets add some labels here!!!!
+
+        axCorr.annotate('(a)',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=12,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
+        axHistx.annotate('(b)',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=12,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
+        axHisty.annotate('(c)',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=12,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
+
+        axCorr.annotate('r={:.2f}'.format(r),(1, 1),xytext=(-5,-5),xycoords='axes fraction',fontsize=12,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
+
+        axHistx.annotate('-- median={:.2f}'.format(x_median),(1, 1),xytext=(-5,-5),xycoords='axes fraction',fontsize=12,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+        axHistx.annotate('- mean={:.2f}'.format(x_mean),(1, 1),xytext=(-5,-20),xycoords='axes fraction',fontsize=12,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+        # axHistx.annotate('std={:.2f}'.format(x_std),(1, 1),xytext=(-5,-35),xycoords='axes fraction',fontsize=12,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+
+        axHisty.annotate('-- median={:.2f}'.format(y_median),(1, 1),xytext=(-5,-5),xycoords='axes fraction',fontsize=12,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+        axHisty.annotate('- mean={:.2f}'.format(y_mean),(1, 1),xytext=(-5,-20),xycoords='axes fraction',fontsize=12,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+        # axHisty.annotate('std={:.2f}'.format(y_std),(1, 1),xytext=(-5,-35),xycoords='axes fraction',fontsize=12,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+
+        # Plot mean and std on the plots.
+        axHistx.plot([x_mean_pos,x_mean_pos],[0, 1],c='b',linewidth=1, alpha=1)
+        axHistx.plot([x_median_pos,x_median_pos],[0, 1],c='b', linestyle='--', linewidth=1, alpha=1)
+
+        # For 95% quantile
+        a=x_025_pos<=int_arr
+        b=x_975_pos>=int_arr
+        c=a==b
+        axHistx.fill_between(int_arr,x_int,0, where=c,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.1)
+        # For 65% quantile
+        a=x_175_pos<=int_arr
+        b=x_825_pos>=int_arr
+        c=a==b
+        axHistx.fill_between(int_arr,x_int,0, where=c,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.1)
+
+        axHisty.plot([0, 1],[y_mean_pos,y_mean_pos],c='r',linewidth=1, alpha=1)
+        axHisty.plot([0, 1],[y_median_pos,y_median_pos],c='r', linestyle='--', linewidth=1, alpha=1)
+
+        # For 95% quantile
+        a=y_025_pos<=int_arr
+        b=y_975_pos>=int_arr
+        c=a==b
+        axHisty.fill_betweenx(int_arr,0,y_int, where=c,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.1)
+        # For 65% quantile
+        a=y_175_pos<=int_arr
+        b=y_825_pos>=int_arr
+        c=a==b
+        axHisty.fill_betweenx(int_arr,0,y_int, where=c,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.1)
+
+
+        #Make the tickmarks pretty
+        ticklabels = axHistx.get_yticklabels()
+        for label in ticklabels:
+            label.set_fontsize(12)
+            label.set_family('sans-serif')
+        
+        #Make the tickmarks pretty
+        ticklabels = axHisty.get_xticklabels()
+        for label in ticklabels:
+            label.set_fontsize(12)
+            label.set_family('sans-serif')
+        
+        # #Cool trick that changes the number of tickmarks for the histogram axes
+        axHisty.xaxis.set_major_locator(LinearLocator(3))
+        axHistx.yaxis.set_major_locator(LinearLocator(3))
+        axHisty.yaxis.set_major_locator(LinearLocator(5))
+        axHistx.xaxis.set_major_locator(LinearLocator(5))
+
+
+        axCorr.yaxis.set_major_locator(LinearLocator(5))
+        axCorr.xaxis.set_major_locator(LinearLocator(5))
+
+        # plt.show()
+        plt.savefig(directory+'/PLOTS/'+'Corr_av_'+str(av_int)+'_dh_'+str(dh)+'_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)+'.png',dpi=200)
+        plt.close()
+
+
+        # 
+
