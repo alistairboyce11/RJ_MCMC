@@ -24,13 +24,18 @@ program RJ_MCMC
     ! Parameters of the Markov chain
     !-----------------------------------------
 
-
+    ! 0 let Vp Free, 1 Scale Vp, 2 Fix Vp to ref.
+    integer, parameter :: vp_flag = 1                  
+    ! scaling parameter for vph in voro when vp_flag=1
+    ! dvp=dvs*vp_scale, when vp_scale<=1.0
+    ! For S40RTS scaling dvp = dvs * 1.0/(depth/2891.0+2.0), when vp_scale>1.0
+    real, parameter :: vp_scale = 2.0                    
 
     character (len=*), parameter :: dirname = 'OUT_TEST' ! This is where output info files are saved and input data files are taken.
     character*8, parameter :: storename = 'STORFFC1'     ! This is where output models are saved
-    integer, parameter :: burn_in = 200000 ! 55000 !Burn-in period
-    integer, parameter :: nsample = 200000 ! 50000!Post burn-in
-    integer, parameter :: thin = 50    !Thinning of the chain 
+    integer, parameter :: burn_in = 0!200000 ! 55000 !Burn-in period
+    integer, parameter :: nsample = 2000!00 ! 50000!Post burn-in
+    integer, parameter :: thin = 2!50    !Thinning of the chain 
 
     integer, parameter :: Scratch = 1     ! 0: Start from Stored model 1: Start from scratch
     integer, parameter :: store = 999999999    !Store models every "store" iteration. 
@@ -77,7 +82,7 @@ program RJ_MCMC
     ! Parameters for Displaying results 
     !-------------------------------------------- 
 
-    integer, parameter :: display = 1000 ! display results in OUT/mpi.out 
+    integer, parameter :: display = 100 ! display results in OUT/mpi.out 
     !every display samples
 
      !discretezation for the posterior distribution.
@@ -106,7 +111,7 @@ program RJ_MCMC
 
     !****************************************************************
 
-    real , EXTERNAL    ::    gasdev,ran3,interp ! Functions for random variables and interpolation.
+    real , EXTERNAL    ::    gasdev,ran3,interp, vp_scale_S40 ! Functions for random variables and interpolation.
     real log, sqrt
 
     integer i,ii,sample,ind,th,ount,k ! various indices
@@ -187,7 +192,6 @@ program RJ_MCMC
     logical :: stuck
     integer :: nharm_R,nharm_L,iharm
     real :: dummy_d_obsdcR(ndatadmax), dummy_d_obsdcL(ndatadmax)
-    real :: lat,lon
 
     ! For saving all models
     integer th_all
@@ -198,12 +202,10 @@ program RJ_MCMC
     ! todo: implement a test with raylquo
 1000 format(I4)
 
-
     !***********************************************************************
 
     CALL cpu_time(t1)  !Tic. start counting time 
  
-
     !Start Parralelization of the code. From now on, the code is run on each
     !processor independently, with ra = the number of the proc.
 
@@ -315,10 +317,10 @@ program RJ_MCMC
     end do
     j=j-1
     
-    vsref_min=minval(model_ref(j:nptref,4)*(1-width)) ! setting min/max velocities for writing later
+    vsref_min=minval(model_ref(j:nptref,4)*(1-width)) ! setting min/max vsv velocities for writing later
     vsref_max=maxval(model_ref(j:nptref,4)*(1+width))
     
-    vpref_min=minval(model_ref(j:nptref,7)*(1-vp_max)) ! setting min/max velocities for writing later
+    vpref_min=minval(model_ref(j:nptref,7)*(1-vp_max)) ! setting min/max vph velocities for writing later
     vpref_max=maxval(model_ref(j:nptref,7)*(1+vp_max))
 
     ! vpref_min=minval(model_ref(j:nptref,4)*vpvs*(1+vp_min/100.)*(1-width)) 
@@ -328,12 +330,12 @@ program RJ_MCMC
     ! Add / remove overtones as necessary.
     if (testing) then !!!!!!!testing: create synthetic model
         write(*,*)'testing'
-      
+    
 !########################################################################################################
 
         ! GET SYNTH SWD DATA ---------------------------------------------------------------- 
         nlims_cur=1
-        open(65,file='./Durand_data_raw_fund.in',status='old')! 65: name of the opened file in memory (unit identifier)
+        open(65,file='./Durand_data_raw.in',status='old')! 65: name of the opened file in memory (unit identifier)
         read(65,*,IOSTAT=io)ndatad_R ! number of Rayleigh modes
         read(65,*,IOSTAT=io)nharm_R ! number of harmonics
 
@@ -395,7 +397,21 @@ program RJ_MCMC
         voro(1,3)=-1   !0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
         voro(1,4)=0.0  !vph=vph_prem*(1+voro(i,4))
         npt=npt+1
-        do i=2,23
+        do i=2,3
+            voro(i,1)=30*(i-1) !depth of interface
+            voro(i,2)=0.0    !0.1*(-1)**i  !vsv=vsv_prem*(1+voro(i,2))
+            voro(i,3)=-1    !0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
+            voro(i,4)=0.0   !vph=vph_prem*(1+voro(i,4))
+            npt=npt+1
+        end do
+        do i=4,8
+            voro(i,1)=30*(i-1) !depth of interface
+            voro(i,2)=0.0    !0.1*(-1)**i  !vsv=vsv_prem*(1+voro(i,2))
+            voro(i,3)=-1    !0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
+            voro(i,4)=-0.3   !vph=vph_prem*(1+voro(i,4))
+            npt=npt+1
+        end do
+        do i=9,23
             voro(i,1)=30*(i-1) !depth of interface
             voro(i,2)=0.0    !0.1*(-1)**i  !vsv=vsv_prem*(1+voro(i,2))
             voro(i,3)=-1    !0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
@@ -483,6 +499,12 @@ program RJ_MCMC
 
         
         ! write synthetic model into a file
+        open(64,file=dirname//'/true_voro_model.out',status='replace')
+        do i=1,npt
+            write(64,*)voro(i,1),voro(i,2),voro(i,3),voro(i,4)
+        enddo
+        close(64)
+
         open(65,file=dirname//'/true_model.out',status='replace')
         do i=1,nptfinal
             write(65,*)(rearth-r(i))/1000,vsv(i),xi(i),vph(i)
@@ -507,7 +529,6 @@ program RJ_MCMC
             enddo
             nlims_cur=nlims_R(2,k)+1
         enddo
-        
         
         nlims_cur=1
         read(65,*,IOSTAT=io)ndatad_L ! number of Love modes
@@ -562,7 +583,6 @@ program RJ_MCMC
     ! Initial number of cells
     !------------------------------------
 
-
     j=0
     tes=.false.
     do while(.not.tes)
@@ -581,7 +601,24 @@ program RJ_MCMC
             else
                 voro(i,3)= -1
             endif
-            voro(i,4)= vp_min+(vp_max-vp_min)*ran3(ra)
+
+            if (vp_flag==0) then
+                ! Vp Free
+                voro(i,4) = vp_min+(vp_max-vp_min)*ran3(ra)
+            elseif (vp_flag==1) then
+                ! Vp scaled
+                if (vp_scale.gt.1.0) then
+                    voro(i,4) = voro(i,2) * vp_scale_S40(voro(i,1))
+                else
+                    voro(i,4) = voro(i,2) * vp_scale
+                endif
+            elseif (vp_flag==2) then
+                ! Vp Fixed to ref
+                voro(i,4) = 0.0
+            end if
+
+
+            
         enddo
 !         open(65,file=dirname//'/stuck_039.out',status='old')
 !         read(65,*,IOSTAT=io)npt
@@ -746,9 +783,20 @@ program RJ_MCMC
         ount=ount+1
         malayv=malay
         if (mod(ount,every)==0) then ! check regularly if acceptance rates are in an acceptable range, else change proposal width.
-        
-            if ((Ac_vp/(Pr_vp+1))>0.54) p_vp=p_vp*(1+perturb)! if not increase width of proposition density
-            if ((Ac_vp/(Pr_vp+1))<0.34) p_vp=p_vp*(1-perturb)! or decrease it
+            
+            if (vp_flag==0) then
+                ! Vp Free
+                if ((Ac_vp/(Pr_vp+1))>0.54) p_vp=p_vp*(1+perturb)! if not increase width of proposition density
+                if ((Ac_vp/(Pr_vp+1))<0.34) p_vp=p_vp*(1-perturb)! or decrease it
+            elseif (vp_flag==1) then
+                ! Vp scaled
+                p_vp=p_vp
+            elseif (vp_flag==2) then
+                ! Vp Fixed to ref
+                p_vp=p_vp
+            end if
+            
+            
             if ((Acxi/(Prxi+1))>0.54) pxi=pxi*(1+perturb)
             if ((Acxi/(Prxi+1))<0.34) pxi=pxi*(1-perturb)
             if ((Acnd_R/(Prnd_R+1))>0.54) pAd_R=pAd_R*(1+perturb) ! for rayleigh waves
@@ -780,48 +828,67 @@ program RJ_MCMC
                 
                 
                 sigma_count=sigma_count+1
+                if (vp_flag==0) then
+                    ! Vp Free
+                    if ((AcB/PrB)>Ar_birth_old) then! Going in the right direction
 
-                if ((AcB/PrB)>Ar_birth_old) then! Going in the right direction
+                        if (mod(int(sigma_count/switch_sigma),2)==0) then
+                            if (sigmav>sigmav_old) then !Going up
+                                sigmav_new=sigmav*(1+perturb)
+                            else !Going down
+                                sigmav_new=sigmav*(1-perturb)
+                            endif
+                            sigmavp_new=sigmavp
+                        else
+                            ! sigmavp
+                            if (sigmavp>sigmavp_old) then !Going up
+                                sigmavp_new=sigmavp*(1+perturb)
+                            else !Going down
+                                sigmavp_new=sigmavp*(1-perturb)
+                            endif
+                            sigmav_new=sigmav
+                        endif
 
-                    if (mod(int(sigma_count/switch_sigma),2)==0) then
+
+                    else ! Going in the wrong direction
+
+                        if (mod(int(sigma_count/switch_sigma),2)==0) then
+                            if (sigmav>sigmav_old) then !Going up
+                                sigmav_new=sigmav*(1-perturb)
+                            else
+                                sigmav_new=sigmav*(1+perturb)
+                            endif
+                            sigmavp_new=sigmavp
+
+                        else
+                            ! sigmavp
+                            if (sigmavp>sigmavp_old) then !Going up
+                                sigmavp_new=sigmavp*(1-perturb)
+                            else
+                                sigmavp_new=sigmavp*(1+perturb)
+                            endif
+                            sigmav_new=sigmav
+                        endif
+
+                    endif
+             
+                else
+                    if ((AcB/PrB)>Ar_birth_old) then! Going in the right direction
                         if (sigmav>sigmav_old) then !Going up
                             sigmav_new=sigmav*(1+perturb)
                         else !Going down
                             sigmav_new=sigmav*(1-perturb)
                         endif
-                        sigmavp_new=sigmavp
-                    else
-                        ! sigmavp
-                        if (sigmavp>sigmavp_old) then !Going up
-                            sigmavp_new=sigmavp*(1+perturb)
-                        else !Going down
-                            sigmavp_new=sigmavp*(1-perturb)
-                        endif
-                        sigmav_new=sigmav
-                    endif
-
-
-                else ! Going in the wrong direction
-
-                    if (mod(int(sigma_count/switch_sigma),2)==0) then
+                    else ! Going in the wrong direction
                         if (sigmav>sigmav_old) then !Going up
                             sigmav_new=sigmav*(1-perturb)
                         else
                             sigmav_new=sigmav*(1+perturb)
                         endif
-                        sigmavp_new=sigmavp
-
-                    else
-                        ! sigmavp
-                        if (sigmavp>sigmavp_old) then !Going up
-                            sigmavp_new=sigmavp*(1-perturb)
-                        else
-                            sigmavp_new=sigmavp*(1+perturb)
-                        endif
-                        sigmav_new=sigmav
                     endif
-
+                    sigmavp_new=sigmavp
                 endif
+
                 !write(*,*)sigmav_new
                 !write(*,*)
                 sigmav_old=sigmav
@@ -837,16 +904,23 @@ program RJ_MCMC
                 AcD=0
             endif
             
-            if ((Ac_vp/(Pr_vp+1))<0.01) then 
-                write(filenamemax,"('/stuck_',I3.3,'.out')") rank    
-                open(56,file=dirname//filenamemax,status='replace')
-                write(56,*) npt
-                do i=1,npt
-                    write(56,*)voro(i,1),voro(i,2),voro(i,3),voro(i,4)
-                enddo
-                close(56)
-                stuck=.true.
-            endif
+            if (vp_flag==0) then
+                ! Vp Free
+                if ((Ac_vp/(Pr_vp+1))<0.01) then 
+                    write(filenamemax,"('/stuck_',I3.3,'.out')") rank    
+                    open(56,file=dirname//filenamemax,status='replace')
+                    write(56,*) npt
+                    do i=1,npt
+                        write(56,*)voro(i,1),voro(i,2),voro(i,3),voro(i,4)
+                    enddo
+                    close(56)
+                    stuck=.true.
+                endif
+            end if
+
+
+
+
             
             !-----------------------------------------------
 
@@ -882,8 +956,17 @@ program RJ_MCMC
         Ad_R_prop = Ad_R
         Ad_L_prop = Ad_L
         
+        ! Determine the random value used in proposals - need tos change to account for Vp.
+        
+        if (vp_flag==0) then
+            ! Vp Free
+            u=ran3(ra) * 1.0
+        elseif ((vp_flag==1).or.(vp_flag==2)) then
+            ! Vp scaled or Fixed to ref
+            u=ran3(ra) * 0.9 ! We don't make a Vp change proposal in this case.
+        end if
 
-        u=ran3(ra)
+
         ind=1
         out=1 ! indicates if change is acceptable, i. e. not out of bounds etc.
         move=.false.
@@ -918,7 +1001,6 @@ program RJ_MCMC
             Prxi=Prxi+1 !increase counter to calculate acceptance rates
             ani=.true.
             if (npt_ani.ne.0) then
-                !write(*,*)'changing ani'
                 ! Choose randomly an anisotropic cell among the npt_ani possibilities
                 ind2 = ceiling(ran3(ra)*(npt_ani))
                 if (ind2==0) ind2=1 !number of the anisotropic cell
@@ -941,61 +1023,28 @@ program RJ_MCMC
                 if ((voro_prop(ind,3)<=xi_min).or.(voro_prop(ind,3)>=xi_max)) then
                     out=0
                 endif
-                !if (out==0) then 
-                !    write(*,*)'ani change failed'
-                !else 
-                !    write(*,*)'ani change succeeded'
+
             else
                 out=0
             endif
-        elseif (u<0.2) then !change vp --------------------------------------------
-            change_vp=.true.
-            !write(*,*)'changing vp'
-                
-            ! Choose a random cell
-            ind=ceiling(ran3(ra)*npt)
-            if (ind==0) ind=1
-            
-            Pr_vp=Pr_vp+1
-            if (ind>npt) then
-                out=0
-            else
-                voro_prop(ind,4)=voro(ind,4)+gasdev(ra)*p_vp
 
-                !Check if oustide bounds of prior
-                if ((voro_prop(ind,4)<=vp_min).or.(voro_prop(ind,4)>=vp_max)) out=0
-                
-            endif     
-            !if (out==0) then 
-            !    write(*,*)'vp change failed'
-            !else 
-            !    write(*,*)'vp change succeeded'
-        elseif (u<0.3) then !change position--------------------------------------------
+        elseif (u<0.2) then !change position--------------------------------------------
             move=.true.
 
             ind=1+ceiling(ran3(ra)*(npt-1))
             if (ind==1) ind=2
             PrP=PrP+1
             voro_prop(ind,1)=voro(ind,1)+gasdev(ra)*pd1
-            !if (ount.GT.burn_in) then 
-            ! if (voro(ind,1)<(d_max/2)) then
-            !     PrP(1)=PrP(1)+1
-            !     voro_prop(ind,1)=voro(ind,1)+gasdev(ra)*pd1
-            ! else
-            !     PrP(2)=PrP(2)+1
-            !     voro_prop(ind,1)=voro(ind,1)+gasdev(ra)*pd2
-            ! endif
-            !endif
  
             if ((voro_prop(ind,1)<=d_min).or.(voro_prop(ind,1)>=d_max)) then
                 out=0
             endif
-            ! Check prior on velocity when moving cell location.
-            if ((voro_prop(ind,2)<=-width).or.(voro_prop(ind,2)>=width)) then
-                out=0
-            endif
- 
-        elseif (u<0.4) then ! Change noise parameter for rayleigh waves
+            ! Check prior on velocity when moving cell location - this is not necessary so comment...
+            ! if ((voro_prop(ind,2)<=-width).or.(voro_prop(ind,2)>=width)) then
+            !     out=0
+            ! endif
+
+        elseif (u<0.3) then ! Change noise parameter for rayleigh waves
             noisd_R=.true.
             Prnd_R = Prnd_R + 1
             Ad_R_prop = Ad_R+gasdev(ra)*pAd_R
@@ -1003,7 +1052,7 @@ program RJ_MCMC
             if ((Ad_R_prop<=Ad_R_min).or.(Ad_R_prop>=Ad_R_max)) then
                 out=0
             endif
-        elseif (u<0.5) then ! Change noise parameter for love waves
+        elseif (u<0.4) then ! Change noise parameter for love waves
             noisd_L=.true.
             Prnd_L = Prnd_L + 1
             Ad_L_prop = Ad_L+gasdev(ra)*pAd_L
@@ -1012,7 +1061,7 @@ program RJ_MCMC
                 out=0
             endif         
         
-        elseif (u<0.6) then ! change vsv-----------------------------------
+        elseif (u<0.5) then ! change vsv-----------------------------------
             
             value=.true.
             ind=ceiling(ran3(ra)*npt)
@@ -1025,23 +1074,36 @@ program RJ_MCMC
             
             PrV=PrV+1
             voro_prop(ind,2)=voro(ind,2)+gasdev(ra)*pv1
-
-            ! if (voro(ind,1)<(d_max/2)) then
-            !     PrV(1)=PrV(1)+1
-            !     voro_prop(ind,2)=voro(ind,2)+gasdev(ra)*pv1
-            ! else
-            !     PrV(2)=PrV(2)+1
-            !     voro_prop(ind,2)=voro(ind,2)+gasdev(ra)*pv2
-            ! endif
-
             
-            !Check if oustide bounds of prior, width relates to vsv.
+            if (vp_flag==0) then
+                ! Vp Free
+                voro_prop(ind,4) = voro_prop(ind,4)
+            elseif (vp_flag==1) then
+                ! Vp scaled
+                if (vp_scale.gt.1.0) then
+                    voro_prop(ind,4) = voro_prop(ind,2) * vp_scale_S40(voro_prop(ind,1))
+                else
+                    voro_prop(ind,4) = voro_prop(ind,2) * vp_scale
+                endif
+
+            elseif (vp_flag==2) then
+                ! Vp Fixed to ref
+                voro_prop(ind,4) = 0.0
+            end if
+
+
+            !Check if vsv oustide bounds of prior, width relates to vsv.
             if ((voro_prop(ind,2)<=-width).or.(voro_prop(ind,2)>=width)) then
+                out=0
+            endif
+            !Check if scaled vph oustide bounds of prior - should not happen.
+            if ((voro_prop(ind,4)<=vp_min).or.(voro_prop(ind,4)>=vp_max)) then
                 out=0
             endif
 
 
-        elseif (u<0.7) then !Birth of an isotropic cell -------------------------------------
+
+        elseif (u<0.6) then !Birth of an isotropic cell -------------------------------------
             birth = .true.
             PrB = PrB + 1
             npt_prop = npt + 1
@@ -1052,15 +1114,28 @@ program RJ_MCMC
                 call whichcell_d(voro_prop(npt_prop,1),voro,npt,ind)!
 
                 voro_prop(npt_prop,2) = voro(ind,2)+gasdev(ra)*sigmav ! sigmav: special width for new layers
-                !voro_prop(npt_prop,2) = -width+2*width*ran3(ra) ! use completely random new value
                 voro_prop(npt_prop,3) = -1
-                voro_prop(npt_prop,4) = voro(ind,4)+gasdev(ra)*sigmavp ! sigmavp: special width for new layers
-                ! voro_prop(npt_prop,4) = vp_min+(vp_max-vp_min)*ran3(ra) ! use completely random new value
                 isoflag_prop(npt_prop) = .true. 
-                
                 logprob_vsv=log(1/(sigmav*sqrt(2*pi)))-((voro(ind,2)-voro_prop(npt_prop,2))**2)/(2*sigmav**2) ! correct acceptance rates because transdimensional
-                logprob_vp=log(1/(sigmavp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(npt_prop,4))**2)/(2*sigmavp**2)
-                
+                                
+                if (vp_flag==0) then
+                    ! Vp Free
+                    voro_prop(npt_prop,4) = voro(ind,4)+gasdev(ra)*sigmavp ! sigmavp: special width for new layers
+                    logprob_vp=log(1/(sigmavp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(npt_prop,4))**2)/(2*sigmavp**2)
+                elseif (vp_flag==1) then
+                    ! Vp scaled
+                    if (vp_scale.gt.1.0) then
+                        voro_prop(npt_prop,4) = voro_prop(npt_prop,2) * vp_scale_S40(voro_prop(npt_prop,1))
+                    else
+                        voro_prop(npt_prop,4) = voro_prop(npt_prop,2) * vp_scale
+                    endif
+                    logprob_vp = 1.0
+                elseif (vp_flag==2) then
+                    ! Vp Fixed to ref
+                    voro_prop(npt_prop,4) = 0.0
+                    logprob_vp = 1.0
+                end if
+
                 !Check bounds                    
                 if ((voro_prop(npt_prop,2)<=-width).or.(voro_prop(npt_prop,2)>=width)) then
                     out=0
@@ -1069,7 +1144,7 @@ program RJ_MCMC
                     out=0
                 end if
             endif
-        elseif (u<0.8) then !death of an isotropic cell !---------------------------------------    !
+        elseif (u<0.7) then !death of an isotropic cell !---------------------------------------    !
 
             death = .true.
             PrD = PrD + 1
@@ -1101,10 +1176,18 @@ program RJ_MCMC
             
                 call whichcell_d(voro(ind,1),voro_prop,npt_prop,ind2)
                 logprob_vsv= log(1/(sigmav*sqrt(2*pi)))-((voro(ind,2)-voro_prop(ind2,2))**2)/(2*sigmav**2) ! same as for birth
-                logprob_vp=log(1/(sigmavp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(ind2,4))**2)/(2*sigmavp**2)
+                
+                if (vp_flag==0) then
+                    ! Vp Free
+                    logprob_vp=log(1/(sigmavp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(ind2,4))**2)/(2*sigmavp**2)
+                elseif ((vp_flag==1).or.(vp_flag==2)) then
+                    ! Vp scaled or Vp Fixed to ref
+                    logprob_vp = 1.0 
+                end if
+                
                 
             endif
-        elseif (u<0.9) then !Birth of an anisotropic layer----------------------------------------
+        elseif (u<0.8) then !Birth of an anisotropic layer----------------------------------------
             birtha = .true.
             PrBa = PrBa + 1    
             if (npt_iso==0) then
@@ -1121,7 +1204,7 @@ program RJ_MCMC
                         exit
                     endif
                 enddo
-                voro_prop(ind,3) =  xi_min+(xi_max-xi_min)*ran3(ra) 
+                voro_prop(ind,3) =  xi_min+(xi_max-xi_min)*ran3(ra) ! Seems quite wild to guess over this whole range.
                 if (voro(ind,3).NE.-1) stop "1130"
                 if ((voro_prop(ind,3)<=xi_min).or.(voro_prop(ind,3)>=xi_max)) then
                     write(*,*)'anisotropy out of bounds'
@@ -1129,10 +1212,7 @@ program RJ_MCMC
                 endif
                 isoflag_prop(ind)=.false.
             endif
-        
-        !else
-        ! Will never be above 1 so can use 1.1 below.
-        elseif (u<1.1) then !death of an anisotropic layer!---------------------------------------    
+        elseif (u<0.9) then !death of an anisotropic layer!---------------------------------------    
             deatha = .true.
             PrDa = PrDa + 1
             if (npt_ani==0) then
@@ -1151,7 +1231,37 @@ program RJ_MCMC
                 enddo
                 voro_prop(ind,3)=-1
                 isoflag_prop(ind)=.true.
-            endif        
+            endif
+        
+        ! Will never be above 1 so can use 1.1 below.
+        elseif (u<1.1) then !change vp --------------------------------------------
+            if (vp_flag==0) then
+                ! Vp Free
+                change_vp=.true.
+                
+                ! Choose a random cell
+                ind=ceiling(ran3(ra)*npt)
+                if (ind==0) ind=1
+                
+                Pr_vp=Pr_vp+1
+                if (ind>npt) then
+                    out=0
+                else
+                    voro_prop(ind,4)=voro(ind,4)+gasdev(ra)*p_vp
+    
+                    !Check if oustide bounds of prior
+                    if ((voro_prop(ind,4)<=vp_min).or.(voro_prop(ind,4)>=vp_max)) then
+                        out=0
+                    endif
+                endif
+
+            elseif ((vp_flag==1).or.(vp_flag==2)) then
+                ! Code should not get here....
+                ! Write some exit statement....
+                stop "Incorrect place for vph proposal change..."
+            end if
+   
+
         else
             out=0
             
@@ -1263,23 +1373,46 @@ program RJ_MCMC
         ! now check if we accept the new model - different treatement depending on the change
         ! When out = 0 log(out) becomes nan so if statements yield false.
         if (birth) then!------------------------------------------------------------------
-            if (log(ran3(ra))<log(out) + log(real(npt)+1)-log(real(npt_prop)+1) -&
-                log(2*width)-logprob_vsv-log(vp_max-vp_min)-logprob_vp&
-                -like_prop+like) then ! transdimensional case
-                accept=.true.
-                AcB=AcB+1
-            endif
-        
+            if (vp_flag==0) then
+                ! Vp Free
+                if (log(ran3(ra))<log(out) + log(real(npt)+1)-log(real(npt_prop)+1) -&
+                    log(2*width)-logprob_vsv-log(vp_max-vp_min)-logprob_vp&
+                    -like_prop+like) then ! transdimensional case
+                    accept=.true.
+                    AcB=AcB+1
+                endif
+            elseif ((vp_flag==1).or.(vp_flag==2)) then
+                ! Vp scaled or Vp Fixed to ref
+                if (log(ran3(ra))<log(out) + log(real(npt)+1)-log(real(npt_prop)+1) -&
+                    log(2*width)-logprob_vsv&
+                    -like_prop+like) then ! transdimensional case
+                    accept=.true.
+                    AcB=AcB+1
+                endif
+            end if
+            
         elseif (death) then!-------------------------------------------------------------
         
-            if (log(ran3(ra))<log(out) + log(real(npt)+1)&
-                -log(real(npt_prop)+1) + &
-                log(2*width)+logprob_vsv+log(vp_max-vp_min)+logprob_vp&
-                -like_prop+like) then! transdimensional case
-                accept=.true.
-                AcD=AcD+1
-            endif
-        
+            if (vp_flag==0) then
+                ! Vp Free
+                if (log(ran3(ra))<log(out) + log(real(npt)+1)&
+                    -log(real(npt_prop)+1) + &
+                    log(2*width)+logprob_vsv+log(vp_max-vp_min)+logprob_vp&
+                    -like_prop+like) then! transdimensional case
+                    accept=.true.
+                    AcD=AcD+1
+                endif
+            elseif ((vp_flag==1).or.(vp_flag==2)) then
+                ! Vp scaled or Vp Fixed to ref
+                if (log(ran3(ra))<log(out) + log(real(npt)+1)&
+                    -log(real(npt_prop)+1) + &
+                    log(2*width)+logprob_vsv&
+                    -like_prop+like) then! transdimensional case
+                    accept=.true.
+                    AcD=AcD+1
+                endif
+            end if
+
         elseif (noisd_R) then !@@@@@@@@@@@@@@@@@@@@@@@@@@@@ logrsig  @@@@@@@@@@@@
             logrsig=ndatad_R*log(Ad_R/Ad_R_prop) ! ATTENTION avc ld 2
             if (log(ran3(ra))<logrsig+log(out)-like_prop+like) then ! hierarchical case
@@ -1299,18 +1432,8 @@ program RJ_MCMC
                 accept=.true.
                 if (value) then
                     AcV=AcV+1
-                    ! if (voro(ind,1)<(d_max/2)) then
-                    !     AcV(1)=AcV(1)+1
-                    ! else
-                    !     AcV(2)=AcV(2)+1
-                    ! endif
                 elseif (move) then
                     AcP=AcP+1
-                    ! if (voro(ind,1)<(d_max/2)) then
-                    !     AcP(1)=AcP(1)+1
-                    ! else
-                    !     AcP(2)=AcP(2)+1
-                    ! endif
                 elseif(ani)then
                     Acxi=Acxi+1
                 elseif(change_vp)then
@@ -1548,15 +1671,15 @@ program RJ_MCMC
             convB(ount)=100*AcB/PrB
             convDa(ount)=100*AcDa/PrDa
             convD(ount)=100*AcD/PrD
-            ! convvs1(ount)=100*Acv(1)/Prv(1)
-            ! convvs2(ount)=100*Acv(2)/Prv(2)
-            ! convdp1(ount)=100*Acp(1)/Prp(1)
-            ! convdp2(ount)=100*Acp(2)/Prp(2)
 
             convvs1(ount)=100*Acv/Prv
             convdp1(ount)=100*Acp/Prp
+            
+            if (vp_flag==0) then
+                ! Vp Free
+                convvp(ount)=100*Ac_vp/Pr_vp
+            end if
 
-            convvp(ount)=100*Ac_vp/Pr_vp
             convxi(ount)=100*Acxi/Prxi
             convd_R(ount)=lsd_R
             convd_L(ount)=lsd_L
@@ -1591,14 +1714,18 @@ program RJ_MCMC
             write(*,*)'number of cells:',npt
             write(*,*)'Ad_R',Ad_R,'Ad_L',Ad_L
             write(*,*)'Acceptance rates'
-            ! write(*,*)'AR_move',100*AcP(1)/PrP(1),100*AcP(2)/PrP(2)
-            ! write(*,*)'AR_value',100*AcV(1)/PrV(1),100*AcV(2)/PrV(2)
             write(*,*)'AR_move',100*AcP/PrP
             write(*,*)'AR_value',100*AcV/PrV
             write(*,*)'AR_Birth',100*AcB/PrB,'AR_Death',100*AcD/PrD,'sigmav',sigmav,'sigmavp',sigmavp
             write(*,*)'AR_Birtha',100*AcBa/PrBa,'AR_Deatha',100*AcDa/PrDa
             write(*,*)'AR_xi',100*Acxi/Prxi,'pxi',pxi
-            write(*,*)'AR_vp',100*Ac_vp/Pr_vp,'p_vp',p_vp
+            if (vp_flag==0) then
+                ! Vp Free
+                write(*,*)'AR_vp',100*Ac_vp/Pr_vp,'p_vp',p_vp
+            elseif ((vp_flag==1).or.(vp_flag==2)) then
+                ! Vp scaled or Fixed to ref
+                write(*,*)'AR_vp, p_vp not relevant'
+            end if
             write(*,*)'AR_Ad_R',100*Acnd_R/Prnd_R,'pAd_R',pAd_R
             write(*,*)'AR_Ad_L',100*Acnd_L/Prnd_L,'pAd_L',pAd_L
             write(*,*)'npt_iso',npt_iso,'npt_ani',npt_ani
@@ -1692,7 +1819,11 @@ program RJ_MCMC
         ! call MPI_REDUCE(convvs2,convvs2s,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(convdp1,convdp1s,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         ! call MPI_REDUCE(convdp2,convdp2s,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-        call MPI_REDUCE(convvp,convvps,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        if (vp_flag==0) then
+            ! Vp Free
+            call MPI_REDUCE(convvp,convvps,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        end if
+        
         call MPI_REDUCE(convxi,convxis,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(histoch,histochs,disd,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(ML_Ad_R,ML_Ad_Rs,disA,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
@@ -1732,11 +1863,13 @@ program RJ_MCMC
         convDs=convDs/j
         convDas=convDas/j
         convvs1s=convvs1s/j
-        ! convvs2s=convvs2s/j
         convdp1s=convdp1s/j
-        ! convdp2s=convdp2s/j
-        convvps=convvps/j
         convxis=convxis/j
+        if (vp_flag==0) then
+            ! Vp Free
+            convvps=convvps/j
+        end if
+        
  
         probanis=probanis/j
 
@@ -1897,12 +2030,21 @@ program RJ_MCMC
         enddo
         close(54)
         
-        open(54,file=dirname//'/Convergence_vp.out',status='replace')
-        write(54,*)burn_in,nsample,burn_in,nsample
-        do i=1,nsample+burn_in
-            write(54,*)convvp(i),convvps(i)
-        enddo
-        close(54)
+
+        if (vp_flag==0) then
+            ! Vp Free
+            open(54,file=dirname//'/Convergence_vp.out',status='replace')
+            write(54,*)burn_in,nsample,burn_in,nsample
+            do i=1,nsample+burn_in
+                write(54,*)convvp(i),convvps(i)
+            enddo
+            close(54)
+        elseif ((vp_flag==1).or.(vp_flag==2)) then
+            ! Vp scaled or Fixed to ref
+            write(*,*)'No Convergence_vp file to write...'
+        end if
+
+
         
         open(54,file=dirname//'/Convergence_xi.out',status='replace')
         write(54,*)burn_in,nsample,burn_in,nsample
@@ -2026,9 +2168,22 @@ END
 
 !-------------------------------------------------------------------
 !                        
-!    interpolation
+!    Function to calculate dVp scaling factor based on depth
+!     See Ritsema et al., 2011 GJI - S40RTS model
 ! 
 ! ----------------------------------------------------------------------------
+
+
+FUNCTION vp_scale_S40(m_depth)
+
+    !     ..Arguments..
+    real m_depth ! depth in the mantle
+    real vp_scale_S40     ! Vsv,vph perturbations
+
+    vp_scale_S40=1.0/(m_depth/2891.0+2.0)
+
+END FUNCTION vp_scale_S40
+
 
 
 !the code is finished. 
