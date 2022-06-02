@@ -104,7 +104,7 @@ subroutine combine_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 r(k)=depth(j)
                 rho(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,2),model_ref(i+1,2),r(k))
                 qkappa(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,5),model_ref(i+1,5),r(k))
-                qshear(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,1),model_ref(i+1,1),r(k))
+                qshear(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,6),model_ref(i+1,6),r(k))
                 eta(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,9),model_ref(i+1,9),r(k))
                 
                 vsv(k)=vsv(k+1)
@@ -121,7 +121,7 @@ subroutine combine_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 r(k)=depth(j)
                 rho(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,2),model_ref(i+1,2),r(k))
                 qkappa(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,5),model_ref(i+1,5),r(k))
-                qshear(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,1),model_ref(i+1,1),r(k))
+                qshear(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,6),model_ref(i+1,6),r(k))
                 eta(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,9),model_ref(i+1,9),r(k))
                 
                 vsh(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,8),model_ref(i+1,8),r(k))
@@ -185,7 +185,7 @@ subroutine combine_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 r(k)=depth(j)
                 rho(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,2),model_ref(i+1,2),r(k))
                 qkappa(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,5),model_ref(i+1,5),r(k))
-                qshear(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,1),model_ref(i+1,1),r(k))
+                qshear(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,6),model_ref(i+1,6),r(k))
                 eta(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,9),model_ref(i+1,9),r(k))
                 
                 vsv(k)=vsv(k+1)
@@ -203,7 +203,7 @@ subroutine combine_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 r(k)=depth(j)
                 rho(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,2),model_ref(i+1,2),r(k))
                 qkappa(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,5),model_ref(i+1,5),r(k))
-                qshear(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,1),model_ref(i+1,1),r(k))
+                qshear(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,6),model_ref(i+1,6),r(k))
                 eta(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,9),model_ref(i+1,9),r(k))
                 vsv(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,4),model_ref(i+1,4),r(k))*(1+voro2(j,2))
                 vsh(k)=vsv(k)*sqrt(vshvsv(j))
