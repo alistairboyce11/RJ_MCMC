@@ -34,7 +34,7 @@ except NameError:
 Layer_Hist      = True
 Layers_Aniso_Tr = True
 Posterior       = True
-Posterior2      = False
+Posterior2      = True
 Sigmad          = True
 Dispersion      = True
 Convergence     = True
@@ -104,6 +104,7 @@ if not os.path.exists(directory+'/PLOTS/'):
     os.mkdir(directory+'/PLOTS/')
 maxnlay = 80
 
+fname_pre=str(os.getcwd().split('/')[-1])+'_'
 
 
 def weighted_avg_and_std(values, weights):
@@ -117,7 +118,69 @@ def weighted_avg_and_std(values, weights):
     variance = np.average((values-average)**2, weights=weights)
     return (average, math.sqrt(variance))
 
-# std = np.sqrt(np.cov(values, aweights=weights))
+
+
+#########################################################
+# Get Input models to inversion.
+#########################################################
+
+
+def get_inversion_model(filename='RM_ak135.txt'):
+    '''
+    reads the input inverse models into a dictionary.
+    contains: 
+        npt_true: number of points
+        depth: depth of interfaces
+        vsv, xi, vph
+
+    Parameters
+    ----------
+    filename : str
+        file containing the models saved from run_POC_synth.sh.
+        E.g., RM_ak135.txt RM_craton.txt RM_craton_meta.txt
+    
+    Returns
+    -------
+    model : dict 
+        contains the data of the inversion model.
+
+    '''
+    model           = {}
+
+    file=filename
+    # read file
+    print(file)
+
+    f=open(file,'r')
+    lines=f.readlines()
+    f.close()
+
+    npt_true=len(lines)
+    # depths AK135Vp AK135Vs Vp dVp VsH dVsH VsV dVsV  Vs_PR06 dVs_PR06 Xi_PR06 dXi_PR06 Vs_FW10 dVs_FW10 Xi_FW10 dXi_FW10 (calculate w.r.t. nul value, PR06=1, FW10=0)
+
+    d=np.zeros(npt_true)
+    xi=np.ones(npt_true)
+    vsv=np.zeros(npt_true)
+    vph=np.zeros(npt_true)
+
+
+    for i in range(npt_true):
+        data=lines[i].split()
+        d[i]=float(data[0])
+        xi[i]=float(data[11])
+        vsv[i]=float(data[7])*1000.0
+        vph[i]=float(data[3])*1000.0
+
+    model['npt_true']=npt_true
+    model['depth']=d
+    model['vsv']=vsv
+    model['xi']=xi
+    model['vph']=vph
+
+    return model
+
+
+
 
 ########## histogram of number of layers
 if Layer_Hist:
@@ -137,7 +200,7 @@ if Layer_Hist:
     plt.ylabel('Frequency')
     
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Layer_hist.png',dpi=200)
+    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Layer_hist.png',dpi=200)
     plt.close()
 
 ########## matrix containing number of layers and number of anisotropic layers
@@ -169,7 +232,7 @@ if Layers_Aniso_Tr:
     plt.colorbar()
     plt.plot([0, nlay], [0, nlay], '--r', linewidth=1)
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Layers_Aniso_Tr.png',dpi=200)
+    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Layers_Aniso_Tr.png',dpi=200)
     plt.close()
 
 ############ Posterior #######################
@@ -561,7 +624,7 @@ if Posterior:
 
 
     ax1.set_title('$V_{SV}$ above '+str(dep_val)+'km')
-    ax1.set_xlabel('$V_{SV}$ (km/s)', fontsize=10)
+    ax1.set_xlabel('$V_{SV}$ (m/s)', fontsize=10)
     ax1.set_ylabel('Norm. Probability',fontsize=10)
     ax1.set_xlim([vref_min,vref_max])
     ax1.set_ylim([0.0,1.0])
@@ -572,10 +635,10 @@ if Posterior:
 
     ax3.set_title('$V_{PH}$ above '+str(dep_val)+'km')
     ax3.set_xlim([vp_min,vp_max])
-    ax3.set_xlabel('$V_{PH}$ (km/s)',fontsize=10)
+    ax3.set_xlabel('$V_{PH}$ (m/s)',fontsize=10)
 
     ax4.set_title('$V_{SV}$ at '+str(dep_val)+'km')
-    ax4.set_xlabel('$V_{SV}$ (km/s)', fontsize=10)
+    ax4.set_xlabel('$V_{SV}$ (m/s)', fontsize=10)
     ax4.set_ylabel('Norm. Probability',fontsize=10)
     ax4.set_xlim([vref_min,vref_max])
     ax4.set_ylim([0.0,1.0])
@@ -586,10 +649,10 @@ if Posterior:
 
     ax6.set_title('$V_{PH}$ at '+str(dep_val)+'km')
     ax6.set_xlim([vp_min,vp_max])
-    ax6.set_xlabel('$V_{PH}$ (km/s)',fontsize=10)
+    ax6.set_xlabel('$V_{PH}$ (m/s)',fontsize=10)
 
     ax7.set_title('$V_{SV}$ below '+str(dep_val)+'km')
-    ax7.set_xlabel('$V_{SV}$ (km/s)', fontsize=10)
+    ax7.set_xlabel('$V_{SV}$ (m/s)', fontsize=10)
     ax7.set_ylabel('Norm. Probability',fontsize=10)
     ax7.set_xlim([vref_min,vref_max])
     ax7.set_ylim([0.0,1.0])
@@ -600,12 +663,12 @@ if Posterior:
 
     ax9.set_title('$V_{PH}$ below '+str(dep_val)+'km')
     ax9.set_xlim([vp_min,vp_max])
-    ax9.set_xlabel('$V_{PH}$ (km/s)',fontsize=10)
+    ax9.set_xlabel('$V_{PH}$ (m/s)',fontsize=10)
 
     plt.subplots_adjust(wspace=0.35,hspace=0.35)
 
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Hist_dist_'+str(dep_val)+'.png',dpi=200)
+    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Hist_dist_'+str(dep_val)+'.png',dpi=200)
     plt.close()
 
     fig, (ax0, ax1, ax2, ax4, ax5) = plt.subplots(nrows=1, ncols=5, sharey=True,
@@ -618,7 +681,7 @@ if Posterior:
 
     ax0.invert_yaxis()
     ax0.set_xlim([vref_min,vref_max])
-    ax0.set_xlabel('$V_{SV}$ (km/s)', fontsize=10)
+    ax0.set_xlabel('$V_{SV}$ (m/s)', fontsize=10)
     ax0.set_title('S-wave velocity')
     ax1.set_ylim([prof,0.])
     ax1.set_xlabel('$Xi$',fontsize=10)
@@ -630,7 +693,7 @@ if Posterior:
     ax0.set_ylabel('Depth (km)',fontsize=10)
     # ax2.set_xlabel(r'VpVs*(1+X)',fontsize=10)
     # ax2.set_title('Vp/Vs deviation')
-    ax2.set_xlabel('$V_{PH}$ (km/s)',fontsize=10)
+    ax2.set_xlabel('$V_{PH}$ (m/s)',fontsize=10)
     ax2.set_title('P-wave velocity')
 
     ax1.pcolormesh(xis,depths,xid,cmap='viridis')
@@ -710,15 +773,33 @@ if Posterior:
     ax4.plot(average_probani,depths,c='k',linewidth=1)
     ax4.set_xlabel('Probability',fontsize=10)
     ax4.set_title('Anisotropy')
-
     ax4.set_xlim([0,100])
+
+
+    # Try plotting LSQR CPinSeis results too...
+    
+    # model_1=get_inversion_model(filename='/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_fund/RM_craton.txt')
+    # model_2=get_inversion_model(filename='/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_fund/RM_craton_meta.txt')
+    # model_3=get_inversion_model(filename='/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_over/RM_craton.txt')
+    # model_4=get_inversion_model(filename='/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_over/RM_craton_meta.txt')
+
+
+    # ax0.plot(model_1['vsv'],model_1['depth'],c='magenta',linewidth=1)
+    # ax1.plot(model_1['xi'],model_1['depth'],c='magenta',linewidth=1)
+    # ax2.plot(model_1['vph'],model_1['depth'],c='magenta',linewidth=1)
+
+
+
+
+
+
 
     plt.legend([true, ave], ['true', 'ave'])
 
     fig.suptitle('Posterior and Averages')
 
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Posterior.png',dpi=200)
+    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Posterior.png',dpi=200)
     plt.close()
 
 
@@ -841,7 +922,7 @@ if Posterior2:
 
     ax0.invert_yaxis()
     ax0.set_xlim([vref_min,vref_max])
-    ax0.set_xlabel('$V_{SV}$ (km/s)', fontsize=10)
+    ax0.set_xlabel('$V_{SV}$ (m/s)', fontsize=10)
     ax0.set_title('S-wave velocity')
     ax1.set_ylim([prof,0.])
     ax1.set_xlabel('$Xi$',fontsize=10)
@@ -849,7 +930,7 @@ if Posterior2:
     ax1.set_title('Radial Anisotropy')
     ax2.set_xlim([vp_min,vp_max])
     ax0.set_ylabel('Depth (km)',fontsize=10)
-    ax2.set_xlabel('$V_{PH}$ (km/s)',fontsize=10)
+    ax2.set_xlabel('$V_{PH}$ (m/s)',fontsize=10)
     ax2.set_title('P-wave velocity')
 
     # ax1.pcolormesh(xis,depths,xid,cmap='viridis')
@@ -962,7 +1043,7 @@ if Posterior2:
     fig.suptitle('Posterior and Averages')
 
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Posterior2.png',dpi=300)
+    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Posterior2.png',dpi=300)
     plt.close()
 
 
@@ -993,7 +1074,7 @@ if Sigmad:
     plt.ylabel('Frequency')
     plt.plot(d,sigmad_R)
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Sigmad_R.png',dpi=200)
+    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Sigmad_R.png',dpi=200)
     # histogram of love uncertainty parameter
     file=open(directory+'/'+'Sigmad_L.out','r')
     lines=file.readlines()
@@ -1018,7 +1099,7 @@ if Sigmad:
     plt.ylabel('Frequency')
     plt.plot(d,sigmad_L)
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Sigmad_L.png',dpi=200)
+    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Sigmad_L.png',dpi=200)
     plt.close()
 
     if os.path.isfile(directory+'/'+'Sigmad_PsPp.out'):
@@ -1046,7 +1127,7 @@ if Sigmad:
         plt.ylabel('Frequency')
         plt.plot(d,sigmad_PsPp)
         # plt.show()
-        plt.savefig(directory+'/PLOTS/'+'Sigmad_PsPp.png',dpi=200)
+        plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Sigmad_PsPp.png',dpi=200)
         plt.close()
 
 
@@ -1098,7 +1179,7 @@ if Convergence:
     plt.ylabel('Misfit')
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_misfit.png',dpi=200)
+    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_misfit.png',dpi=200)
     plt.close()
     
     ############### number of layers over time, for one core and average over all cores ###############
@@ -1125,7 +1206,7 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_layers.png',dpi=200)
+    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_layers.png',dpi=200)
     plt.close()
 
 
@@ -1153,7 +1234,7 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_sigma_R.png',dpi=200)
+    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_sigma_R.png',dpi=200)
     plt.close()
 
     ################ love uncertainty parameter over time, for one core and average over all cores ###############
@@ -1180,7 +1261,7 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_sigma_L.png',dpi=200)
+    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_sigma_L.png',dpi=200)
     plt.close()
 
     ################ acceptance rates for birth of isotropic and anisotropic layers over time, for one core and average over all cores ###############
@@ -1213,7 +1294,7 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_Birth.png',dpi=200)
+    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_Birth.png',dpi=200)
     plt.close()
 
     ################ acceptance rates for death of isotropic and anisotropic layers over time, for one core and average over all cores ###############
@@ -1246,10 +1327,10 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_Death.png',dpi=200)
+    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_Death.png',dpi=200)
     plt.close()
 
-    ################ acceptance rates for change in anisotropy over time, for one core and average over all cores ###############
+    ################ ####################################################### ###############
     file=open(directory+'/'+'Convergence_xi.out','r')
     lines=file.readlines()
     file.close()
@@ -1273,39 +1354,41 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_xi.png',dpi=200)
+    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_xi.png',dpi=200)
     plt.close()
 
-    ################ acceptance rates for change in vp/vsv over time, for one core and average over all cores ###############
-    file=open(directory+'/'+'Convergence_vp.out','r')
-    lines=file.readlines()
-    file.close()
+    ################ #######################################################s ###############
+    if os.path.isfile(directory+'/'+'Convergence_vp.out'):
 
-    burn_in=int(lines[0].split()[0])
-    nsample=int(lines[0].split()[1])
+        file=open(directory+'/'+'Convergence_vp.out','r')
+        lines=file.readlines()
+        file.close()
 
-    convP_one=[]
-    convP=[]
-    for line in lines[1:]:
-        data=line.split()
-        convP_one.append(float(data[0]))
-        convP.append(float(data[1]))
+        burn_in=int(lines[0].split()[0])
+        nsample=int(lines[0].split()[1])
 
-    plt.figure('convergence_vp')
-    plt.title('Vp Change Rate Convergence')
-    plt.plot(convP_one[burn_in:],label='vp change, one core')
-    plt.plot(convP[burn_in:],label='vp change, all cores')
-    plt.xlabel('Iteration number')
-    plt.ylabel('XXX')
-    plt.xlim([0,nsample])
-    plt.legend()
-    # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_vp.png',dpi=200)
-    plt.close()
+        convP_one=[]
+        convP=[]
+        for line in lines[1:]:
+            data=line.split()
+            convP_one.append(float(data[0]))
+            convP.append(float(data[1]))
+
+        plt.figure('convergence_vp')
+        plt.title('Vp Change Rate Convergence')
+        plt.plot(convP_one[burn_in:],label='vp change, one core')
+        plt.plot(convP[burn_in:],label='vp change, all cores')
+        plt.xlabel('Iteration number')
+        plt.ylabel('XXX')
+        plt.xlim([0,nsample])
+        plt.legend()
+        # plt.show()
+        plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_vp.png',dpi=200)
+        plt.close()
 
 
     
-    ################ acceptance rates for change in vsv (upper half) over time, for one core and average over all cores ###############
+    ################ ####################################################### ###############
     file=open(directory+'/'+'Convergence_vs.out','r')
     lines=file.readlines()
     file.close()
@@ -1329,38 +1412,10 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_vs.png',dpi=200)
+    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_vs.png',dpi=200)
     plt.close()
-    
-    ################ acceptance rates for change in vsv (lower half) over time, for one core and average over all cores ###############
-    if os.path.isfile(directory+'/'+'Convergence_vs2.out'):
-        file=open(directory+'/'+'Convergence_vs2.out','r')
-        lines=file.readlines()
-        file.close()
 
-        burn_in=int(lines[0].split()[0])
-        nsample=int(lines[0].split()[1])
-
-        convsv2_one=[]
-        convsv2=[]
-        for line in lines[1:]:
-            data=line.split()
-            convsv2_one.append(float(data[0]))
-            convsv2.append(float(data[1]))
-
-        plt.figure('convergence_vs2')
-        plt.title('Vsv Change Rate Convergence, lower half')
-        plt.plot(convsv2_one[burn_in:],label='vsv change lower half, one core')
-        plt.plot(convsv2[burn_in:],label='vsv change lower half, all cores')
-        plt.xlabel('Iteration number')
-        plt.ylabel('XXX')
-        plt.xlim([0,nsample])
-        plt.legend()
-        # plt.show()
-        plt.savefig(directory+'/PLOTS/'+'Convergence_vs2.png',dpi=200)
-        plt.close()
-    
-    ################ acceptance rates for change in depth (upper half) over time, for one core and average over all cores ###############
+    ############################################################################
     file=open(directory+'/'+'Convergence_dp.out','r')
     lines=file.readlines()
     file.close()
@@ -1384,36 +1439,10 @@ if Convergence:
     plt.xlim([0,nsample])
     plt.legend()
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Convergence_dp.png',dpi=200)
+    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_dp.png',dpi=200)
     plt.close()
-    
-    ################ acceptance rates for change in depth (lower half) over time, for one core and average over all cores ###############
-    if os.path.isfile(directory+'/'+'Convergence_dp2.out'):
-        file=open(directory+'/'+'Convergence_dp2.out','r')
-        lines=file.readlines()
-        file.close()
 
-        burn_in=int(lines[0].split()[0])
-        nsample=int(lines[0].split()[1])
 
-        condp2_one=[]
-        condp2=[]
-        for line in lines[1:]:
-            data=line.split()
-            condp2_one.append(float(data[0]))
-            condp2.append(float(data[1]))
-
-        plt.figure('convergence_dp2')
-        plt.title('Depth Change Rate Convergence, lower half')
-        plt.plot(condp2_one[burn_in:],label='depth change lower half, one core')
-        plt.plot(condp2[burn_in:],label='depth change lower half, all cores')
-        plt.xlabel('Iteration number')
-        plt.ylabel('XXX')
-        plt.xlim([0,nsample])
-        plt.legend()
-        # plt.show()
-        plt.savefig(directory+'/PLOTS/'+'Convergence_dp2.png',dpi=200)
-        plt.close()
 
 
     if os.path.isfile(directory+'/'+'Convergence_sigma_PsPp.out'):
@@ -1442,7 +1471,7 @@ if Convergence:
         plt.xlim([0,nsample])
         plt.legend()
         # plt.show()
-        plt.savefig(directory+'/PLOTS/'+'Convergence_sigma_PsPp.png',dpi=200)
+        plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_sigma_PsPp.png',dpi=200)
         plt.close()
 
 
@@ -1548,13 +1577,13 @@ if Dispersion:
     # plt.xlim([40,360])
     plt.ylim([2.5,9.5])
     plt.xlabel('Period (s)')
-    plt.ylabel('Phase Velocity (km/s)')
+    plt.ylabel('Phase Velocity (m/s)')
     plt.title('Compare Dispersion Curves')
 
     plt.xlim([np.min(period_R+period_L),np.max(period_R+period_L)])
 
     # plt.show()
-    plt.savefig(directory+'/PLOTS/'+'Dispersion.png',dpi=200)
+    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Dispersion.png',dpi=200)
     plt.close()
 
 
@@ -1626,15 +1655,15 @@ if PsPp_Fit:
         plt.xlim([np.min(rayp_obs),np.max(rayp_obs)])
         
         # plt.show()
-        plt.savefig(directory+'/PLOTS/'+'PsPp_Fit.png',dpi=200)
+        plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'PsPp_Fit.png',dpi=200)
         plt.close()
 
 
 if Corr_Hist:
-    if os.path.isfile(directory+'/'+'Posterior_corr_50.json'):
+    if os.path.isfile(directory+'/'+'Posterior_corr_100_200.json'):
         print('Posterior Correlation file present')
         
-        with open(directory+'/'+'Posterior_corr_50.json') as data_file:
+        with open(directory+'/'+'Posterior_corr_100_200.json') as data_file:
             corrs = json.load(data_file)
 
         nsample  = int(corrs['params_inversion']['nsample'])
@@ -1757,11 +1786,11 @@ if Corr_Hist:
         y=y/np.max(y[:])
 
         # Set up your x and y labels
-        ylabel = str(p1_l)+' (km/s) '+str(int(p1_u_dep))+' - '+str(int(p1_l_dep))+' km'
+        ylabel = str(p1_l)+' (m/s) '+str(int(p1_u_dep))+' - '+str(int(p1_l_dep))+' km'
         if p2 == 'xi':
             xlabel = str(p2_l)+' '+str(int(p2_u_dep))+' - '+str(int(p2_l_dep))+' km' 
         else:
-            xlabel = str(p2_l)+' (km/s) '+str(int(p2_u_dep))+' - '+str(int(p2_l_dep))+' km' 
+            xlabel = str(p2_l)+' (m/s) '+str(int(p2_u_dep))+' - '+str(int(p2_l_dep))+' km' 
         # Define the locations for the axes
         left, width = 0.12, 0.55
         bottom, height = 0.12, 0.55
@@ -1840,7 +1869,7 @@ if Corr_Hist:
 
         # axins1.xaxis.set_ticks_position("top")
         # axins1.xaxis.set_label_position("top")
-        axCorr.plot(max_loc_p1_p2[1]+0.5,max_loc_p1_p2[0]+0.5,c='r',marker='x',markersize=5,linewidth=1, alpha=1) # centered using +0.5
+
 
         # Option 4
 
@@ -1996,6 +2025,84 @@ if Corr_Hist:
         axHisty.fill_betweenx(int_arr,0,y_int, where=c,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.1)
 
 
+
+        #################### Plot Max points and LSQR / inital model points
+        # Max position: x, r
+        axCorr.plot(max_loc_p1_p2[1]+0.5,max_loc_p1_p2[0]+0.5,c='r',marker='x',markersize=5,linewidth=1, alpha=1) # centered using +0.5
+        
+        Modes='fund'
+        # Modes='over'
+
+        ########################### Add PREM to plot #########################################
+        if os.path.isfile('/Users/alistair/Google_Drive/Lyon_Pdoc/PREM_4_MINEOS/PREM_corr.json'):
+            print('Adding PREM as Green circle') # o, g
+            with open('/Users/alistair/Google_Drive/Lyon_Pdoc/PREM_4_MINEOS/PREM_corr.json') as data_file:
+                PREM_corr = json.load(data_file)
+            corr_name='corr_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)
+            PREM_p1_p2 = np.array(PREM_corr['stack'][str(av_int)][str(corr_name)])
+            print(PREM_p1_p2[0])
+            axCorr.plot(PREM_p1_p2[0][1],PREM_p1_p2[0][0],c='g',marker='o',markersize=5,linewidth=1, alpha=1)
+        ########################### Add AK135 to plot #########################################
+        if os.path.isfile('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/AK135sph_corr.json'):
+            print('Adding AK135 as Grey triangle') # t, g
+            with open('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/AK135sph_corr.json') as data_file:
+                AK135_corr = json.load(data_file)
+            corr_name='corr_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)
+            AK135_p1_p2 = np.array(AK135_corr['stack'][str(av_int)][str(corr_name)])
+            print(AK135_p1_p2[0])
+            axCorr.plot(AK135_p1_p2[0][1],AK135_p1_p2[0][0],c='gray',marker='^',markersize=5,linewidth=1, alpha=1)
+
+        if os.path.isfile('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/RM_ak135_corr.json'):
+            print('Adding AK135 inversion as Grey inverted triangle') # t, g
+            with open('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/RM_ak135_corr.json') as data_file:
+                AK135_corr = json.load(data_file)
+            corr_name='corr_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)
+            AK135_p1_p2 = np.array(AK135_corr['stack'][str(av_int)][str(corr_name)])
+            print(AK135_p1_p2[0])
+            axCorr.plot(AK135_p1_p2[0][1],AK135_p1_p2[0][0],c='gray',marker='v',markersize=5,linewidth=1, alpha=1)
+
+
+        ########################### Add Craton to plot #########################################
+        if os.path.isfile('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/AK135_craton_corr.json'):
+            print('Adding AK135_craton input as blue triangle') # t, b
+            with open('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/AK135_craton_corr.json') as data_file:
+                AK135_corr = json.load(data_file)
+            corr_name='corr_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)
+            AK135_p1_p2 = np.array(AK135_corr['stack'][str(av_int)][str(corr_name)])
+            print(AK135_p1_p2[0])
+            axCorr.plot(AK135_p1_p2[0][1],AK135_p1_p2[0][0],c='b',marker='^',markersize=5,linewidth=1, alpha=1)
+
+        if os.path.isfile('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/RM_craton_corr.json'):
+            print('Adding RM_craton inversion as blue inverted triangle') # v, b
+            with open('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/RM_craton_corr.json') as data_file:
+                AK135_corr = json.load(data_file)
+            corr_name='corr_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)
+            AK135_p1_p2 = np.array(AK135_corr['stack'][str(av_int)][str(corr_name)])
+            print(AK135_p1_p2[0])
+            axCorr.plot(AK135_p1_p2[0][1],AK135_p1_p2[0][0],c='b',marker='v',markersize=5,linewidth=1, alpha=1)
+
+        ########################### Add Craton to plot #########################################
+        if os.path.isfile('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/AK135_craton_meta_corr.json'):
+            print('Adding AK135_craton_meta input as red triangle') # t, br
+            with open('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/AK135_craton_meta_corr.json') as data_file:
+                AK135_corr = json.load(data_file)
+            corr_name='corr_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)
+            AK135_p1_p2 = np.array(AK135_corr['stack'][str(av_int)][str(corr_name)])
+            print(AK135_p1_p2[0])
+            axCorr.plot(AK135_p1_p2[0][1],AK135_p1_p2[0][0],c='r',marker='^',markersize=5,linewidth=1, alpha=1)
+
+        if os.path.isfile('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/RM_craton_meta_corr.json'):
+            print('Adding RM_craton_meta inversion as red inverted triangle') # v, r
+            with open('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/RM_craton_meta_corr.json') as data_file:
+                AK135_corr = json.load(data_file)
+            corr_name='corr_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)
+            AK135_p1_p2 = np.array(AK135_corr['stack'][str(av_int)][str(corr_name)])
+            print(AK135_p1_p2[0])
+            axCorr.plot(AK135_p1_p2[0][1],AK135_p1_p2[0][0],c='r',marker='v',markersize=5,linewidth=1, alpha=1)
+
+
+
+
         #Make the tickmarks pretty
         ticklabels = axHistx.get_yticklabels()
         for label in ticklabels:
@@ -2019,9 +2126,7 @@ if Corr_Hist:
         axCorr.xaxis.set_major_locator(LinearLocator(5))
 
         # plt.show()
-        plt.savefig(directory+'/PLOTS/'+'Corr_av_'+str(av_int)+'_dh_'+str(dh)+'_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)+'.png',dpi=200)
+        plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Corr_av_'+str(av_int)+'_dh_'+str(dh)+'_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)+'.png',dpi=200)
         plt.close()
 
-
-        # 
 
