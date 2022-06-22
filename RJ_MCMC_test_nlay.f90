@@ -31,11 +31,16 @@ program RJ_MCMC
     ! For S40RTS scaling dvp = dvs * 1.0/(depth/2891.0+2.0), when vp_scale>1.0
     real, parameter :: vp_scale = 2.0                    
 
+    character (len=*), parameter :: mods_dirname = 'MODS_OUT_TEST' ! This is where output info files are saved and input data files are taken.
+    real, parameter :: noise = 0.04                                ! Gaussian noise added to data ()>0). twice for Love.
+    real, parameter :: obs_err_R = 0.1                             ! Observational errors
+    real, parameter :: obs_err_L = 0.2                             ! Observational errors
+    
     character (len=*), parameter :: dirname = 'OUT_TEST' ! This is where output info files are saved and input data files are taken.
     character*8, parameter :: storename = 'STORFFC1'     ! This is where output models are saved
-    integer, parameter :: burn_in = 0!200000 ! 55000 !Burn-in period
-    integer, parameter :: nsample = 2000!00 ! 50000!Post burn-in
-    integer, parameter :: thin = 2!50    !Thinning of the chain 
+    integer, parameter :: burn_in = 200000 ! 55000 !Burn-in period
+    integer, parameter :: nsample = 200000 ! 50000!Post burn-in
+    integer, parameter :: thin = 50    !Thinning of the chain 
 
     integer, parameter :: Scratch = 1     ! 0: Start from Stored model 1: Start from scratch
     integer, parameter :: store = 999999999    !Store models every "store" iteration. 
@@ -82,7 +87,7 @@ program RJ_MCMC
     ! Parameters for Displaying results 
     !-------------------------------------------- 
 
-    integer, parameter :: display = 100 ! display results in OUT/mpi.out 
+    integer, parameter :: display = 1000 ! display results in OUT/mpi.out 
     !every display samples
 
      !discretezation for the posterior distribution.
@@ -197,7 +202,6 @@ program RJ_MCMC
     integer th_all
     integer, parameter :: everyall = 5000
     character filebycore*15
-    character (len=*), parameter :: mods_dirname = 'MODS_OUT_TEST' ! This is where output info files are saved and input data files are taken.
 
     ! todo: implement a test with raylquo
 1000 format(I4)
@@ -310,7 +314,8 @@ program RJ_MCMC
         model_ref(i,2),model_ref(i,3),model_ref(i,4),model_ref(i,5),&
         model_ref(i,6),model_ref(i,7),model_ref(i,8),model_ref(i,9),&
         i=1,nptref)
-    
+    close(7)
+
     j=1
     do while (model_ref(j,1)<rearth-d_max*1000.)
         j=j+1
@@ -335,7 +340,7 @@ program RJ_MCMC
 
         ! GET SYNTH SWD DATA ---------------------------------------------------------------- 
         nlims_cur=1
-        open(65,file='./Durand_data_raw.in',status='old')! 65: name of the opened file in memory (unit identifier)
+        open(65,file='./Durand_data_raw_fund.in',status='old')! 65: name of the opened file in memory (unit identifier)
         read(65,*,IOSTAT=io)ndatad_R ! number of Rayleigh modes
         read(65,*,IOSTAT=io)nharm_R ! number of harmonics
 
@@ -346,7 +351,7 @@ program RJ_MCMC
             nlims_R(2,k)=nlims_R(1,k)+nlims_cur_diff
             do i=nlims_cur,nlims_cur+nlims_cur_diff
                 read(65,*,IOSTAT=io)n_R(i),peri_R(i),dummy_d_obsdcR(i),d_obsdCRe(i)
-                d_obsdCRe(i)=0.1 ! Manually override errors
+                d_obsdCRe(i)=obs_err_R ! Manually override errors
             enddo
             nlims_cur=nlims_R(2,k)+1
         enddo
@@ -363,7 +368,7 @@ program RJ_MCMC
             nlims_L(2,k)=nlims_L(1,k)+nlims_cur_diff
             do i=nlims_cur,nlims_cur+nlims_cur_diff
                 read(65,*,IOSTAT=io)n_L(i),peri_L(i),dummy_d_obsdcL(i),d_obsdCLe(i)
-                d_obsdCLe(i)=0.2 ! Manually override errors
+                d_obsdCLe(i)=obs_err_L ! Manually override errors
             enddo
             nlims_cur=nlims_L(2,k)+1
         enddo
@@ -408,7 +413,7 @@ program RJ_MCMC
             voro(i,1)=30*(i-1) !depth of interface
             voro(i,2)=0.0    !0.1*(-1)**i  !vsv=vsv_prem*(1+voro(i,2))
             voro(i,3)=-1    !0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
-            voro(i,4)=-0.3   !vph=vph_prem*(1+voro(i,4))
+            voro(i,4)=-0.0   !vph=vph_prem*(1+voro(i,4))
             npt=npt+1
         end do
         do i=9,23
@@ -419,8 +424,8 @@ program RJ_MCMC
             npt=npt+1
         end do
         
-        ! take voro, combine_vp it with prem into a format suitable for minos
-        call combine_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+        ! take voro, combine_linear_vp it with prem into a format suitable for minos
+        call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
             r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
         
         !calculate synthetic dispersion curves
@@ -475,10 +480,10 @@ program RJ_MCMC
         IF (nbproc.gt.1) THEN
             IF (ran==0) THEN
                 do i=1,ndatad_R
-                    d_obsdcR(i)=d_obsdcR(i)+gasdev(ra)*0.04
+                    d_obsdcR(i)=d_obsdcR(i)+gasdev(ra)*noise
                 end do
                 do i=1,ndatad_L
-                    d_obsdcL(i)=d_obsdcL(i)+gasdev(ra)*0.08
+                    d_obsdcL(i)=d_obsdcL(i)+gasdev(ra)*noise*2 ! Make the Love noise twice the Rayleigh
                 end do
                 do i=2,nbproc
                     call MPI_SEND(d_obsdcR, ndatadmax, MPI_Real, i-1, 1, MPI_COMM_WORLD, ierror)
@@ -490,10 +495,10 @@ program RJ_MCMC
             endif
         else
             do i=1,ndatad_R
-                d_obsdcR(i)=d_obsdcR(i)+gasdev(ra)*0.04
+                d_obsdcR(i)=d_obsdcR(i)+gasdev(ra)*noise
             end do
             do i=1,ndatad_L
-                d_obsdcL(i)=d_obsdcL(i)+gasdev(ra)*0.08
+                d_obsdcL(i)=d_obsdcL(i)+gasdev(ra)*noise*2 ! Make the Love noise twice the Rayleigh
             end do
         endif
 
@@ -627,7 +632,7 @@ program RJ_MCMC
 !         enddo
 !         close(65)
 
-        call combine_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+        call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
             r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
         write(*,*)"Combined"
         if (ndatad_R>0) then
@@ -961,9 +966,15 @@ program RJ_MCMC
         if (vp_flag==0) then
             ! Vp Free
             u=ran3(ra) * 1.0
+            if (u.ge.1.0) then
+                u=0.95
+            endif
         elseif ((vp_flag==1).or.(vp_flag==2)) then
             ! Vp scaled or Fixed to ref
             u=ran3(ra) * 0.9 ! We don't make a Vp change proposal in this case.
+            if (u.ge.0.9) then
+                u=0.85
+            endif
         end if
 
 
@@ -1039,6 +1050,12 @@ program RJ_MCMC
             if ((voro_prop(ind,1)<=d_min).or.(voro_prop(ind,1)>=d_max)) then
                 out=0
             endif
+
+
+            ! ############### UPDATE VP here!!!!!!!!!!!!!!!!!!!!
+            ! with s40 scaling
+
+
             ! Check prior on velocity when moving cell location - this is not necessary so comment...
             ! if ((voro_prop(ind,2)<=-width).or.(voro_prop(ind,2)>=width)) then
             !     out=0
@@ -1273,7 +1290,7 @@ program RJ_MCMC
 
         !**************************************************************************
         if (out==1) then
-            call combine_vp(model_ref,nptref,nic_ref,noc_ref,voro_prop,npt_prop,d_max,&
+            call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro_prop,npt_prop,d_max,&
                 r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
             
             if (ndatad_R>0) then
@@ -1523,7 +1540,7 @@ program RJ_MCMC
 
                 th_all=th_all+1
                 
-                call combine_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+                call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)   
 
 
@@ -1570,7 +1587,7 @@ program RJ_MCMC
                 th = th + 1
                 histo(npt)=histo(npt)+1 !histogram of number of layers
                 
-                ! call combine_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+                ! call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 !     r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)   
                 j=1
                 do i=disd,1,-1 ! average model
