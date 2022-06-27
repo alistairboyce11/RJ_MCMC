@@ -56,6 +56,14 @@ joint_invert: params.h
 	$(F77) -o run2 RJ_MCMC_test_joint_invert.f90 \
 	-L./ -lroutines -lm
 
+joint_store_prepare: params.h 
+	$(F77) -o run RJ_MCMC_joint_prepare_store.f90 \
+	-L./ -lroutines -lm
+
+joint_store_invert: params.h 
+	$(F77) -o run2 RJ_MCMC_joint_invert_store.f90 \
+	-L./ -lroutines -lm
+
 global: params.h 
 	$(F77) -o run RJ_MCMC_test_nlay.f90 \
 	-L./ -lroutines -lm

@@ -1,10 +1,10 @@
 
-    character (len=*), parameter :: dirname = 'OUT_TRANS_10000_NEW'
+    character (len=*), parameter :: dirname = 'OUT'
     character*8, parameter :: storename = 'STORFFC1'
-    integer, parameter :: burn_in = 20000! 55000 !Burn-in period
-    integer, parameter :: nsample = 100000! 50000!Post burn-in
+    integer, parameter :: burn_in = 200000! 55000 !Burn-in period
+    integer, parameter :: nsample = 500000! 50000!Post burn-in
     
-    integer, parameter :: thin = 50    !Thinning of the chain 
+    integer, parameter :: thin = 20    !Thinning of the chain 
 
     integer, parameter :: Scratch = 1     ! 0: Start from Stored model 1: Start from scratch
     integer, parameter :: store = 99999999    !Store models every "store" iteration. 
@@ -16,7 +16,7 @@
 
     !depth
     real, parameter :: d_min = 0   ! depth bounds  
-    real, parameter :: d_max = 1000 
+    real, parameter :: d_max = 1500 
       
     real, parameter :: width = 0.4 ! width of the prior in vsv
     
@@ -50,7 +50,7 @@
     ! Parameters for Displaying results 
     !-------------------------------------------- 
 
-    integer, parameter :: display = 1500 ! display results in OUT/mpi.out 
+    integer, parameter :: display = 1000 ! display results in OUT/mpi.out 
     !every display samples
 
      !discretezation for the posterior distribution.
@@ -58,12 +58,12 @@
      !This is because the solution is visualized as an histogram, 
      !and hence we need to define the number of bins
 
-    integer, parameter :: disd = 200 !depth
-    integer, parameter :: disv = 100 !velocity/anisotropy
-    integer, parameter :: disA = 200 !for noise parameter 
+    integer, parameter :: disd = 50 !depth
+    integer, parameter :: disv = 50 !velocity/anisotropy
+    integer, parameter :: disA = 50 !for noise parameter 
 
     !depth of model for display
-    real, parameter :: prof = d_max!1100
+    real, parameter :: prof = 800!1100
     
     !parameters for minos
     real, parameter :: eps=1e-3 !precision of runge-kutta, as high as possible for speed
@@ -74,14 +74,18 @@
     integer, parameter :: nharmo_max=6 !max number of harmonics
     
     ! parameters for joint inversion
-    integer, parameter :: numdis_max=3000
-    real, parameter :: logalpha_min=-200
-    real, parameter :: logalpha_max=20
+    integer, parameter :: numdis_max=16200
+    real, parameter :: logalpha_min=-100
+    real, parameter :: logalpha_max=5
     integer, parameter :: num_logalpha=200
-    real, parameter :: widening_start=1.
-    integer, parameter :: n_w=15
-    real,parameter :: widening_step=0.5
-    integer,parameter :: nsample_widening=10000! 50000!Post burn-in
-    integer,parameter :: burn_in_widening=10000! 50000!Post burn-in
+    real, parameter :: widening_start=2.
+    integer, parameter :: n_w=1
+    real,parameter :: widening_step=1.
+    integer,parameter :: nsample_widening=500000! 50000!Post burn-in
+    integer,parameter :: burn_in_widening=100000! 50000!Post burn-in
     
     logical :: getting_old
+    
+    real :: num_cluster=0
+    
+    integer :: everyall=10000
