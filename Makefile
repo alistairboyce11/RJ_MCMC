@@ -86,7 +86,7 @@ obj: params.h
 	
 obj_vp: params.h
 	$(F77) -c src/whichcell_d.f90
-	$(F77) -c src/combine_vp.f90
+	$(F77) -c src/combine_linear_vp.f90
 	$(F77) -c src/minos_bran.f
 	$(F77) -c src/dispersion_minos.f90
 	$(F77) -c src/interp.f90
@@ -104,7 +104,7 @@ obj_vp: params.h
 #	\rm ./*.o
 
 	ar -r libroutines.a  whichcell_d.o minos_bran.o combine.o dispersion_minos.o interp.o combine_linear.o
-	# ar -r libroutines.a  whichcell_d.o minos_bran.o combine_vp.o dispersion_minos.o interp.o
+	# ar -r libroutines.a  whichcell_d.o minos_bran.o combine_linear_vp.o dispersion_minos.o interp.o
 	\rm ./*.o
 
 #

@@ -25,7 +25,7 @@ program RJ_MCMC
     !-----------------------------------------
 
     ! 0 let Vp Free, 1 Scale Vp, 2 Fix Vp to ref.
-    integer, parameter :: vp_flag = 1                  
+    integer, parameter :: vp_flag = 0                  
     ! scaling parameter for vph in voro when vp_flag=1
     ! dvp=dvs*vp_scale, when vp_scale<=1.0
     ! For S40RTS scaling dvp = dvs * 1.0/(depth/2891.0+2.0), when vp_scale>1.0
@@ -232,7 +232,7 @@ program RJ_MCMC
       
     testing=.true.
     if (testing) write(*,*)'testing with synthetic model'
-    write(*,*)'testing',maxrq
+    ! write(*,*)'testing',maxrq
     ra=rank !seed for RNG
     ran=rank
     inorout=0
@@ -307,13 +307,22 @@ program RJ_MCMC
     !************************************************************
     !                READ PREM 
     !************************************************************
-    open(7,file="Model_PREM_SIMPLE.in",status='old',form='formatted')
-    !  110 format(20a4)
+    ! open(7,file="Model_PREM_SIMPLE.in",status='old',form='formatted')
+    ! !  110 format(20a4)
+    ! read(7,*) nptref,nic_ref,noc_ref
+    ! read(7,'(f8.0, 3f9.2, 2f9.1, 2f9.2, f9.5)') (model_ref(i,1),&
+    !     model_ref(i,2),model_ref(i,3),model_ref(i,4),model_ref(i,5),&
+    !     model_ref(i,6),model_ref(i,7),model_ref(i,8),model_ref(i,9),&
+    !     i=1,nptref)
+    ! close(7)
+
+    open(7,file="Model_PREM_DISC_20.in",status='old',form='formatted')
     read(7,*) nptref,nic_ref,noc_ref
-    read(7,'(f8.0, 3f9.2, 2f9.1, 2f9.2, f9.5)') (model_ref(i,1),&
-        model_ref(i,2),model_ref(i,3),model_ref(i,4),model_ref(i,5),&
-        model_ref(i,6),model_ref(i,7),model_ref(i,8),model_ref(i,9),&
-        i=1,nptref)
+    do i = 1,nptref
+         read(7,*) model_ref(i,1),&
+                    model_ref(i,2),model_ref(i,3),model_ref(i,4),model_ref(i,5),&
+                    model_ref(i,6),model_ref(i,7),model_ref(i,8),model_ref(i,9)
+    end do
     close(7)
 
     j=1
@@ -413,7 +422,7 @@ program RJ_MCMC
             voro(i,1)=30*(i-1) !depth of interface
             voro(i,2)=0.0    !0.1*(-1)**i  !vsv=vsv_prem*(1+voro(i,2))
             voro(i,3)=-1    !0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
-            voro(i,4)=-0.0   !vph=vph_prem*(1+voro(i,4))
+            voro(i,4)=0.0   !vph=vph_prem*(1+voro(i,4))
             npt=npt+1
         end do
         do i=9,23
@@ -518,9 +527,10 @@ program RJ_MCMC
         write(*,*)'DONE INITIALIZING SYNTHETIC MODEL'
     
     else ! real data , untested , unedited, will probably need a little work to get working
-        ! GET SWD DATA ---------------------------------------------------------------- 
+        ! GET SWD DATA ----------------------------------------------------------------
+        write(*,*) 'Starting reading data....'
         nlims_cur=1
-        open(65,file=dirname//'/real_dispersion.in',status='old')! 65: name of the opened file in memory (unit identifier)
+        open(65,file=dirname//'/mod_dispersion.in',status='old')! 65: name of the opened file in memory (unit identifier)
         read(65,*,IOSTAT=io)ndatad_R ! number of Rayleigh modes
         read(65,*,IOSTAT=io)nharm_R ! number of harmonics
         do k=1,nharm_R
@@ -570,6 +580,9 @@ program RJ_MCMC
         if (ndatad_R>=ndatad_L) tref=sum(peri_R(:ndatad_R))/ndatad_R
         if (ndatad_L>ndatad_R) tref=sum(peri_L(:ndatad_L))/ndatad_L
         
+
+        write(*,*) 'Finished reading data....'
+
     endif
     
     !ra=rank
@@ -1050,12 +1063,6 @@ program RJ_MCMC
             if ((voro_prop(ind,1)<=d_min).or.(voro_prop(ind,1)>=d_max)) then
                 out=0
             endif
-
-
-            ! ############### UPDATE VP here!!!!!!!!!!!!!!!!!!!!
-            ! with s40 scaling
-
-
             ! Check prior on velocity when moving cell location - this is not necessary so comment...
             ! if ((voro_prop(ind,2)<=-width).or.(voro_prop(ind,2)>=width)) then
             !     out=0
