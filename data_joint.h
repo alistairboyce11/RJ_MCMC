@@ -79,7 +79,7 @@
     real, parameter :: logalpha_max=20
     integer, parameter :: num_logalpha=200
     real, parameter :: widening_start=1.
-    integer, parameter :: n_w=15
+    integer, parameter :: n_w=1
     real,parameter :: widening_step=0.5
     integer,parameter :: nsample_widening=10000! 50000!Post burn-in
     integer,parameter :: burn_in_widening=10000! 50000!Post burn-in
