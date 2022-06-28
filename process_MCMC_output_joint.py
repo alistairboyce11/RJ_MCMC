@@ -727,27 +727,28 @@ def apply_stuff(comm,directory,functions,params_inversion,params_dispersion,disp
     #                     outputs_all[function]['stack'][key]=res[function]['stack'][key]
     #                 for key in res[function]['nostack']:
     #                     outputs_all[function]['nostack'][key]=res[function]['nostack'][key] # nostack are kept as in the first one
-
+    for function in functions:
+        outputs_all[function.__name__]=function('',{},model_ref,{},params_dispersion,params_inversion,dispersion_ref,dispersion_all,0.,np.zeros((1)),outputs={},init=True)
     for file in files:
-        output=process_one_file(file,functions,params_inversion,params_dispersion,dispersion_ref,dispersion_all,model_ref)
+        process_one_file(file,functions,params_inversion,params_dispersion,dispersion_ref,dispersion_all,model_ref,outputs_all)
         print('done',rank,file)
-        for function in output:
-            if function in outputs_all:
-                for key in output[function]['stack']: # stack are stacked
-                    outputs_all[function]['stack'][key]+=output[function]['stack'][key]
-            else:
-                outputs_all[function]={}
-                outputs_all[function]['stack']={}
-                outputs_all[function]['nostack']={}
+        # for function in output:
+        #     if function in outputs_all:
+        #         for key in output[function]['stack']: # stack are stacked
+        #             outputs_all[function]['stack'][key]+=output[function]['stack'][key]
+        #     else:
+        #         outputs_all[function]={}
+        #         outputs_all[function]['stack']={}
+        #         outputs_all[function]['nostack']={}
 
-                for key in output[function]['stack']:
-                    outputs_all[function]['stack'][key]=output[function]['stack'][key]
-                for key in output[function]['nostack']:
-                    outputs_all[function]['nostack'][key]=output[function]['nostack'][key]
-                for key in output[function]:
-                    if key=='stack' or key=='nostack':
-                        continue
-                    outputs_all[function][key]=output[function][key]
+        #         for key in output[function]['stack']:
+        #             outputs_all[function]['stack'][key]=output[function]['stack'][key]
+        #         for key in output[function]['nostack']:
+        #             outputs_all[function]['nostack'][key]=output[function]['nostack'][key]
+        #         for key in output[function]:
+        #             if key=='stack' or key=='nostack':
+        #                 continue
+        #             outputs_all[function][key]=output[function][key]
     for function in outputs_all:
         for key in outputs_all[function]['stack']:
 
@@ -779,8 +780,9 @@ def apply_stuff(comm,directory,functions,params_inversion,params_dispersion,disp
                 for i in range(len(outputs_all[function]['meansum'])): # calculate average
                     key_mean=outputs_all[function]['meansum'][i]
                     key_sum=outputs_all[function]['meansum_weights'][i]
+                    ndata=outputs_all[function]['nostack'][outputs_all[function]['meansum_ndata'][i]]
 
-                    weights=np.transpose(np.tile(outputs_all[function]['stack'][key_sum],(outputs_all[function]['nostack']['ndata'],1))) # sum of weights
+                    weights=np.tile(outputs_all[function]['stack'][key_sum],(ndata,1)) # sum of weights
 
                     outputs_all[function]['stack'][key_mean]=np.divide(outputs_all[function]['stack'][key_mean],weights)
 
@@ -792,12 +794,14 @@ def apply_stuff(comm,directory,functions,params_inversion,params_dispersion,disp
 
                     key_mean_shift=outputs_all[function]['meansum_sq_shift'][i]
 
+                    ndata=outputs_all[function]['nostack'][outputs_all[function]['meansum_sq_ndata'][i]]
+
                     print(key_sum,key_mean_sq,key_mean_shift)
 
-                    weights=np.transpose(np.tile(outputs_all[function]['stack'][key_sum],(outputs_all[function]['nostack']['ndata'],1))) # get weights
+                    weights=np.tile(outputs_all[function]['stack'][key_sum],(ndata,1)) # get weights
                     #weights=outputs_all[function]['stack'][key_sum] # get weights
 
-                    print(np.shape(weights),np.shape(outputs_all[function]['stack'][key_sum]),outputs_all[function]['nostack']['ndata'],np.shape(np.tile(outputs_all[function]['stack'][key_sum],(outputs_all[function]['nostack']['ndata'],1))),np.shape(outputs_all[function]['stack'][key_mean_sq]))
+                    print(np.shape(weights),np.shape(outputs_all[function]['stack'][key_sum]),ndata,np.shape(np.tile(outputs_all[function]['stack'][key_sum],(ndata,1))),np.shape(outputs_all[function]['stack'][key_mean_sq]))
 
                     mean_sq=np.divide(outputs_all[function]['stack'][key_mean_sq],weights) # mean of squares
                     mean_shifted=np.square(np.divide(outputs_all[function]['stack'][key_mean_shift],weights)) # square of means, shifted by reference model
@@ -838,7 +842,7 @@ def apply_stuff(comm,directory,functions,params_inversion,params_dispersion,disp
 
 
 
-def process_one_file(file,functions,params_inversion,params_dispersion,dispersion_ref,dispersion_all,model_ref):
+def process_one_file(file,functions,params_inversion,params_dispersion,dispersion_ref,dispersion_all,model_ref,outputs_all={}):
     '''
     Processes one file, reading the podels in the file, applying the functions to them and stacking the results
 
@@ -866,7 +870,7 @@ def process_one_file(file,functions,params_inversion,params_dispersion,dispersio
     # dispersion_ref=input_dict['dispersion_ref']
     # dispersion_all=input_dict['dispersion_all']
     # model_ref=input_dict['model_ref']
-    outputs={}
+    #outputs={}
 
     numtot=0
 
@@ -970,25 +974,25 @@ def process_one_file(file,functions,params_inversion,params_dispersion,dispersio
 
         # apply functions
         for function in functions:
-            output=function(file,model,model_ref,dispersion_one,params_dispersion,params_inversion,dispersion_ref,dispersion_all,alpha_ref,alpha,first=(numtot==0))
+            function(file,model,model_ref,dispersion_one,params_dispersion,params_inversion,dispersion_ref,dispersion_all,alpha_ref,alpha,first=(numtot==0),outputs=outputs_all[function.__name__])
 
-            # stack outputs
-            if function.__name__ in outputs:
-                for key in output['stack']:
+            # # stack outputs
+            # if function.__name__ in outputs:
+            #     for key in output['stack']:
 
-                    outputs[function.__name__]['stack'][key]+=output['stack'][key]
-            else:
-                outputs[function.__name__]={}
-                outputs[function.__name__]['stack']={}
-                outputs[function.__name__]['nostack']={}
-                for key in output['stack']:
-                    outputs[function.__name__]['stack'][key]=output['stack'][key]
-                for key in output['nostack']:
-                    outputs[function.__name__]['nostack'][key]=output['nostack'][key]
-                for key in output:
-                    if key=='stack' or key=='nostack':
-                        continue
-                    outputs[function.__name__][key]=output[key]
+            #         outputs[function.__name__]['stack'][key]+=output['stack'][key]
+            # else:
+            #     outputs[function.__name__]={}
+            #     outputs[function.__name__]['stack']={}
+            #     outputs[function.__name__]['nostack']={}
+            #     for key in output['stack']:
+            #         outputs[function.__name__]['stack'][key]=output['stack'][key]
+            #     for key in output['nostack']:
+            #         outputs[function.__name__]['nostack'][key]=output['nostack'][key]
+            #     for key in output:
+            #         if key=='stack' or key=='nostack':
+            #             continue
+            #         outputs[function.__name__][key]=output[key]
         line=f.readline()
         #print(numtot)
         numtot+=1
@@ -1011,9 +1015,9 @@ def process_one_file(file,functions,params_inversion,params_dispersion,dispersio
     print('get alpha: ',time_alpha)
     print('apply: ',time_apply)
 
-    return outputs
+    return #outputs
 
-def create_posterior(file,model,model_ref,dispersion_one,params_dispersion,params_inversion,dispersion_ref,dispersion_all,alpha_ref,alpha,first=True):
+def create_posterior(file,model,model_ref,dispersion_one,params_dispersion,params_inversion,dispersion_ref,dispersion_all,alpha_ref,alpha,first=True,outputs={},init=False):
     '''
     example of a function to be applied to the data
     creates a 2D histogram of vsv for the reference and each member of the cluster
@@ -1048,37 +1052,58 @@ def create_posterior(file,model,model_ref,dispersion_one,params_dispersion,param
         has 2 subdicts, 'stack' and 'nostack'.
 
     '''
+
     ndatad=50
     ndatav=50
-    outputs={}
-    outputs['stack']={}
-    outputs['nostack']={}
-    vsv_ref=np.zeros((ndatad,ndatav))
-    xi_ref=np.zeros_like(vsv_ref)
-    vp_ref=np.zeros_like(vsv_ref)
 
-    vsv_wide=np.zeros((ndatad,ndatav))
-    xi_wide=np.zeros_like(vsv_wide)
-    vp_wide=np.zeros_like(vsv_wide)
+    if init:
 
-    numdis=dispersion_all['numdis']
-    vsv_all=np.zeros((ndatad,ndatav,numdis))
-    xi_all=np.zeros_like(vsv_all)
-    vp_all=np.zeros_like(vsv_all)
+        outputs={}
+        outputs['stack']={}
+        outputs['nostack']={}
+        outputs['stack']['vsv_ref']=np.zeros((ndatad,ndatav))
+        outputs['stack']['xi_ref']=np.zeros((ndatad,ndatav))
+        outputs['stack']['vp_ref']=np.zeros((ndatad,ndatav))
 
-    depths=np.linspace(params_inversion['d_min'],params_inversion['d_max'],ndatad)
-    vels_vsv=np.linspace(np.amin(model_ref['vsv']*(1-params_inversion['width_vsv'])),
-                     np.amax(model_ref['vsv']*(1+params_inversion['width_vsv'])),
-                     ndatav)
-    vels_vp=np.linspace(params_inversion['vpvs_min'],params_inversion['vpvs_max'],ndatav)
-    vels_xi=np.linspace(params_inversion['xi_min'],params_inversion['xi_max'],ndatav)
+        outputs['stack']['vsv_wide']=np.zeros((ndatad,ndatav))
+        outputs['stack']['xi_wide']=np.zeros((ndatad,ndatav))
+        outputs['stack']['vp_wide']=np.zeros((ndatad,ndatav))
 
-    outputs['nostack']['depths']=depths
-    outputs['nostack']['vels_vsv']=vels_vsv
-    outputs['nostack']['vels_vp']=vels_vp
-    outputs['nostack']['vels_xi']=vels_xi
-    outputs['nostack']['ndatad']=ndatad
-    outputs['nostack']['ndatav']=ndatav
+        numdis=dispersion_all['numdis']
+        outputs['stack']['vsv_all']=np.zeros((ndatad,ndatav,numdis))
+        outputs['stack']['xi_all']=np.zeros((ndatad,ndatav,numdis))
+        outputs['stack']['vp_all']=np.zeros((ndatad,ndatav,numdis))
+
+        outputs['nostack']['depths']=np.linspace(params_inversion['d_min'],params_inversion['d_max'],ndatad)
+        outputs['nostack']['vels_vsv']=np.linspace(np.amin(model_ref['vsv']*(1-params_inversion['width_vsv'])),
+                         np.amax(model_ref['vsv']*(1+params_inversion['width_vsv'])),
+                         ndatav)
+        outputs['nostack']['vels_vp']=np.linspace(params_inversion['vpvs_min'],params_inversion['vpvs_max'],ndatav)
+        outputs['nostack']['vels_xi']=np.linspace(params_inversion['xi_min'],params_inversion['xi_max'],ndatav)
+
+        # outputs['nostack']['depths']=depths
+        # outputs['nostack']['vels_vsv']=vels_vsv
+        # outputs['nostack']['vels_vp']=vels_vp
+        # outputs['nostack']['vels_xi']=vels_xi
+        # outputs['nostack']['ndatad']=ndatad
+        outputs['nostack']['ndatav']=ndatav
+
+        # outputs['stack']['vsv_ref']=vsv_ref
+        # outputs['stack']['xi_ref']=xi_ref
+        # outputs['stack']['vp_ref']=vp_ref
+        # outputs['stack']['vsv_all']=vsv_all
+        # outputs['stack']['xi_all']=xi_all
+        # outputs['stack']['vp_all']=vp_all
+        # outputs['stack']['vsv_wide']=vsv_wide
+        # outputs['stack']['xi_wide']=xi_wide
+        # outputs['stack']['vp_wide']=vp_wide
+
+        return outputs
+
+    depths=outputs['nostack']['depths']
+    vels_vsv=outputs['nostack']['vels_vsv']
+    vels_vp=outputs['nostack']['vels_vp']
+    vels_xi=outputs['nostack']['vels_xi']
 
     vsv_model=model['vsv']
     xi_model=model['xi']
@@ -1095,34 +1120,32 @@ def create_posterior(file,model,model_ref,dispersion_one,params_dispersion,param
     alpha=np.exp(alpha)
 
     ind_vsv=np.digitize(np.interp(depths,depth_model,vsv_model),bins=vels_vsv,right=True)
-    vsv_ref[np.arange(ndatad),ind_vsv]+=np.reshape(np.tile(alpha_ref,(ndatad,1)),(ndatad))
-    vsv_wide[np.arange(ndatad),ind_vsv]+=np.reshape(np.tile(1.,(ndatad,1)),(ndatad))
+    outputs['stack']['vsv_ref'][np.arange(ndatad),ind_vsv]+=np.reshape(np.tile(alpha_ref,(ndatad,1)),(ndatad))
+    outputs['stack']['vsv_wide'][np.arange(ndatad),ind_vsv]+=np.reshape(np.tile(1.,(ndatad,1)),(ndatad))
 
-    vsv_all[np.arange(ndatad),ind_vsv,:]+=np.tile(np.ma.exp(alpha),(ndatad,1))
+    outputs['stack']['vsv_all'][np.arange(ndatad),ind_vsv,:]+=np.tile(alpha,(ndatad,1))
 
     ind_xi=np.digitize(np.interp(depths,depth_model,xi_model),bins=vels_xi,right=True)
-    xi_ref[np.arange(ndatad),ind_xi]+=np.reshape(np.tile(alpha_ref,(ndatad,1)),(ndatad))
-    xi_wide[np.arange(ndatad),ind_xi]+=np.reshape(np.tile(1.,(ndatad,1)),(ndatad))
+    outputs['stack']['xi_ref'][np.arange(ndatad),ind_xi]+=np.reshape(np.tile(alpha_ref,(ndatad,1)),(ndatad))
+    outputs['stack']['xi_wide'][np.arange(ndatad),ind_xi]+=np.reshape(np.tile(1.,(ndatad,1)),(ndatad))
 
-    xi_all[np.arange(ndatad),ind_xi,:]+=np.tile(np.ma.exp(alpha),(ndatad,1))
+    outputs['stack']['xi_all'][np.arange(ndatad),ind_xi,:]+=np.tile(alpha,(ndatad,1))
 
     ind_vp=np.digitize(np.interp(depths,depth_model,vp_model),bins=vels_vp,right=True)
+    outputs['stack']['vp_ref'][np.arange(ndatad),ind_vp]+=np.reshape(np.tile(alpha_ref,(ndatad,1)),(ndatad))
+    outputs['stack']['vp_wide'][np.arange(ndatad),ind_vp]+=np.reshape(np.tile(1.,(ndatad,1)),(ndatad))
 
+    outputs['stack']['vp_all'][np.arange(ndatad),ind_vp,:]+=np.tile(alpha,(ndatad,1))
 
-    vp_ref[np.arange(ndatad),ind_vp]+=np.reshape(np.tile(alpha_ref,(ndatad,1)),(ndatad))
-    vp_wide[np.arange(ndatad),ind_vp]+=np.reshape(np.tile(1.,(ndatad,1)),(ndatad))
-
-    vp_all[np.arange(ndatad),ind_vp,:]+=np.tile(np.ma.exp(alpha),(ndatad,1))
-
-    outputs['stack']['vsv_ref']=vsv_ref
-    outputs['stack']['xi_ref']=xi_ref
-    outputs['stack']['vp_ref']=vp_ref
-    outputs['stack']['vsv_all']=vsv_all
-    outputs['stack']['xi_all']=xi_all
-    outputs['stack']['vp_all']=vp_all
-    outputs['stack']['vsv_wide']=vsv_wide
-    outputs['stack']['xi_wide']=xi_wide
-    outputs['stack']['vp_wide']=vp_wide
+    # outputs['stack']['vsv_ref']+=vsv_ref
+    # outputs['stack']['xi_ref']+=xi_ref
+    # outputs['stack']['vp_ref']+=vp_ref
+    # outputs['stack']['vsv_all']+=vsv_all
+    # outputs['stack']['xi_all']+=xi_all
+    # outputs['stack']['vp_all']+=vp_all
+    # outputs['stack']['vsv_wide']+=vsv_wide
+    # outputs['stack']['xi_wide']+=xi_wide
+    # outputs['stack']['vp_wide']+=vp_wide
     #outputs['stack']['alpha_sum']=alpha
     #outputs['stack']['alpha_ref_sum']=alpha_ref
     #outputs['stack']['models_sum_vsv']=np.multiply(np.tile(alpha,(ndatad,1)),np.transpose(np.tile(np.interp(depths,depth_model,vsv_model),(numdis,1))))
@@ -1134,48 +1157,110 @@ def create_posterior(file,model,model_ref,dispersion_one,params_dispersion,param
 
 
 
-    return outputs
+    return
 
-def get_average(file,model,model_ref,dispersion_one,params_dispersion,params_inversion,dispersion_ref,dispersion_all,alpha_ref,alpha,first=True):
+def get_average(file,model,model_ref,dispersion_one,params_dispersion,params_inversion,dispersion_ref,dispersion_all,alpha_ref,alpha,first=True,outputs={},init=False):
 
     ndatad=200
-    outputs={}
-    outputs['stack']={}
-    outputs['nostack']={}
-    # vsv_ref=np.zeros((ndatad))
-    # xi_ref=np.zeros_like(vsv_ref)
-    # vp_ref=np.zeros_like(vsv_ref)
-    # probani_ref=np.zeros_like(vsv_ref)
 
-    # vsv_ref_sq=np.zeros((ndatad))
-    # xi_ref_sq=np.zeros_like(vsv_ref)
-    # vp_ref_sq=np.zeros_like(vsv_ref)
+    if init:
+        outputs={}
+        outputs['stack']={}
+        outputs['nostack']={}
+        # vsv_ref=np.zeros((ndatad))
+        # xi_ref=np.zeros_like(vsv_ref)
+        # vp_ref=np.zeros_like(vsv_ref)
+        # probani_ref=np.zeros_like(vsv_ref)
 
-    # vsv_wide=np.zeros((ndatad))
-    # xi_wide=np.zeros_like(vsv_ref)
-    # vp_wide=np.zeros_like(vsv_ref)
-    # probani_wide=np.zeros_like(vsv_ref)
+        # vsv_ref_sq=np.zeros((ndatad))
+        # xi_ref_sq=np.zeros_like(vsv_ref)
+        # vp_ref_sq=np.zeros_like(vsv_ref)
 
-    # vsv_wide_sq=np.zeros((ndatad))
-    # xi_wide_sq=np.zeros_like(vsv_ref)
-    # vp_wide_sq=np.zeros_like(vsv_ref)
+        # vsv_wide=np.zeros((ndatad))
+        # xi_wide=np.zeros_like(vsv_ref)
+        # vp_wide=np.zeros_like(vsv_ref)
+        # probani_wide=np.zeros_like(vsv_ref)
 
-    # numdis=dispersion_all['numdis']
-    # vsv_all=np.zeros((ndatad,numdis))
-    # xi_all=np.zeros_like(vsv_all)
-    # vp_all=np.zeros_like(vsv_all)
-    # probani_all=np.zeros_like(vsv_all)
+        # vsv_wide_sq=np.zeros((ndatad))
+        # xi_wide_sq=np.zeros_like(vsv_ref)
+        # vp_wide_sq=np.zeros_like(vsv_ref)
 
-    # vsv_all_sq=np.zeros((ndatad,numdis))
-    # xi_all_sq=np.zeros_like(vsv_all)
-    # vp_all_sq=np.zeros_like(vsv_all)
+        # numdis=dispersion_all['numdis']
+        # vsv_all=np.zeros((ndatad,numdis))
+        # xi_all=np.zeros_like(vsv_all)
+        # vp_all=np.zeros_like(vsv_all)
+        # probani_all=np.zeros_like(vsv_all)
 
+        # vsv_all_sq=np.zeros((ndatad,numdis))
+        # xi_all_sq=np.zeros_like(vsv_all)
+        # vp_all_sq=np.zeros_like(vsv_all)
 
+        numdis=dispersion_all['numdis']
 
-    depths=np.linspace(params_inversion['d_min'],params_inversion['d_max'],ndatad)
+        depths=np.linspace(params_inversion['d_min'],params_inversion['d_max'],ndatad)
 
-    outputs['nostack']['depths']=depths
-    outputs['nostack']['ndata']=ndatad
+        outputs['nostack']['depths']=depths
+        outputs['nostack']['ndata']=ndatad
+
+        outputs['meansum']=[]
+        outputs['meansum_weights']=[]
+        outputs['meansum_ndata']=[]
+        # outputs['meansum_sq']=[]
+        # outputs['meansum_sq_weights']=[]
+        # outputs['meansum_sq_shift']=[]
+        outputs['meansum_ref']=[]
+        outputs['meansum_ref_weights']=[]
+        # outputs['meansum_sq_ref']=[]
+        # outputs['meansum_sq_ref_weights']=[]
+        # outputs['meansum_sq_ref_shift']=[]
+        outputs['meansum_wide']=[]
+        outputs['meansum_wide_weights']=[]
+
+        outputs['stack']['alpha_sum']=np.zeros((numdis))
+        outputs['stack']['alpha_ref_sum']=0
+        outputs['stack']['alpha_wide_sum']=0
+
+        # outputs['stack']['models_mean_vsv']=vsv_all
+        # outputs['meansum'].append('models_mean_vsv')
+        # outputs['meansum_weights'].append('alpha_sum')
+        # outputs['stack']['models_mean_vsv_ref']=vsv_ref
+        # outputs['meansum_ref'].append('models_mean_vsv_ref')
+        # outputs['meansum_ref_weights'].append('alpha_ref_sum')
+        # outputs['stack']['models_mean_vsv_wide']=vsv_wide
+        # outputs['stack']['models_mean_vsv_sq']=vsv_all_sq
+        # outputs['stack']['models_mean_vsv_sq_ref']=vsv_ref_sq
+        # outputs['stack']['models_mean_vsv_sq_wide']=vsv_wide_sq
+
+        # outputs['nostack']['models_mean_vsv_mean_sq']=vsv_model_ref
+        # outputs['stack']['models_mean_vp']=vp_all
+        # outputs['stack']['models_mean_vp_ref']=vp_ref
+        # outputs['stack']['models_mean_vp_wide']=vp_wide
+        # outputs['stack']['models_mean_vp_sq']=vp_all_sq
+        # outputs['stack']['models_mean_vp_sq_ref']=vp_ref_sq
+        # outputs['stack']['models_mean_vp_sq_wide']=vp_wide_sq
+        # outputs['nostack']['models_mean_vp_mean_sq']=np.zeros_like(vp_ref)
+        # outputs['stack']['models_mean_xi']=xi_all
+        # outputs['stack']['models_mean_xi_ref']=xi_ref
+        # outputs['stack']['models_mean_xi_wide']=xi_wide
+        # outputs['stack']['models_mean_xi_sq']=xi_all_sq
+        # outputs['stack']['models_mean_xi_sq_ref']=xi_ref_sq
+        # outputs['stack']['models_mean_xi_sq_wide']=xi_wide_sq
+        # outputs['nostack']['models_mean_xi_mean_sq']=np.ones_like(xi_ref)
+        outputs['stack']['probani']=np.zeros((ndatad,numdis))
+        outputs['meansum'].append('probani')
+        outputs['meansum_weights'].append('alpha_sum')
+        outputs['meansum_ndata'].append('ndata')
+        outputs['stack']['probani_ref']=np.zeros((ndatad))
+        outputs['meansum_ref'].append('probani_ref')
+        outputs['meansum_ref_weights'].append('alpha_ref_sum')
+        outputs['stack']['probani_wide']=np.zeros((ndatad))
+        outputs['meansum_wide'].append('probani_wide')
+        outputs['meansum_wide_weights'].append('alpha_wide_sum')
+
+        return outputs
+
+    depths=outputs['nostack']['depths']
+    ndatad=outputs['nostack']['ndata']
 
     # vsv_model=model['vsv']
     xi_model=model['xi']
@@ -1232,29 +1317,16 @@ def get_average(file,model,model_ref,dispersion_one,params_dispersion,params_inv
     # vp_all=np.multiply(vp_alt,alpha_alt)
     # vp_all_sq=np.multiply(vp_alt,alpha_alt)
 
-    probani_wide=(xi!=1.)
+    outputs['stack']['probani_wide']+=(xi!=1.)
 
-    probani_ref=alpha_ref*(xi!=1.)
+    outputs['stack']['probani_ref']+=alpha_ref*(xi!=1.)
 
-    probani_alt,alpha_alt=np.meshgrid((xi!=1.),alpha)
-    probani_all=np.multiply(probani_alt,alpha_alt)
+    alpha_alt,probani_alt=np.meshgrid(alpha,(xi!=1.))
+    outputs['stack']['probani']+=np.multiply(probani_alt,alpha_alt)
 
-    outputs['meansum']=[]
-    outputs['meansum_weights']=[]
-    # outputs['meansum_sq']=[]
-    # outputs['meansum_sq_weights']=[]
-    # outputs['meansum_sq_shift']=[]
-    outputs['meansum_ref']=[]
-    outputs['meansum_ref_weights']=[]
-    # outputs['meansum_sq_ref']=[]
-    # outputs['meansum_sq_ref_weights']=[]
-    # outputs['meansum_sq_ref_shift']=[]
-    outputs['meansum_wide']=[]
-    outputs['meansum_wide_weights']=[]
-
-    outputs['stack']['alpha_sum']=alpha
-    outputs['stack']['alpha_ref_sum']=alpha_ref
-    outputs['stack']['alpha_wide_sum']=1.
+    outputs['stack']['alpha_sum']+=alpha
+    outputs['stack']['alpha_ref_sum']+=alpha_ref
+    outputs['stack']['alpha_wide_sum']+=1.
 
     # outputs['stack']['models_mean_vsv']=vsv_all
     # outputs['meansum'].append('models_mean_vsv')
@@ -1281,22 +1353,16 @@ def get_average(file,model,model_ref,dispersion_one,params_dispersion,params_inv
     # outputs['stack']['models_mean_xi_sq_ref']=xi_ref_sq
     # outputs['stack']['models_mean_xi_sq_wide']=xi_wide_sq
     # outputs['nostack']['models_mean_xi_mean_sq']=np.ones_like(xi_ref)
-    outputs['stack']['probani']=probani_all
-    outputs['meansum'].append('probani')
-    outputs['meansum_weights'].append('alpha_sum')
-    outputs['stack']['probani_ref']=probani_ref
-    outputs['meansum_ref'].append('probani_ref')
-    outputs['meansum_ref_weights'].append('alpha_ref_sum')
-    outputs['stack']['probani_wide']=probani_wide
-    outputs['meansum_wide'].append('probani_wide')
-    outputs['meansum_wide_weights'].append('alpha_wide_sum')
+    # outputs['stack']['probani']=probani_all
+    # outputs['stack']['probani_ref']=probani_ref
+    # outputs['stack']['probani_wide']=probani_wide
 
 
 
 
-    return outputs
+    return #outputs
 
-def get_histograms(file,model,model_ref,dispersion_one,params_dispersion,params_inversion,dispersion_ref,dispersion_all,alpha_ref,alpha,first=True):
+def get_histograms(file,model,model_ref,dispersion_one,params_dispersion,params_inversion,dispersion_ref,dispersion_all,alpha_ref,alpha,first=True,outputs={},init=False):
     '''
     example of a function to be applied to the data
     creates a 2D histogram of vsv for the reference and each member of the cluster
@@ -1332,41 +1398,63 @@ def get_histograms(file,model,model_ref,dispersion_one,params_dispersion,params_
 
     '''
     ndata=200
-    outputs={}
-    outputs['stack']={}
-    outputs['nostack']={}
-
-    #params_inversion['milay']=5
-    #params_inversion['malay']=40
-
-    range_nlay=np.arange(params_inversion['milay'],params_inversion['malay']+1)
-    range_sigmaR=np.linspace(params_inversion['Ad_R_min'],
-                     params_inversion['Ad_R_max'],
-                     ndata)
-    range_sigmaL=np.linspace(params_inversion['Ad_L_min'],
-                     params_inversion['Ad_L_max'],
-                     ndata)
-    range_alpha=np.linspace(-100,
-                     10,
-                     ndata)
-
     numdis=dispersion_all['numdis']
-    nlay=np.zeros((params_inversion['malay']-params_inversion['milay']+1,numdis))
-    nlay_ref=np.zeros((params_inversion['malay']-params_inversion['milay']+1))
-    nlay_wide=np.zeros_like(nlay_ref)
-    sigmaR=np.zeros((ndata,numdis))
-    sigmaR_ref=np.zeros((ndata))
-    sigmaR_wide=np.zeros_like(sigmaR_ref)
-    sigmaL=np.zeros_like(sigmaR)
-    sigmaL_ref=np.zeros_like(sigmaR_ref)
-    sigmaL_wide=np.zeros_like(sigmaR_ref)
-    alphahist=np.zeros_like(sigmaR)
-    alphahist_ref=np.zeros_like(sigmaR_ref)
+    if init:
+        outputs={}
+        outputs['stack']={}
+        outputs['nostack']={}
 
-    outputs['nostack']['range_nlay']=range_nlay
-    outputs['nostack']['range_sigmaR']=range_sigmaR
-    outputs['nostack']['range_sigmaL']=range_sigmaL
-    outputs['nostack']['range_alpha']=range_alpha
+        #params_inversion['milay']=5
+        #params_inversion['malay']=40
+
+        range_nlay=np.arange(params_inversion['milay'],params_inversion['malay']+1)
+        range_sigmaR=np.linspace(params_inversion['Ad_R_min'],
+                         params_inversion['Ad_R_max'],
+                         ndata)
+        range_sigmaL=np.linspace(params_inversion['Ad_L_min'],
+                         params_inversion['Ad_L_max'],
+                         ndata)
+        range_alpha=np.linspace(-100,
+                         10,
+                         ndata)
+
+        outputs['stack']['nlay_hist']=np.zeros((params_inversion['malay']-params_inversion['milay']+1,numdis))
+        outputs['stack']['nlay_ref_hist']=np.zeros((params_inversion['malay']-params_inversion['milay']+1))
+        outputs['stack']['nlay_wide_hist']=np.zeros((params_inversion['malay']-params_inversion['milay']+1))
+        outputs['stack']['sigmaR_hist']=np.zeros((ndata,numdis))
+        outputs['stack']['sigmaR_ref_hist']=np.zeros((ndata))
+        outputs['stack']['sigmaR_wide_hist']=np.zeros((ndata))
+        outputs['stack']['sigmaL_hist']=np.zeros((ndata,numdis))
+        outputs['stack']['sigmaL_ref_hist']=np.zeros((ndata))
+        outputs['stack']['sigmaL_wide_hist']=np.zeros((ndata))
+        outputs['stack']['alpha_hist']=np.zeros((ndata,numdis))
+        outputs['stack']['alpha_ref_hist']=np.zeros((ndata))
+
+        outputs['nostack']['range_nlay']=range_nlay
+        outputs['nostack']['range_sigmaR']=range_sigmaR
+        outputs['nostack']['range_sigmaL']=range_sigmaL
+        outputs['nostack']['range_alpha']=range_alpha
+
+        # outputs['stack']['nlay_hist']=nlay
+        # outputs['stack']['nlay_ref_hist']=nlay_ref
+        # outputs['stack']['nlay_wide_hist']=nlay_wide
+        # outputs['stack']['sigmaR_hist']=sigmaR
+        # outputs['stack']['sigmaR_ref_hist']=sigmaR_ref
+        # outputs['stack']['sigmaR_wide_hist']=sigmaR_wide
+        # outputs['stack']['sigmaL_hist']=sigmaL
+        # outputs['stack']['sigmaL_ref_hist']=sigmaL_ref
+        # outputs['stack']['sigmaL_wide_hist']=sigmaL_wide
+        # outputs['stack']['alpha_hist']=alphahist
+        # outputs['stack']['alpha_ref_hist']=alphahist_ref
+
+        return outputs
+
+        return outputs
+
+    range_nlay=outputs['nostack']['range_nlay']
+    range_sigmaR=outputs['nostack']['range_sigmaR']
+    range_sigmaL=outputs['nostack']['range_sigmaL']
+    range_alpha=outputs['nostack']['range_alpha']
 
     nlay_model=model['npt']
 
@@ -1383,52 +1471,140 @@ def get_histograms(file,model,model_ref,dispersion_one,params_dispersion,params_
     alpha=np.exp(alpha)
 
     ind_nlay=nlay_model-params_inversion['milay']
-    nlay[ind_nlay,:]=alpha
-    nlay_ref[ind_nlay]=alpha_ref
-    nlay_wide[ind_nlay]+=1
+    outputs['stack']['nlay_hist'][ind_nlay,:]+=alpha
+    outputs['stack']['nlay_ref_hist'][ind_nlay]+=alpha_ref
+    outputs['stack']['nlay_wide_hist'][ind_nlay]+=1
 
     ind_sigmaR=np.digitize(model['Ad_R'],bins=range_sigmaR)
-    sigmaR[ind_sigmaR,:]=alpha
-    sigmaR_ref[ind_sigmaR]=alpha_ref
-    sigmaR_wide[ind_sigmaR]+=1
+    outputs['stack']['sigmaR_hist'][ind_sigmaR,:]+=alpha
+    outputs['stack']['sigmaR_ref_hist'][ind_sigmaR]+=alpha_ref
+    outputs['stack']['sigmaR_wide_hist'][ind_sigmaR]+=1
 
     ind_sigmaL=np.digitize(model['Ad_L'],bins=range_sigmaL)
-    sigmaL[ind_sigmaL,:]=alpha
-    sigmaL_ref[ind_sigmaL]=alpha_ref
-    sigmaL_wide[ind_sigmaL]+=1
+    outputs['stack']['sigmaL_hist'][ind_sigmaL,:]+=alpha
+    outputs['stack']['sigmaL_ref_hist'][ind_sigmaL]+=alpha_ref
+    outputs['stack']['sigmaL_wide_hist'][ind_sigmaL]+=1
 
     ind_alpha=np.digitize(alpha_old,bins=range_alpha)
-    alphahist[ind_alpha,np.arange(numdis)]=1
+    outputs['stack']['alpha_hist'][ind_alpha,np.arange(numdis)]+=1
     ind_alpha=np.digitize(alpha_ref_old,bins=range_alpha)
-    alphahist_ref[ind_alpha]=1
+    outputs['stack']['alpha_ref_hist'][ind_alpha]+=1
 
-    outputs['stack']['nlay_hist']=nlay
-    outputs['stack']['nlay_ref_hist']=nlay_ref
-    outputs['stack']['nlay_wide_hist']=nlay_wide
-    outputs['stack']['sigmaR_hist']=sigmaR
-    outputs['stack']['sigmaR_ref_hist']=sigmaR_ref
-    outputs['stack']['sigmaR_wide_hist']=sigmaR_wide
-    outputs['stack']['sigmaL_hist']=sigmaL
-    outputs['stack']['sigmaL_ref_hist']=sigmaL_ref
-    outputs['stack']['sigmaL_wide_hist']=sigmaL_wide
-    outputs['stack']['alpha_hist']=alphahist
-    outputs['stack']['alpha_ref_hist']=alphahist_ref
-
-
-    return outputs
-
-def get_dispersion_mean(file,model,model_ref,dispersion_one,params_dispersion,params_inversion,dispersion_ref,dispersion_all,alpha_ref,alpha,first=True):
-
-    outputs={}
-    outputs['stack']={}
-    outputs['nostack']={}
+    # outputs['stack']['nlay_hist']=nlay
+    # outputs['stack']['nlay_ref_hist']=nlay_ref
+    # outputs['stack']['nlay_wide_hist']=nlay_wide
+    # outputs['stack']['sigmaR_hist']=sigmaR
+    # outputs['stack']['sigmaR_ref_hist']=sigmaR_ref
+    # outputs['stack']['sigmaR_wide_hist']=sigmaR_wide
+    # outputs['stack']['sigmaL_hist']=sigmaL
+    # outputs['stack']['sigmaL_ref_hist']=sigmaL_ref
+    # outputs['stack']['sigmaL_wide_hist']=sigmaL_wide
+    # outputs['stack']['alpha_hist']=alphahist
+    # outputs['stack']['alpha_ref_hist']=alphahist_ref
 
 
+    return #outputs
+
+def get_dispersion_mean(file,model,model_ref,dispersion_one,params_dispersion,params_inversion,dispersion_ref,dispersion_all,alpha_ref,alpha,first=True,outputs={},init=False):
+
+    numdis=dispersion_all['numdis']
+    if init:
+        outputs={}
+        outputs['stack']={}
+        outputs['nostack']={}
+
+
+
+        dispersion_R_ref=dispersion_ref['R']['dispersion']
+        dispersion_L_ref=dispersion_ref['L']['dispersion']
+
+        outputs['nostack']['ndata_R']=len(dispersion_R_ref)
+        outputs['nostack']['ndata_L']=len(dispersion_L_ref)
+
+        outputs['meansum']=[]
+        outputs['meansum_weights']=[]
+        outputs['meansum_ndata']=[]
+        outputs['meansum_sq']=[]
+        outputs['meansum_sq_weights']=[]
+        outputs['meansum_sq_ndata']=[]
+        outputs['meansum_sq_shift']=[]
+        outputs['meansum_ref']=[]
+        outputs['meansum_ref_weights']=[]
+        outputs['meansum_sq_ref']=[]
+        outputs['meansum_sq_ref_weights']=[]
+        outputs['meansum_sq_ref_shift']=[]
+        outputs['meansum_wide']=[]
+        outputs['meansum_wide_weights']=[]
+
+        shape_all_R=np.shape(dispersion_all['R']['dispersion'])
+        shape_all_L=np.shape(dispersion_all['L']['dispersion'])
+
+        outputs['stack']['dispersion_R']=np.zeros(shape_all_R)
+        outputs['stack']['dispersion_R_sq']=np.zeros(shape_all_R)
+        outputs['stack']['dispersion_R_shift']=np.zeros(shape_all_R)
+        outputs['meansum'].append('dispersion_R')
+        outputs['meansum_weights'].append('alpha_sum')
+        outputs['meansum_ndata'].append('ndata_R')
+        outputs['meansum_sq'].append('dispersion_R_sq')
+        outputs['meansum_sq_weights'].append('alpha_sum')
+        outputs['meansum_sq_ndata'].append('ndata_R')
+        outputs['meansum_sq_shift'].append('dispersion_R_shift')
+
+        outputs['stack']['dispersion_R_ref']=np.zeros_like(dispersion_R_ref)
+        outputs['stack']['dispersion_R_sq_ref']=np.zeros_like(dispersion_R_ref)
+        outputs['stack']['dispersion_R_shift_ref']=np.zeros_like(dispersion_R_ref)
+        outputs['meansum_ref'].append('dispersion_R_ref')
+        outputs['meansum_ref_weights'].append('alpha_ref_sum')
+        outputs['meansum_sq_ref'].append('dispersion_R_sq_ref')
+        outputs['meansum_sq_ref_weights'].append('alpha_ref_sum')
+        outputs['meansum_sq_ref_shift'].append('dispersion_R_shift_ref')
+
+        outputs['stack']['dispersion_R_wide']=np.zeros_like(dispersion_R_ref)
+        outputs['stack']['dispersion_R_sq_wide']=np.zeros_like(dispersion_R_ref)
+        outputs['stack']['dispersion_R_shift_wide']=np.zeros_like(dispersion_R_ref)
+        outputs['meansum_ref'].append('dispersion_R_wide')
+        outputs['meansum_ref_weights'].append('alpha_wide_sum')
+        outputs['meansum_sq_ref'].append('dispersion_R_sq_wide')
+        outputs['meansum_sq_ref_weights'].append('alpha_wide_sum')
+        outputs['meansum_sq_ref_shift'].append('dispersion_R_shift_wide')
+
+        outputs['stack']['dispersion_L']=np.zeros(shape_all_L)
+        outputs['stack']['dispersion_L_sq']=np.zeros(shape_all_L)
+        outputs['stack']['dispersion_L_shift']=np.zeros(shape_all_L)
+        outputs['meansum'].append('dispersion_L')
+        outputs['meansum_weights'].append('alpha_sum')
+        outputs['meansum_ndata'].append('ndata_L')
+        outputs['meansum_sq'].append('dispersion_L_sq')
+        outputs['meansum_sq_weights'].append('alpha_sum')
+        outputs['meansum_sq_ndata'].append('ndata_L')
+        outputs['meansum_sq_shift'].append('dispersion_L_shift')
+
+        outputs['stack']['dispersion_L_ref']=np.zeros_like(dispersion_L_ref)
+        outputs['stack']['dispersion_L_sq_ref']=np.zeros_like(dispersion_L_ref)
+        outputs['stack']['dispersion_L_shift_ref']=np.zeros_like(dispersion_L_ref)
+        outputs['meansum_ref'].append('dispersion_L_ref')
+        outputs['meansum_ref_weights'].append('alpha_ref_sum')
+        outputs['meansum_sq_ref'].append('dispersion_L_sq_ref')
+        outputs['meansum_sq_ref_weights'].append('alpha_ref_sum')
+        outputs['meansum_sq_ref_shift'].append('dispersion_L_shift_ref')
+
+        outputs['stack']['dispersion_L_wide']=np.zeros_like(dispersion_L_ref)
+        outputs['stack']['dispersion_L_sq_wide']=np.zeros_like(dispersion_L_ref)
+        outputs['stack']['dispersion_L_shift_wide']=np.zeros_like(dispersion_L_ref)
+        outputs['meansum_ref'].append('dispersion_L_wide')
+        outputs['meansum_ref_weights'].append('alpha_wide_sum')
+        outputs['meansum_sq_ref'].append('dispersion_L_sq_wide')
+        outputs['meansum_sq_ref_weights'].append('alpha_wide_sum')
+        outputs['meansum_sq_ref_shift'].append('dispersion_L_shift_wide')
+
+        outputs['stack']['alpha_sum']=np.zeros((numdis))
+        outputs['stack']['alpha_ref_sum']=0
+        outputs['stack']['alpha_wide_sum']=0
+
+        return outputs
 
     dispersion_R_model=dispersion_one['R']['dispersion']
     dispersion_L_model=dispersion_one['L']['dispersion']
-
-    outputs['nostack']['ndata']=len(dispersion_R_model)
 
     alpha_ref_max=dispersion_ref['alpha_max']
     alpha_max=dispersion_all['alpha_max']
@@ -1437,105 +1613,82 @@ def get_dispersion_mean(file,model,model_ref,dispersion_one,params_dispersion,pa
     alpha=np.minimum(np.zeros_like(alpha),alpha-alpha_max)
     #alpha=np.ma.array(alpha,mask=alpha<-20.)
     alpha=np.exp(alpha)
-    dispersion_R_true=dispersion_ref['R']['dispersion']
-    dispersion_L_true=dispersion_ref['L']['dispersion']
+    dispersion_R_true_ref=dispersion_ref['R']['dispersion']
+    dispersion_L_true_ref=dispersion_ref['L']['dispersion']
+    dispersion_R_true_all=dispersion_all['R']['dispersion']
+    dispersion_L_true_all=dispersion_all['L']['dispersion']
 
     #numdis=dispersion_all['numdis']
 
-    dis_alt,alpha_alt=np.meshgrid(dispersion_R_model,alpha)
-    dispersions_R=np.multiply(dis_alt,alpha_alt)
-    dis_alt,alpha_alt=np.meshgrid(dispersion_R_model-dispersion_R_true,alpha)
-    dispersions_R_shift=np.multiply(dis_alt,alpha_alt)
-    dis_alt,alpha_alt=np.meshgrid(np.square(dispersion_R_model-dispersion_R_true),alpha)
-    dispersions_R_sq=np.multiply(dis_alt,alpha_alt)
+    alpha_alt=np.tile(alpha,(len(dispersion_R_true_ref),1))
+    #dis_alt,alpha_alt=np.meshgrid(dispersion_R_model,alpha)
+    outputs['stack']['dispersion_R']+=np.multiply(dispersion_R_true_all,alpha_alt)
+    dis_alt=np.transpose(np.tile(dispersion_R_model,(numdis,1)))-dispersion_R_true_all
+    #dis_alt,alpha_alt=np.meshgrid(dispersion_R_model-dispersion_R_true,alpha)
+    outputs['stack']['dispersion_R_shift']+=np.multiply(dis_alt,alpha_alt)
+    dis_alt=np.square(np.transpose(np.tile(dispersion_R_model,(numdis,1)))-dispersion_R_true_all)
+    #dis_alt,alpha_alt=np.meshgrid(np.square(dispersion_R_model-dispersion_R_true),alpha)
+    outputs['stack']['dispersion_R_sq']+=np.multiply(dis_alt,alpha_alt)
 
-    dis_alt,alpha_alt=np.meshgrid(dispersion_L_model,alpha)
-    dispersions_L=np.multiply(dis_alt,alpha_alt)
-    dis_alt,alpha_alt=np.meshgrid(dispersion_L_model-dispersion_L_true,alpha)
-    dispersions_L_shift=np.multiply(dis_alt,alpha_alt)
-    dis_alt,alpha_alt=np.meshgrid(np.square(dispersion_L_model-dispersion_L_true),alpha)
-    dispersions_L_sq=np.multiply(dis_alt,alpha_alt)
+    alpha_alt=np.tile(alpha,(len(dispersion_L_true_ref),1))
+    #dis_alt,alpha_alt=np.meshgrid(dispersion_L_model,alpha)
+    outputs['stack']['dispersion_L']+=np.multiply(dispersion_R_true_all,alpha_alt)
+    dis_alt=np.transpose(np.tile(dispersion_L_model,(numdis,1)))-dispersion_L_true_all
+    #dis_alt,alpha_alt=np.meshgrid(dispersion_L_model-dispersion_L_true,alpha)
+    outputs['stack']['dispersion_L_shift']+=np.multiply(dis_alt,alpha_alt)
+    dis_alt=np.square(np.transpose(np.tile(dispersion_L_model,(numdis,1)))-dispersion_L_true_all)
+    #dis_alt,alpha_alt=np.meshgrid(np.square(dispersion_L_model-dispersion_L_true),alpha)
+    outputs['stack']['dispersion_L_sq']+=np.multiply(dis_alt,alpha_alt)
 
-    outputs['meansum']=[]
-    outputs['meansum_weights']=[]
-    outputs['meansum_sq']=[]
-    outputs['meansum_sq_weights']=[]
-    outputs['meansum_sq_shift']=[]
-    outputs['meansum_ref']=[]
-    outputs['meansum_ref_weights']=[]
-    outputs['meansum_sq_ref']=[]
-    outputs['meansum_sq_ref_weights']=[]
-    outputs['meansum_sq_ref_shift']=[]
-    outputs['meansum_wide']=[]
-    outputs['meansum_wide_weights']=[]
+    # outputs['stack']['dispersion_R']=dispersions_R
+    # outputs['stack']['dispersion_R_sq']=dispersions_R_sq
+    # outputs['stack']['dispersion_R_shift']=dispersions_R_shift
 
-    outputs['stack']['dispersion_R']=dispersions_R
-    outputs['stack']['dispersion_R_sq']=dispersions_R_sq
-    outputs['stack']['dispersion_R_shift']=dispersions_R_shift
-    outputs['meansum'].append('dispersion_R')
-    outputs['meansum_weights'].append('alpha_sum')
-    outputs['meansum_sq'].append('dispersion_R_sq')
-    outputs['meansum_sq_weights'].append('alpha_sum')
-    outputs['meansum_sq_shift'].append('dispersion_R_shift')
+    outputs['stack']['dispersion_R_ref']+=alpha_ref*dispersion_R_model
+    outputs['stack']['dispersion_R_sq_ref']+=alpha_ref*np.square(dispersion_R_model-dispersion_R_true_ref)
+    outputs['stack']['dispersion_R_shift_ref']+=alpha_ref*(dispersion_R_model-dispersion_R_true_ref)
 
-    outputs['stack']['dispersion_R_ref']=alpha_ref*dispersion_R_model
-    outputs['stack']['dispersion_R_sq_ref']=alpha_ref*np.square(dispersion_R_model-dispersion_R_true)
-    outputs['stack']['dispersion_R_shift_ref']=alpha_ref*(dispersion_R_model-dispersion_R_true)
-    outputs['meansum_ref'].append('dispersion_R_ref')
-    outputs['meansum_ref_weights'].append('alpha_ref_sum')
-    outputs['meansum_sq_ref'].append('dispersion_R_sq_ref')
-    outputs['meansum_sq_ref_weights'].append('alpha_ref_sum')
-    outputs['meansum_sq_ref_shift'].append('dispersion_R_shift_ref')
+    outputs['stack']['dispersion_R_wide']+=dispersion_R_model
+    outputs['stack']['dispersion_R_sq_wide']+=np.square(dispersion_R_model-dispersion_R_true_ref)
+    outputs['stack']['dispersion_R_shift_wide']+=dispersion_R_model-dispersion_R_true_ref
 
-    outputs['stack']['dispersion_R_wide']=dispersion_R_model
-    outputs['stack']['dispersion_R_sq_wide']=np.square(dispersion_R_model-dispersion_R_true)
-    outputs['stack']['dispersion_R_shift_wide']=dispersion_R_model-dispersion_R_true
-    outputs['meansum_ref'].append('dispersion_R_wide')
-    outputs['meansum_ref_weights'].append('alpha_wide_sum')
-    outputs['meansum_sq_ref'].append('dispersion_R_sq_wide')
-    outputs['meansum_sq_ref_weights'].append('alpha_wide_sum')
-    outputs['meansum_sq_ref_shift'].append('dispersion_R_shift_wide')
+    # outputs['stack']['dispersion_L']=dispersions_L
+    # outputs['stack']['dispersion_L_sq']=dispersions_L_sq
+    # outputs['stack']['dispersion_L_shift']=dispersions_L_shift
 
-    outputs['stack']['dispersion_L']=dispersions_L
-    outputs['stack']['dispersion_L_sq']=dispersions_L_sq
-    outputs['stack']['dispersion_L_shift']=dispersions_L_shift
-    outputs['meansum'].append('dispersion_L')
-    outputs['meansum_weights'].append('alpha_sum')
-    outputs['meansum_sq'].append('dispersion_L_sq')
-    outputs['meansum_sq_weights'].append('alpha_sum')
-    outputs['meansum_sq_shift'].append('dispersion_L_shift')
+    outputs['stack']['dispersion_L_ref']+=alpha_ref*dispersion_L_model
+    outputs['stack']['dispersion_L_sq_ref']+=alpha_ref*np.square(dispersion_L_model-dispersion_L_true_ref)
+    outputs['stack']['dispersion_L_shift_ref']+=alpha_ref*(dispersion_L_model-dispersion_L_true_ref)
 
-    outputs['stack']['dispersion_L_ref']=alpha_ref*dispersion_L_model
-    outputs['stack']['dispersion_L_sq_ref']=alpha_ref*np.square(dispersion_L_model-dispersion_L_true)
-    outputs['stack']['dispersion_L_shift_ref']=alpha_ref*(dispersion_L_model-dispersion_L_true)
-    outputs['meansum_ref'].append('dispersion_L_ref')
-    outputs['meansum_ref_weights'].append('alpha_ref_sum')
-    outputs['meansum_sq_ref'].append('dispersion_L_sq_ref')
-    outputs['meansum_sq_ref_weights'].append('alpha_ref_sum')
-    outputs['meansum_sq_ref_shift'].append('dispersion_L_shift_ref')
+    outputs['stack']['dispersion_L_wide']+=dispersion_L_model
+    outputs['stack']['dispersion_L_sq_wide']+=np.square(dispersion_R_model-dispersion_L_true_ref)
+    outputs['stack']['dispersion_L_shift_wide']+=dispersion_L_model-dispersion_L_true_ref
 
-    outputs['stack']['dispersion_L_wide']=dispersion_L_model
-    outputs['stack']['dispersion_L_sq_wide']=np.square(dispersion_R_model-dispersion_R_true)
-    outputs['stack']['dispersion_L_shift_wide']=dispersion_L_model-dispersion_L_true
-    outputs['meansum_ref'].append('dispersion_L_wide')
-    outputs['meansum_ref_weights'].append('alpha_wide_sum')
-    outputs['meansum_sq_ref'].append('dispersion_L_sq_wide')
-    outputs['meansum_sq_ref_weights'].append('alpha_wide_sum')
-    outputs['meansum_sq_ref_shift'].append('dispersion_L_shift_wide')
+    outputs['stack']['alpha_sum']+=alpha
+    outputs['stack']['alpha_ref_sum']+=alpha_ref
+    outputs['stack']['alpha_wide_sum']+=1.
 
-    outputs['stack']['alpha_sum']=alpha
-    outputs['stack']['alpha_ref_sum']=alpha_ref
-    outputs['stack']['alpha_wide_sum']=1.
+    return #outputs
 
-    return outputs
+def get_tradeoff(file,model,model_ref,dispersion_one,params_dispersion,params_inversion,dispersion_ref,dispersion_all,alpha_ref,alpha,first=True,outputs={},init=False):
 
-def get_tradeoff(file,model,model_ref,dispersion_one,params_dispersion,params_inversion,dispersion_ref,dispersion_all,alpha_ref,alpha,first=True):
+    if init:
+        outputs={}
+        outputs['stack']={}
+        outputs['nostack']={}
 
-    outputs={}
-    outputs['stack']={}
-    outputs['nostack']={}
+        numdis=dispersion_all['numdis']
 
-    numdis=dispersion_all['numdis']
+        malay=params_inversion['malay']
+
+        outputs['nostack']['range']=np.arange(malay)
+
+        outputs['stack']['tradeoff_ref']=np.zeros((malay+1,malay+1))
+        outputs['stack']['tradeoff_wide']=np.zeros((malay+1,malay+1))
+        outputs['stack']['tradeoff']=np.zeros((malay+1,malay+1,numdis))
+
+        return outputs
+
 
     alpha_ref_max=dispersion_ref['alpha_max']
     alpha_max=dispersion_all['alpha_max']
@@ -1551,21 +1704,21 @@ def get_tradeoff(file,model,model_ref,dispersion_one,params_dispersion,params_in
     nlay=model['npt']
     nlay_ani=model['npt_ani']
 
-    tradeoff_ref=np.zeros((malay+1,malay+1))
-    tradeoff_wide=np.zeros((malay+1,malay+1))
-    tradeoff=np.zeros((malay+1,malay+1,numdis))
+    # tradeoff_ref=np.zeros((malay+1,malay+1))
+    # tradeoff_wide=np.zeros((malay+1,malay+1))
+    # tradeoff=np.zeros((malay+1,malay+1,numdis))
 
-    tradeoff_ref[nlay,nlay_ani]=alpha_ref
-    tradeoff_wide[nlay,nlay_ani]=1.
-    tradeoff[nlay,nlay_ani,:]=alpha
+    outputs['stack']['tradeoff_ref'][nlay,nlay_ani]+=alpha_ref
+    outputs['stack']['tradeoff_wide'][nlay,nlay_ani]+=1.
+    outputs['stack']['tradeoff'][nlay,nlay_ani,:]+=alpha
 
-    outputs['nostack']['range']=np.arange(malay)
 
-    outputs['stack']['tradeoff_ref']=tradeoff_ref
-    outputs['stack']['tradeoff_wide']=tradeoff_wide
-    outputs['stack']['tradeoff']=tradeoff
 
-    return outputs
+    # outputs['stack']['tradeoff_ref']=tradeoff_ref
+    # outputs['stack']['tradeoff_wide']=tradeoff_wide
+    # outputs['stack']['tradeoff']=tradeoff
+
+    return #outputs
 
 
 ############################################################################
@@ -1576,9 +1729,9 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 
 
-directory='OUT_CLUSTER1_ALL/OUT'
+directory='OUT_CLUSTER0_ALL/OUT'
 
-functions=[create_posterior,get_average,get_histograms,get_dispersion_mean] #create_posterior,get_average,get_histograms,,get_tradeoff
+functions=[create_posterior,get_average,get_histograms,get_dispersion_mean,get_tradeoff] #create_posterior,get_average,get_histograms,,get_tradeoff
 
 prepare=True
 maxpercent=1.
@@ -1654,6 +1807,7 @@ for widening in [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.]:
             ############################################################
             for function in output:
                 filename='processing_'+str(widening)+'_'+str(prepare)+'_'+str(maxpercent)+'_'+function+'_outputs.h5'
+                print(filename)
                 f = h5py.File(directory+'/Processing/'+filename,'w')
                 f.create_dataset('widening',data=params_inversion['widening'])
                 f.create_dataset('prepare',data=prepare)
