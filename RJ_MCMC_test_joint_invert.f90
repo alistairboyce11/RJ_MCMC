@@ -89,6 +89,7 @@ program RJ_MCMC
     real voromax(malay,4) ! best model
     character filenamemax*30  !filename for writing the best model
     real d_cRmoy(ndatadmax), d_cRmoys(ndatadmax), d_cLmoy(ndatadmax), d_cLmoys(ndatadmax) ! average dispersion curve
+    real d_cRmoy_shift(ndatadmax), d_cRmoys_shift(ndatadmax), d_cLmoy_shift(ndatadmax), d_cLmoys_shift(ndatadmax) ! average dispersion curve
     real d_cRdelta(ndatadmax), d_cRdeltas(ndatadmax), d_cLdelta(ndatadmax), d_cLdeltas(ndatadmax) ! standart deviation of dispersion curve
     real model_ref(mk,9) ! reference model, all models are deviations from it
     real,dimension(mk) :: r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,xi,vpvsv_data ! input for forward modelling
@@ -112,8 +113,10 @@ program RJ_MCMC
     real d_obsdcR_alt(ndatadmax,numdis_max),d_obsdcL_alt(ndatadmax,numdis_max)
     real d_obsdcRe_alt(ndatadmax,numdis_max),d_obsdcLe_alt(ndatadmax,numdis_max) !observed data
     real d_cRmoy_alt(ndatadmax,numdis_max),d_cLmoy_alt(ndatadmax,numdis_max)
+    real d_cRmoy_shift_alt(ndatadmax,numdis_max),d_cLmoy_shift_alt(ndatadmax,numdis_max)
     real d_cRdelta_alt(ndatadmax,numdis_max),d_cLdelta_alt(ndatadmax,numdis_max) 
     real d_cRmoy_alts(ndatadmax,numdis_max),d_cLmoy_alts(ndatadmax,numdis_max)
+    real d_cRmoy_shift_alts(ndatadmax,numdis_max),d_cLmoy_shift_alts(ndatadmax,numdis_max)
     real d_cRdelta_alts(ndatadmax,numdis_max),d_cLdelta_alts(ndatadmax,numdis_max) 
     real histo_alt(maxlay,numdis_max),probani_alt(disd,numdis_max)
     real histo_alts(maxlay,numdis_max),probanis_alt(disd,numdis_max)
@@ -136,8 +139,10 @@ program RJ_MCMC
     real postvp_wide(disd,disv),postvs_wide(disd,disv),postxi_wide(disd,disv)
     real postvp_wides(disd,disv),postvs_wides(disd,disv),postxi_wides(disd,disv) ! posteriors
     real d_cRmoy_wide(ndatadmax),d_cLmoy_wide(ndatadmax)
+    real d_cRmoy_wide_shift(ndatadmax),d_cLmoy_wide_shift(ndatadmax)
     real d_cRdelta_wide(ndatadmax),d_cLdelta_wide(ndatadmax) 
     real d_cRmoy_wides(ndatadmax),d_cLmoy_wides(ndatadmax)
+    real d_cRmoy_wides_shift(ndatadmax),d_cLmoy_wides_shift(ndatadmax)
     real d_cRdelta_wides(ndatadmax),d_cLdelta_wides(ndatadmax) 
     real TRA_wide(malay,malay+1),TRA_wides(malay,malay+1)
     
@@ -351,8 +356,6 @@ program RJ_MCMC
     
     !**************************************************************
     
-    write(*,*)dirname
-    
     pxi = 0.4             ! proposal for change in xi
     p_vp = 0.1           ! proposal for change in vp/vsv
     pd = 10!0.2         ! proposal on change in position  
@@ -439,6 +442,10 @@ program RJ_MCMC
     d_cLmoy=0
     d_cRmoys=0
     d_cLmoys=0
+    d_cRmoy_shift=0
+    d_cLmoy_shift=0
+    d_cRmoys_shift=0
+    d_cLmoys_shift=0
     d_cRdelta=0
     d_cLdelta=0
     d_cRdeltas=0
@@ -447,6 +454,10 @@ program RJ_MCMC
     d_cLmoy_alt=0
     d_cRmoy_alts=0
     d_cLmoy_alts=0
+    d_cRmoy_shift_alt=0
+    d_cLmoy_shift_alt=0
+    d_cRmoy_shift_alts=0
+    d_cLmoy_shift_alts=0
     d_cRdelta_alt=0
     d_cLdelta_alt=0
     d_cRdelta_alts=0
@@ -455,6 +466,10 @@ program RJ_MCMC
     d_cLmoy_wide=0
     d_cRmoy_wides=0
     d_cLmoy_wides=0
+    d_cRmoy_wide_shift=0
+    d_cLmoy_wide_shift=0
+    d_cRmoy_wides_shift=0
+    d_cLmoy_wides_shift=0
     d_cRdelta_wide=0
     d_cLdelta_wide=0
     d_cRdelta_wides=0
@@ -553,9 +568,8 @@ program RJ_MCMC
 
         endif
 
-        call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+        call combine_linear(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
             r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
-        write(*,*)"Combined"
         if (ndatad_R>0) then
             
             jcom=3 !rayleigh waves
@@ -569,15 +583,12 @@ program RJ_MCMC
                 if (error_flag) then 
                     tes=.false.
                     write(*,*)"Minos_bran FAILED for RAYLEIGH 004"
-                else
-                    write(*,*)"Minos_bran SUCCESS for RAYLEIGH"
                 end if
                 peri_R_tmp=peri_R(nlims_R(1,iharm):nlims_R(2,iharm))
                 n_R_tmp=n_R(nlims_R(1,iharm):nlims_R(2,iharm))
                 ndatad_R_tmp=nlims_R(2,iharm)-nlims_R(1,iharm)+1 ! fortran slices take the first and the last element
                 call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
                     peri_R_tmp,n_R_tmp,d_cR_tmp,rq_R,ndatad_R_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
-                write(*,*)"dispersion_minos for RAYLEIGH"
                 d_cR(nlims_R(1,iharm):nlims_R(2,iharm))=d_cR_tmp
                 if (ier) tes=.false.
                 if (maxval(abs(rq_R(:ndatad_R_tmp)))>maxrq*eps) tes=.false.
@@ -596,15 +607,12 @@ program RJ_MCMC
                 if (error_flag) then 
                     tes=.false.
                     write(*,*)"Minos_bran FAILED for LOVE 004"
-                else
-                    write(*,*)"Minos_bran SUCCESS for LOVE"
                 end if
                 peri_L_tmp=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
                 n_L_tmp=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
                 ndatad_L_tmp=nlims_L(2,iharm)-nlims_L(1,iharm)+1 ! fortran slices take the first and the last element
                 call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
                 peri_L_tmp,n_L_tmp,d_cL_tmp,rq_L,ndatad_L_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
-                write(*,*)"dispersion_minos for LOVE"
                 d_cL(nlims_L(1,iharm):nlims_L(2,iharm))=d_cL_tmp
                 if (ier) tes=.false.
                 if (maxval(abs(rq_L(:ndatad_L_tmp)))>maxrq*eps) tes=.false.
@@ -632,10 +640,6 @@ program RJ_MCMC
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! Check and double-check
-    write(*,*)'getting the ratio of the uncertainties'
-    
-    write(*,*)'getting initial likelihood'
-    
     
     !***********************************************************
 
@@ -662,8 +666,6 @@ program RJ_MCMC
     
     like= (liked_R + liked_L)
     like_w=like/widening
-    
-    write(*,*)like,like_w
     
     stuck=.false.
     
@@ -1064,7 +1066,7 @@ program RJ_MCMC
         !**************************************************************************
         if (out==1) then ! maybe we don't need a forward calculation for changes in noise parameters
 
-            call combine(model_ref,nptref,nic_ref,noc_ref,voro_prop,npt_prop,d_max,&
+            call combine_linear(model_ref,nptref,nic_ref,noc_ref,voro_prop,npt_prop,d_max,&
                 r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
             
             if (ndatad_R>0) then
@@ -1361,19 +1363,28 @@ program RJ_MCMC
                 ! average dispersion curve and variance
                 d_cRmoy=d_cRmoy+d_cR*alpharef
                 d_cLmoy=d_cLmoy+d_cL*alpharef
-                d_cRdelta=d_cRdelta+(d_cR**2)*alpharef
-                d_cLdelta=d_cLdelta+(d_cL**2)*alpharef
+                
+                d_cRmoy_shift=d_cRmoy_shift+(d_cR-d_obsdCR)*alpharef
+                d_cLmoy_shift=d_cLmoy_shift+(d_cL-d_obsdCL)*alpharef
+                d_cRdelta=d_cRdelta+((d_cR-d_obsdCR)**2)*alpharef
+                d_cLdelta=d_cLdelta+((d_cL-d_obsdCL)**2)*alpharef
                 
                 d_cRmoy_wide=d_cRmoy_wide+d_cR
                 d_cLmoy_wide=d_cLmoy_wide+d_cL
-                d_cRdelta_wide=d_cRdelta_wide+(d_cR**2)
-                d_cLdelta_wide=d_cLdelta_wide+(d_cL**2)
+                
+                d_cRmoy_wide_shift=d_cRmoy_wide_shift+(d_cR-d_obsdCR)
+                d_cLmoy_wide_shift=d_cLmoy_wide_shift+(d_cL-d_obsdCL)
+                d_cRdelta_wide=d_cRdelta_wide+((d_cR-d_obsdCR)**2)
+                d_cLdelta_wide=d_cLdelta_wide+((d_cL-d_obsdCL)**2)
                 
                 do idis=1,numdis
                     d_cRmoy_alt(:,idis)=d_cRmoy_alt(:,idis)+d_cR*alpha(idis)
                     d_cLmoy_alt(:,idis)=d_cLmoy_alt(:,idis)+d_cL*alpha(idis)
-                    d_cRdelta_alt(:,idis)=d_cRdelta_alt(:,idis)+(d_cR**2)*alpha(idis)
-                    d_cLdelta_alt(:,idis)=d_cLdelta_alt(:,idis)+(d_cL**2)*alpha(idis)
+                    
+                    d_cRmoy_shift_alt(:,idis)=d_cRmoy_shift_alt(:,idis)+(d_cR-d_obsdCR_alt(:,idis))*alpha(idis)
+                    d_cLmoy_shift_alt(:,idis)=d_cLmoy_shift_alt(:,idis)+(d_cL-d_obsdCL_alt(:,idis))*alpha(idis)
+                    d_cRdelta_alt(:,idis)=d_cRdelta_alt(:,idis)+((d_cR-d_obsdCR_alt(:,idis))**2)*alpha(idis)
+                    d_cLdelta_alt(:,idis)=d_cLdelta_alt(:,idis)+((d_cL-d_obsdCL_alt(:,idis))**2)*alpha(idis)
                 enddo
                 
 !                 write(*,*)'logcratio',logcratio
@@ -1395,7 +1406,7 @@ program RJ_MCMC
                     logalhist(i_al,idis)=logalhist(i_al,idis)+1
                 enddo
                 
-                call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+                call combine_linear(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                     r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)   
                 j=1
                 do i=disd,1,-1 ! average model
@@ -1605,6 +1616,8 @@ program RJ_MCMC
         
         d_cRmoy=d_cRmoy/th
         d_cLmoy=d_cLmoy/th
+        d_cRmoy_shift=d_cRmoy_shift/th
+        d_cLmoy_shift=d_cLmoy_shift/th
         d_cRdelta=d_cRdelta/th
         d_cLdelta=d_cLdelta/th
         
@@ -1615,21 +1628,38 @@ program RJ_MCMC
         
         d_cRmoy_wide=d_cRmoy_wide/th_wide
         d_cLmoy_wide=d_cLmoy_wide/th_wide
+        d_cRmoy_wide_shift=d_cRmoy_wide_shift/th_wide
+        d_cLmoy_wide_shift=d_cLmoy_wide_shift/th_wide
         d_cRdelta_wide=d_cRdelta_wide/th_wide
         d_cLdelta_wide=d_cLdelta_wide/th_wide
         
         inorout(ran+1)=1
         k=k+1
         do idis=1,numdis
-            avvs_alt(:,idis)=avvs_alt(:,idis)/alphasum(idis)
-            avvp_alt(:,idis)=avvp_alt(:,idis)/alphasum(idis)
-            avxi_alt(:,idis)=avxi_alt(:,idis)/alphasum(idis)
-            probani_alt(:,idis)=100*probani_alt(:,idis)/alphasum(idis)
             
-            d_cRmoy_alt(:,idis)=d_cRmoy_alt(:,idis)/alphasum(idis)
-            d_cLmoy_alt(:,idis)=d_cLmoy_alt(:,idis)/alphasum(idis)
-            d_cRdelta_alt(:,idis)=d_cRdelta_alt(:,idis)/alphasum(idis)
-            d_cLdelta_alt(:,idis)=d_cLdelta_alt(:,idis)/alphasum(idis)
+            if (alphasum(idis)==0) then
+                avvs_alt(:,idis)=0
+                avvp_alt(:,idis)=0
+                avxi_alt(:,idis)=0
+                probani_alt(:,idis)=0
+                
+                d_cRmoy_alt(:,idis)=0
+                d_cLmoy_alt(:,idis)=0
+                d_cRdelta_alt(:,idis)=0
+                d_cLdelta_alt(:,idis)=0
+            else
+                avvs_alt(:,idis)=avvs_alt(:,idis)/alphasum(idis)
+                avvp_alt(:,idis)=avvp_alt(:,idis)/alphasum(idis)
+                avxi_alt(:,idis)=avxi_alt(:,idis)/alphasum(idis)
+                probani_alt(:,idis)=100*probani_alt(:,idis)/alphasum(idis)
+                
+                d_cRmoy_alt(:,idis)=d_cRmoy_alt(:,idis)/alphasum(idis)
+                d_cLmoy_alt(:,idis)=d_cLmoy_alt(:,idis)/alphasum(idis)
+                d_cRmoy_shift_alt(:,idis)=d_cRmoy_shift_alt(:,idis)/alphasum(idis)
+                d_cLmoy_shift_alt(:,idis)=d_cLmoy_shift_alt(:,idis)/alphasum(idis)
+                d_cRdelta_alt(:,idis)=d_cRdelta_alt(:,idis)/alphasum(idis)
+                d_cLdelta_alt(:,idis)=d_cLdelta_alt(:,idis)/alphasum(idis)
+            endif
         enddo
     else
         write(*,*)
@@ -1721,16 +1751,22 @@ program RJ_MCMC
         ! 
         call MPI_REDUCE(d_cRmoy,d_cRmoys,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(d_cLmoy,d_cLmoys,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(d_cRmoy_shift,d_cRmoys_shift,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(d_cLmoy_shift,d_cLmoys_shift,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(d_cRdelta,d_cRdeltas,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(d_cLdelta,d_cLdeltas,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         
         call MPI_REDUCE(d_cRmoy_alt,d_cRmoy_alts,ndatadmax*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(d_cLmoy_alt,d_cLmoy_alts,ndatadmax*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(d_cRmoy_shift_alt,d_cRmoy_shift_alts,ndatadmax*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(d_cLmoy_shift_alt,d_cLmoy_shift_alts,ndatadmax*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(d_cRdelta_alt,d_cRdelta_alts,ndatadmax*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(d_cLdelta_alt,d_cLdelta_alts,ndatadmax*numdis_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         
         call MPI_REDUCE(d_cRmoy_wide,d_cRmoy_wides,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(d_cLmoy_wide,d_cLmoy_wides,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(d_cRmoy_wide_shift,d_cRmoy_wides_shift,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(d_cLmoy_wide_shift,d_cLmoy_wides_shift,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(d_cRdelta_wide,d_cRdelta_wides,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(d_cLdelta_wide,d_cLdelta_wides,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         
@@ -1756,22 +1792,28 @@ program RJ_MCMC
             if (histochs(i)<0) write(*,*)'hiiiiiiiiiiiiiiiii'
         enddo
         
-        write(*,*)'here'
-
         d_cRmoys=d_cRmoys/j
         d_cLmoys=d_cLmoys/j
+        
+        d_cRmoys_shift=d_cRmoys_shift/j
+        d_cLmoys_shift=d_cLmoys_shift/j
         d_cRdeltas=sqrt(d_cRdeltas/j-d_cRmoys**2)
         d_cLdeltas=sqrt(d_cLdeltas/j-d_cLmoys**2)
         
         d_cRmoy_alts=d_cRmoy_alts/j
         d_cLmoy_alts=d_cLmoy_alts/j
-        d_cRdelta_alts=sqrt(d_cRdelta_alts/j-d_cRmoy_alts**2)
-        d_cLdelta_alts=sqrt(d_cLdelta_alts/j-d_cLmoy_alts**2)
+        
+        d_cRmoy_shift_alts=d_cRmoy_shift_alts/j
+        d_cLmoy_shift_alts=d_cLmoy_shift_alts/j
+        d_cRdelta_alts=sqrt(d_cRdelta_alts/j-d_cRmoy_shift_alts**2)
+        d_cLdelta_alts=sqrt(d_cLdelta_alts/j-d_cLmoy_shift_alts**2)
         
         d_cRmoy_wides=d_cRmoy_wides/j
         d_cLmoy_wides=d_cLmoy_wides/j
-        d_cRdelta_wides=sqrt(d_cRdelta_wides/j-d_cRmoy_wides**2)
-        d_cLdelta_wides=sqrt(d_cLdelta_wides/j-d_cLmoy_wides**2)
+        d_cRmoy_wides_shift=d_cRmoy_wides_shift/j
+        d_cLmoy_wides_shift=d_cLmoy_wides_shift/j
+        d_cRdelta_wides=sqrt(d_cRdelta_wides/j-d_cRmoy_wides_shift**2)
+        d_cLdelta_wides=sqrt(d_cLdelta_wides/j-d_cLmoy_wides_shift**2)
         
         convPs=convPs/j
         convBs=convBs/j
