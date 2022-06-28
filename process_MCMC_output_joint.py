@@ -682,7 +682,7 @@ def apply_stuff(comm,directory,functions,params_inversion,params_dispersion,disp
 
     size = comm.Get_size()
     files=[]
-    for i in range(len(files_all[:2])):
+    for i in range(len(files_all)):
         if i%size==rank:
             files.append(files_all[i])
 
@@ -1731,7 +1731,7 @@ rank = comm.Get_rank()
 
 directory='OUT_CLUSTER0_ALL/OUT'
 
-functions=[create_posterior,get_average,get_histograms,get_dispersion_mean] #create_posterior,get_average,get_histograms,,get_tradeoff
+functions=[create_posterior,get_average,get_histograms,get_dispersion_mean,get_tradeoff] #create_posterior,get_average,get_histograms,,get_tradeoff
 
 prepare=True
 maxpercent=1.
@@ -1775,9 +1775,9 @@ if rank==0:
 # #print(np.amax(dispersion_all['R']['dispersion']))
 
 # #sys.exit()
-for widening in [1.]:#[1.,2.,3.,4.,5.,6.,7.,8.,9.,10.]:
+for widening in [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.]:
 #widening=1.0
-    for maxpercent in [0.]:#[0.,0.1,1.,0.5]:
+    for maxpercent in [0.,0.1,1.,0.5]:
 
         output={}
         params_inversion={}
@@ -1829,52 +1829,52 @@ for widening in [1.]:#[1.,2.,3.,4.,5.,6.,7.,8.,9.,10.]:
 
         #del params_inversion,output,data,weights
 
-# for maxpercent in [0.,0.1,1.,0.5]:
-#     output={}
-#     prepare=False
-#     params_inversion=get_metadata(directory,prepare=prepare)
-#     print('get metadata')
-#     alphafile=directory+'/Processing/alphamax_'+str(prepare)+'_'+str(maxpercent)+'.txt'
-#     if os.path.isfile(alphafile):
-#         file=open(alphafile,'r')
-#         dispersion_ref['alpha_max']=float(file.readline())
-#         dispersion_all['alpha_max']=np.array(file.readline().split()).astype('float')
-#         file.close()
-#     else:
-#         get_alpha_max(comm,directory,params_inversion,params_dispersion,dispersion_ref,dispersion_all,prepare=prepare,maxpercent=maxpercent)
-#         if rank==0:
-#             file=open(alphafile,'w')
-#             file.write(str(dispersion_ref['alpha_max'])+'\n')
-#             file.write(' '.join(map(str,dispersion_all['alpha_max']))+'\n')
-#             file.close()
+for maxpercent in [0.,0.1,1.,0.5]:
+    output={}
+    prepare=False
+    params_inversion=get_metadata(directory,prepare=prepare)
+    print('get metadata')
+    alphafile=directory+'/Processing/alphamax_'+str(prepare)+'_'+str(maxpercent)+'.txt'
+    if os.path.isfile(alphafile):
+        file=open(alphafile,'r')
+        dispersion_ref['alpha_max']=float(file.readline())
+        dispersion_all['alpha_max']=np.array(file.readline().split()).astype('float')
+        file.close()
+    else:
+        get_alpha_max(comm,directory,params_inversion,params_dispersion,dispersion_ref,dispersion_all,prepare=prepare,maxpercent=maxpercent)
+        if rank==0:
+            file=open(alphafile,'w')
+            file.write(str(dispersion_ref['alpha_max'])+'\n')
+            file.write(' '.join(map(str,dispersion_all['alpha_max']))+'\n')
+            file.close()
 
-#     continue
-#     widening=params_inversion['widening']
-#     print('get alphamax')
-#     output=apply_stuff(comm,directory,functions,params_inversion,params_dispersion,dispersion_ref,dispersion_all,model_ref,prepare=prepare,widening=widening)
-#     print('apply functions')
+    continue
+    widening=params_inversion['widening']
+    print('get alphamax')
+    output=apply_stuff(comm,directory,functions,params_inversion,params_dispersion,dispersion_ref,dispersion_all,model_ref,prepare=prepare,widening=widening)
+    print('apply functions')
 
-#     ##########################################################
-#     # Print to file
-#     ##########################################################
-#     if rank==0:
-#         for function in output:
-#             filename='processing_'+'_'+str(maxpercent)+'_'+function+'_outputs.h5'
-#             f = h5py.File(directory+'/Processing/'+filename,'w')
-#             f.create_dataset('widening',data=params_inversion['widening'])
-#             f.create_dataset('prepare',data=prepare)
-#             f.create_dataset('burn-in',data=params_inversion['burn-in'])
-#             f.create_dataset('nsample',data=params_inversion['nsample'])
+    ##########################################################
+    # Print to file
+    ##########################################################
+    if rank==0:
+        for function in output:
+            filename='processing_'+'_'+str(maxpercent)+'_'+function+'_outputs.h5'
+            f = h5py.File(directory+'/Processing/'+filename,'w')
+            f.create_dataset('widening',data=params_inversion['widening'])
+            f.create_dataset('prepare',data=prepare)
+            f.create_dataset('burn-in',data=params_inversion['burn-in'])
+            f.create_dataset('nsample',data=params_inversion['nsample'])
 
 
-#             grp=f.create_group(function)
-#             grp_stack=grp.create_group('stack')
-#             grp_nostack=grp.create_group('nostack')
-#             for key in output[function]['stack']:
-#                 grp_stack.create_dataset(key,data=output[function]['stack'][key])
-#             for key in output[function]['nostack']:
-#                 grp_nostack.create_dataset(key,data=output[function]['nostack'][key])
-#             f.close()
+            grp=f.create_group(function)
+            grp_stack=grp.create_group('stack')
+            grp_nostack=grp.create_group('nostack')
+            for key in output[function]['stack']:
+                grp_stack.create_dataset(key,data=output[function]['stack'][key])
+            for key in output[function]['nostack']:
+                grp_nostack.create_dataset(key,data=output[function]['nostack'][key])
+            f.close()
 
-#     #del params_inversion,output
+    #del params_inversion,output
 
