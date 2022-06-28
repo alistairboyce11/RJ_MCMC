@@ -1,5 +1,5 @@
-subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-    r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+subroutine combine_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+    r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
     implicit none
     include '../params.h'
     
@@ -10,13 +10,15 @@ subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
     real,dimension(malay,4),intent(in) :: voro
     real,dimension(malay,4) :: voro2
     real,dimension(4) :: t
+    real, parameter :: phi = 1 ! P-wave radial anisotropy variable: phi= (vpv/vph)^2
     
     real,dimension(malay) :: vshvsv,vpvsv
     real,dimension(malay+1) :: depth
     integer :: i,j,k
     
     real,dimension(mk),intent(out) :: r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta
-    real,dimension(mk),intent(out) :: xi,vpvsv_data
+    real,dimension(mk),intent(out) :: xi,vp_data
+    real,dimension(mk) :: vs_data
     integer,intent(out) :: nptfinal,nic,noc
         
     voro2=voro
@@ -43,9 +45,9 @@ subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
         if (vshvsv(i)==-1) vshvsv(i)=1
     end do
     
-    do i=1,npt
-        vpvsv(i)=vpvs*(1+voro2(i,4))
-    end do
+    ! do i=1,npt
+    !     vpvsv(i)=vpvs*(1+voro2(i,4))
+    ! end do
     
     i=nptref
     j=1
@@ -59,13 +61,19 @@ subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
     eta(k)=model_ref(i,9)
     
     vsv(k)=model_ref(i,4)*(1+voro2(j,2))
-    vph(k)=vsv(k)*vpvsv(j)
-    vpv(k)=vph(k)
-    
+    ! vph(k)=vsv(k)*vpvsv(j)
+    ! vpv(k)=vph(k)
     vsh(k)=vsv(k)*sqrt(vshvsv(j))
-    
+
+    !!!!!!!!!!!!!!!!! New !!!!!!!!!!!!!!!!!!!!!!!!
+    vph(k)=model_ref(i,7)*(1+voro2(j,4))
+    vpv(k)=vph(k)*sqrt(phi)
+
+
     xi(k)=vshvsv(j)
-    vpvsv_data(k)=voro2(j,4)
+    vp_data(k)=voro2(j,4)
+    vs_data(k)=voro2(j,2)
+    
     j=j+1
     k=k-1
     i=i-1
@@ -85,7 +93,9 @@ subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 vsh(k)=model_ref(i,8)
                 eta(k)=model_ref(i,9)
                 xi(k)=(vsh(k)/vsv(k))**2
-                vpvsv_data(k)=(vpv(k)/vsv(k)/vpvs-1)
+!                 vp_data(k)=(vpv(k)/vsv(k)/vpvs-1)
+                vp_data(k)=0.0
+                vs_data(k)=0.0
                 
                 k=k-1
                 i=i-1
@@ -103,7 +113,8 @@ subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 vsh(k)=vsh(k+1)
                 
                 xi(k)=xi(k+1)
-                vpvsv_data(k)=vpvsv_data(k+1)
+                vp_data(k)=vp_data(k+1)
+                vs_data(k)=vs_data(k+1)
                 
                 k=k-1
                 
@@ -119,7 +130,10 @@ subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 vph(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,7),model_ref(i+1,7),r(k))
                 
                 xi(k)=(vsh(k)/vsv(k))**2
-                vpvsv_data(k)=(vpv(k)/vsv(k)/vpvs-1)
+                ! vp_data(k)=(vpv(k)/vsv(k)/vpvs-1)
+                vp_data(k)=0.0
+                vs_data(k)=0.0
+                
                 if (r(k)<model_ref(nic_ref,1)) nic=nic+2
                 if (r(k)<model_ref(noc_ref,1)) noc=noc+2  
                 
@@ -141,7 +155,8 @@ subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 vsh(k)=vsh(k+1)
                 
                 xi(k)=xi(k+1)
-                vpvsv_data(k)=vpvsv_data(k+1)
+                vp_data(k)=vp_data(k+1)
+                vs_data(k)=vs_data(k+1)
                 
                 k=k-1
                 i=i-1 
@@ -156,12 +171,13 @@ subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 
                 vsv(k)=vsv(k+1)
                 vph(k)=vph(k+1)
-                vpv(k)=vpv(k+1)   
+                vpv(k)=vpv(k+1)
                 vsh(k)=vsh(k+1)
                 
                 xi(k)=xi(k+1)
-                vpvsv_data(k)=vpvsv_data(k+1)
-                
+                vp_data(k)=vp_data(k+1)
+                vs_data(k)=vs_data(k+1)
+
                 k=k-1
                 i=i-1
             elseif (model_ref(i,1)<=depth(j)) then
@@ -178,7 +194,8 @@ subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 vsh(k)=vsh(k+1)
                 
                 xi(k)=xi(k+1)
-                vpvsv_data(k)=vpvsv_data(k+1)
+                vp_data(k)=vp_data(k+1)
+                vs_data(k)=vs_data(k+1)
                 
                 k=k-1
                 
@@ -189,12 +206,15 @@ subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 qshear(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,6),model_ref(i+1,6),r(k))
                 eta(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,9),model_ref(i+1,9),r(k))
                 vsv(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,4),model_ref(i+1,4),r(k))*(1+voro2(j,2))
-                vpv(k)=vsv(k)*vpvsv(j)
                 vsh(k)=vsv(k)*sqrt(vshvsv(j))
-                vph(k)=vpv(k)
+                vph(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,7),model_ref(i+1,7),r(k))*(1+voro2(j,4))
+                vpv(k)=vph(k)*sqrt(phi)
+                ! vpv(k)=vsv(k)*vpvsv(j)
+
                 xi(k)=vshvsv(j)
-                vpvsv_data(k)=voro2(j,4)
-                
+                vp_data(k)=voro2(j,4)
+                vs_data(k)=voro2(j,2)
+
                 if (r(k)<model_ref(nic_ref,1)) nic=nic+2
                 if (r(k)<model_ref(noc_ref,1)) noc=noc+2        
                 
@@ -209,5 +229,5 @@ subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
     enddo
     nptfinal=nptref+2*npt
 
-end subroutine combine
+end subroutine combine_vp
 

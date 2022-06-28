@@ -56,6 +56,14 @@ joint_invert: params.h
 	$(F77) -o run2 RJ_MCMC_test_joint_invert.f90 \
 	-L./ -lroutines -lm
 
+joint_store_prepare: params.h 
+	$(F77) -o run RJ_MCMC_joint_prepare_store.f90 \
+	-L./ -lroutines -lm
+
+joint_store_invert: params.h 
+	$(F77) -o run2 RJ_MCMC_joint_invert_store.f90 \
+	-L./ -lroutines -lm
+
 global: params.h 
 	$(F77) -o run RJ_MCMC_test_nlay.f90 \
 	-L./ -lroutines -lm
@@ -83,7 +91,14 @@ obj: params.h
 	$(F77) -c src/dispersion_minos.f90
 	$(F77) -c src/interp.f90
 	$(F77) -c src/combine_linear.f90
-#
+	
+obj_vp: params.h
+	$(F77) -c src/whichcell_d.f90
+	$(F77) -c src/combine_linear_vp.f90
+	$(F77) -c src/minos_bran.f
+	$(F77) -c src/dispersion_minos.f90
+	$(F77) -c src/interp.f90
+	
 #	# FOR ANIREC
 #	$(F77) -c src/forward_anirec.f
 #	$(CC) -c src/refft.c
@@ -97,6 +112,7 @@ obj: params.h
 #	\rm ./*.o
 
 	ar -r libroutines.a  whichcell_d.o minos_bran.o combine.o dispersion_minos.o interp.o combine_linear.o
+	# ar -r libroutines.a  whichcell_d.o minos_bran.o combine_linear_vp.o dispersion_minos.o interp.o
 	\rm ./*.o
 
 #

@@ -1,4 +1,4 @@
-subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+subroutine combine_linear(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
     r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
     implicit none
     include '../params.h'
@@ -66,11 +66,18 @@ subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
     
     xi(k)=vshvsv(j)
     vpvsv_data(k)=voro2(j,4)
+    
     j=j+1
+
     k=k-1
     i=i-1
     
     do while ((i>=1).or.(j<npt+2))
+        !write(*,*)j
+        !write(*,*)i
+        !write(*,*)'model_ref',model_ref(i,1)
+        !write(*,*)'depth',depth(j)
+        !write(*,*)j,npt,i,depth(j)
         
         if (j>npt) then
         
@@ -97,15 +104,15 @@ subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 qshear(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,6),model_ref(i+1,6),r(k))
                 eta(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,9),model_ref(i+1,9),r(k))
                 
-                vsv(k)=vsv(k+1)
-                vph(k)=vph(k+1)
-                vpv(k)=vpv(k+1)   
-                vsh(k)=vsh(k+1)
-                
-                xi(k)=xi(k+1)
-                vpvsv_data(k)=vpvsv_data(k+1)
+                vsv(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,4),model_ref(i+1,4),r(k))*(1+voro2(j-1,2))
+                vpv(k)=vsv(k)*vpvsv(j-1)
+                vsh(k)=vsv(k)*sqrt(vshvsv(j-1))
+                vph(k)=vpv(k)
+                xi(k)=vshvsv(j-1)
+                vpvsv_data(k)=voro2(j-1,4)
                 
                 k=k-1
+                !
                 
                 r(k)=depth(j)
                 rho(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,2),model_ref(i+1,2),r(k))
@@ -124,8 +131,8 @@ subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 if (r(k)<model_ref(noc_ref,1)) noc=noc+2  
                 
                 k=k-1
-                j=j+1
                 
+                j=j+1
                 
                 
             elseif ((j==npt+1).and.(model_ref(i,1)>depth(j))) then
@@ -135,13 +142,12 @@ subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 qshear(k)=model_ref(i,6)
                 eta(k)=model_ref(i,9)
                 
-                vsv(k)=vsv(k+1)
-                vph(k)=vph(k+1)
-                vpv(k)=vpv(k+1)   
-                vsh(k)=vsh(k+1)
-                
-                xi(k)=xi(k+1)
-                vpvsv_data(k)=vpvsv_data(k+1)
+                vsv(k)=model_ref(i,4)*(1+voro2(j-1,2))
+                vpv(k)=vsv(k)*vpvsv(j-1)
+                vsh(k)=vsv(k)*sqrt(vshvsv(j-1))
+                vph(k)=vpv(k)
+                xi(k)=vshvsv(j-1)
+                vpvsv_data(k)=voro2(j-1,4)
                 
                 k=k-1
                 i=i-1 
@@ -154,13 +160,12 @@ subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 qshear(k)=model_ref(i,6)
                 eta(k)=model_ref(i,9)
                 
-                vsv(k)=vsv(k+1)
-                vph(k)=vph(k+1)
-                vpv(k)=vpv(k+1)   
-                vsh(k)=vsh(k+1)
-                
-                xi(k)=xi(k+1)
-                vpvsv_data(k)=vpvsv_data(k+1)
+                vsv(k)=model_ref(i,4)*(1+voro2(j-1,2))
+                vpv(k)=vsv(k)*vpvsv(j-1)
+                vsh(k)=vsv(k)*sqrt(vshvsv(j-1))
+                vph(k)=vpv(k)
+                xi(k)=vshvsv(j-1)
+                vpvsv_data(k)=voro2(j-1,4)
                 
                 k=k-1
                 i=i-1
@@ -172,15 +177,15 @@ subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 qshear(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,6),model_ref(i+1,6),r(k))
                 eta(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,9),model_ref(i+1,9),r(k))
                 
-                vsv(k)=vsv(k+1)
-                vph(k)=vph(k+1)
-                vpv(k)=vpv(k+1)   
-                vsh(k)=vsh(k+1)
-                
-                xi(k)=xi(k+1)
-                vpvsv_data(k)=vpvsv_data(k+1)
+                vsv(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,4),model_ref(i+1,4),r(k))*(1+voro2(j-1,2))
+                vpv(k)=vsv(k)*vpvsv(j-1)
+                vsh(k)=vsv(k)*sqrt(vshvsv(j-1))
+                vph(k)=vpv(k)
+                xi(k)=vshvsv(j-1)
+                vpvsv_data(k)=voro2(j-1,4)
                 
                 k=k-1
+                !j=j+1
                 
                 
                 r(k)=depth(j)
@@ -188,6 +193,7 @@ subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 qkappa(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,5),model_ref(i+1,5),r(k))
                 qshear(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,6),model_ref(i+1,6),r(k))
                 eta(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,9),model_ref(i+1,9),r(k))
+                
                 vsv(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,4),model_ref(i+1,4),r(k))*(1+voro2(j,2))
                 vpv(k)=vsv(k)*vpvsv(j)
                 vsh(k)=vsv(k)*sqrt(vshvsv(j))
@@ -209,5 +215,5 @@ subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
     enddo
     nptfinal=nptref+2*npt
 
-end subroutine combine
+end subroutine combine_linear
 
