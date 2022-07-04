@@ -180,7 +180,6 @@ program RJ_MCMC
     !-!
 
 
-
     testing=.false.
     if (testing) write(*,*)'testing with synthetic model'
 
@@ -420,6 +419,7 @@ program RJ_MCMC
 !         voro(17,4)=-0.3
 !         voro(18,4)=-0.3
 !         voro(19,4)=-0.3
+
 
         ! take voro, combine it with prem into a format suitable for minos
         call combine_linear(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
@@ -880,7 +880,7 @@ program RJ_MCMC
     !**************************************************************
 
     write(*,*)dirname
-    write(1000*rank,*)dirname
+    !write(1000*rank,*)dirname
 
     widening_prop=widening_start
 
@@ -939,8 +939,13 @@ program RJ_MCMC
             voro(i,4)= vpvsv_min+(vpvsv_max-vpvsv_min)*ran3(ra)
         enddo
 
+        !write(*,*)voro
+
+        !write(*,*)'before combine_linear'
         call combine_linear(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
             r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+
+        !write(*,*)'after combine_linear'
 
         if (ndatad_R>0) then
 
@@ -1093,6 +1098,8 @@ program RJ_MCMC
     convAd_Ls=0
 
     bestmean=-100000000000.
+
+    write(*,*)'start loop'
 
 
     burnin_in_progress=.true.
@@ -1272,6 +1279,7 @@ program RJ_MCMC
         write(100,*)milay,malay
 
         do while ((sample<nsample_widening).or.burnin_in_progress) ! main loop, sample: number of sample post burn-in
+            !write(*,*)ount
             ount=ount+1
             malayv=malay
             if (mod(ount,every)==0) then ! check regularly if acceptance rates are in an acceptable range, else change proposal width
@@ -1930,10 +1938,15 @@ program RJ_MCMC
 
                     write(100,*)nptfinal-noc,npt,npt_ani
                     write(100,*)Ad_R,Ad_L
-                    do i=1,nptfinal-noc
-                        write(100,*)(rearth-r(nptfinal+1-i))/1000.,vsv(nptfinal+1-i)&
-                        ,xi(nptfinal+1-i),vpvsv_data(nptfinal+1-i)
-                    enddo
+                    write(100,*)(rearth-r(nptfinal:1:-1))/1000.
+                    write(100,*)vsv(nptfinal:1:-1)
+                    write(100,*)xi(nptfinal:1:-1)
+                    write(100,*)vpvsv_data(nptfinal:1:-1)
+
+!                     do i=1,nptfinal-noc
+!                         write(100,*)(rearth-r(nptfinal+1-i))/1000.,vsv(nptfinal+1-i)&
+!                         ,xi(nptfinal+1-i),vpvsv_data(nptfinal+1-i)
+!                     enddo
                     write(100,*)like_w
                     !write(100,*)logalpha(:numdis)
 
