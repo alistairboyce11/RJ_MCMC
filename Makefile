@@ -80,24 +80,28 @@ detail_stuck: params.h data_params.h
 	$(F77) -o run detail_stuck_models.f90 \
 	-L./ -lroutines -lm
 
+test_combine_linear: params.h data_params.h
+	$(F77) -o run test_combine_linear.f90 \
+	-L./ -lroutines -lm
+
 synth: params.h data_params.h
 	$(F77) -o run synth_profile.f90 \
 	-L./ -lroutines -lm
 
 obj: params.h
 	$(F77) -c src/whichcell_d.f90
-	$(F77) -c src/combine.f90
+#	$(F77) -c src/combine.f90
 	$(F77) -c src/minos_bran.f
 	$(F77) -c src/dispersion_minos.f90
 	$(F77) -c src/interp.f90
 	$(F77) -c src/combine_linear.f90
 	
-obj_vp: params.h
-	$(F77) -c src/whichcell_d.f90
-	$(F77) -c src/combine_linear_vp.f90
-	$(F77) -c src/minos_bran.f
-	$(F77) -c src/dispersion_minos.f90
-	$(F77) -c src/interp.f90
+#obj_vp: params.h
+#	$(F77) -c src/whichcell_d.f90
+#	$(F77) -c src/combine_linear_vp.f90
+#	$(F77) -c src/minos_bran.f
+#	$(F77) -c src/dispersion_minos.f90
+#	$(F77) -c src/interp.f90
 	
 #	# FOR ANIREC
 #	$(F77) -c src/forward_anirec.f
@@ -111,7 +115,7 @@ obj_vp: params.h
 #	matrixops.o readwrite.o spheror.o buildmod.o 
 #	\rm ./*.o
 
-	ar -r libroutines.a  whichcell_d.o minos_bran.o combine.o dispersion_minos.o interp.o combine_linear.o
+	ar -r libroutines.a  whichcell_d.o minos_bran.o dispersion_minos.o interp.o combine_linear.o #combine.à
 	# ar -r libroutines.a  whichcell_d.o minos_bran.o combine_linear_vp.o dispersion_minos.o interp.o
 	\rm ./*.o
 
