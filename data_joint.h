@@ -78,7 +78,7 @@
     real, parameter :: logalpha_min=-100
     real, parameter :: logalpha_max=5
     integer, parameter :: num_logalpha=200
-    real, parameter :: widening_start=3.
+    real, parameter :: widening_start=1.
     integer, parameter :: n_w=10
     real,parameter :: widening_step=1.
     integer,parameter :: nsample_widening=100000! 50000!Post burn-in
@@ -86,6 +86,6 @@
 
     logical :: getting_old
 
-    real :: num_cluster=6
+    real :: num_cluster=2
 
     integer :: everyall=10000

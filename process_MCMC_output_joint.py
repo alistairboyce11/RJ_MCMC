@@ -1720,7 +1720,7 @@ def get_dispersion_mean(file,model,model_ref,dispersion_one,params_dispersion,pa
 
     alpha_alt=np.tile(alpha,(len(dispersion_L_true_ref),1))
     #dis_alt,alpha_alt=np.meshgrid(dispersion_L_model,alpha)
-    outputs['stack']['dispersion_L']+=np.multiply(dispersion_R_true_all,alpha_alt)
+    outputs['stack']['dispersion_L']+=np.multiply(dispersion_L_true_all,alpha_alt)
     dis_alt=np.transpose(np.tile(dispersion_L_model,(numdis,1)))-dispersion_L_true_all
     #dis_alt,alpha_alt=np.meshgrid(dispersion_L_model-dispersion_L_true,alpha)
     outputs['stack']['dispersion_L_shift']+=np.multiply(dis_alt,alpha_alt)
@@ -1816,24 +1816,24 @@ def get_tradeoff(file,model,model_ref,dispersion_one,params_dispersion,params_in
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 
-directory='OUT_CLUSTER0_ALL/OUT'
-maxpercent=0.05
-prepare=True
-params_dispersion, dispersion_ref, dispersion_all=get_dispersion(directory)
-model_ref=get_model_ref()
-output={}
-params_inversion={}
-widening=1.
-params_inversion=get_metadata(directory,prepare=prepare,widening=widening)
-get_alpha_max(comm,directory, params_inversion, params_dispersion, dispersion_ref, dispersion_all, prepare=prepare, widening=widening, maxpercent=maxpercent)
+# directory='OUT_CLUSTER0_ALL/OUT'
+# maxpercent=0.05
+# prepare=True
+# params_dispersion, dispersion_ref, dispersion_all=get_dispersion(directory)
+# model_ref=get_model_ref()
+# output={}
+# params_inversion={}
+# widening=1.
+# params_inversion=get_metadata(directory,prepare=prepare,widening=widening)
+# get_alpha_max(comm,directory, params_inversion, params_dispersion, dispersion_ref, dispersion_all, prepare=prepare, widening=widening, maxpercent=maxpercent)
 
-if rank==0:
-    print(dispersion_all['alpha_max'][:100])
+# if rank==0:
+#     print(dispersion_all['alpha_max'][:100])
 
-sys.exit()
+#sys.exit()
 #directory='OUT_CLUSTER0_ALL/OUT'
 
-for directory in ['OUT_CLUSTER0_ALL/OUT','OUT_CLUSTER1_ALL/OUT']:
+for directory in ['OUT_CLUSTER1_ALL/OUT']: #'OUT_CLUSTER0_ALL/OUT',
 
     functions=[create_posterior,get_average,get_histograms,get_dispersion_mean,get_tradeoff] #create_posterior,get_average,get_histograms,,get_tradeoff
 
@@ -1901,7 +1901,7 @@ for directory in ['OUT_CLUSTER0_ALL/OUT','OUT_CLUSTER1_ALL/OUT']:
     # #sys.exit()
     for widening in [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.]:
     #widening=1.0
-        for maxpercent in [0.,0.1,1.,0.5,0.05]:
+        for maxpercent in [0.,0.1,0.5,0.05,1.]:
 
             output={}
             params_inversion={}
