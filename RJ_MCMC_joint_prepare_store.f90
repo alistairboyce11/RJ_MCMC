@@ -51,6 +51,8 @@ program RJ_MCMC
         liked_R_prop,liked_R,liked_L_prop,liked_L
     double precision logrsig,Ad_R,Ad_R_prop,Ad_L,Ad_L_prop !uncertainty parameters
     real sigmav,sigmav_old,sigmav_new,AR_birth_old   !proposal on velocity when Birth move
+    real sigmavp,sigmavp_old,sigmavp_new       !proposal on vp when Birth move
+    integer sigma_count                              ! Count Sigmav & sigmavp perturbations
     real d_obsdcR(ndatadmax),d_obsdcL(ndatadmax),d_obsdcRe(ndatadmax),d_obsdcLe(ndatadmax) !observed data
     integer inorout(21000),inorouts(21000),members(21000),io ! mpi related variables
     integer ndatad_R,ndatad_L,ndatad_R_tmp,ndatad_L_tmp !number of observed data points
@@ -72,7 +74,7 @@ program RJ_MCMC
     integer nptmax ! number of layers of the best model
     character filenamemax*300  !filename for writing the best model
     real model_ref(mk,9) ! reference model, all models are deviations from it
-    real,dimension(mk) :: r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,xi,vpvsv_data ! input for forward modelling
+    real,dimension(mk) :: r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,xi,vp_data ! input for forward modelling
     integer nptfinal,nic,noc,nic_ref,noc_ref,jcom ! more inputs
     integer nmodes,n_mode(nmodes_max),l_mode(nmodes_max) ! outputs of forward modelling
     real c_ph(nmodes_max),period(nmodes_max),raylquo(nmodes_max),tref ! more outputs, rayquo: error measurement, should be of the order of eps
@@ -117,7 +119,7 @@ program RJ_MCMC
     ! to save the current state
     real best_current_Ad_R,best_current_Ad_L,best_current_pxi,best_current_p_vp
     real best_current_pAd_R,best_current_pAd_L,best_current_pv
-    real best_current_pd,best_current_sigmav
+    real best_current_pd,best_current_sigmav,best_current_sigmavp
     integer best_current_npt
     real best_current_voro(malay,4)
     logical burnin_in_progress
@@ -206,8 +208,8 @@ program RJ_MCMC
     vsref_min=minval(model_ref(j:nptref,4)*(1-width)) ! setting min/max velocities for writing later
     vsref_max=maxval(model_ref(j:nptref,4)*(1+width))
 
-    vpref_min=minval(model_ref(j:nptref,4)*vpvs*(1+vpvsv_min/100.)*(1-width))
-    vpref_max=maxval(model_ref(j:nptref,4)*vpvs*(1+vpvsv_max/100.)*(1+width))
+    vpref_min=minval(model_ref(j:nptref,7)*(1-vp_max)) ! setting min/max velocities for writing later
+    vpref_max=maxval(model_ref(j:nptref,7)*(1+vp_max))
 
 
     if (testing) then !!!!!!!testing: create synthetic model
@@ -227,80 +229,8 @@ program RJ_MCMC
         wmin_R(numharm_count)=1000./(maxval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))+20)
         wmax_R(numharm_count)=1000./(minval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))-2)
 
-!         numharm_count=numharm_count+1
-!         nlims_R(1,numharm_count)=j
-!         do i=240,40,-10
-!
-!             peri_R(j)=real(i)
-!             d_obsdcRe(j)=0.01
-!             n_R(j)=1
-!             j=j+1
-!         end do
-!         numharm_R(numharm_count)=1
-!         nlims_R(2,numharm_count)=j-1
-!         wmin_R(numharm_count)=1000./(maxval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))+20)
-!         wmax_R(numharm_count)=1000./(minval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))-2)
-
-!         numharm_count=numharm_count+1
-!         nlims_R(1,numharm_count)=j
-!         do i=160,40,-10
-!
-!             peri_R(j)=real(i)
-!             d_obsdcRe(j)=0.01
-!             n_R(j)=2
-!             j=j+1
-!         end do
-!         numharm_R(numharm_count)=2
-!         nlims_R(2,numharm_count)=j-1
-!         wmin_R(numharm_count)=1000./(maxval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))+20)
-!         wmax_R(numharm_count)=1000./(minval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))-2)
-
-!         numharm_count=numharm_count+1
-!         nlims_R(1,numharm_count)=j
-!         do i=90,40,-10
-!
-!             peri_R(j)=real(i)
-!             d_obsdcRe(j)=0.01
-!             n_R(j)=3
-!             j=j+1
-!         end do
-!         numharm_R(numharm_count)=3
-!         nlims_R(2,numharm_count)=j-1
-!         wmin_R(numharm_count)=1000./(maxval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))+20)
-!         wmax_R(numharm_count)=1000./(minval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))-2)
-
-!         numharm_count=numharm_count+1
-!         nlims_R(1,numharm_count)=j
-!         do i=50,40,-5
-!
-!             peri_R(j)=real(i)
-!             d_obsdcRe(j)=0.01
-!             n_R(j)=4
-!             j=j+1
-!         end do
-!         numharm_R(numharm_count)=4
-!         nlims_R(2,numharm_count)=j-1
-!         wmin_R(numharm_count)=1000./(maxval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))+20)
-!         wmax_R(numharm_count)=1000./(minval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))-2)
-
-!         numharm_count=numharm_count+1
-!         nlims_R(1,numharm_count)=j
-!         do i=50,40,-5
-!
-!             peri_R(j)=real(i)
-!             d_obsdcRe(j)=0.01
-!             n_R(j)=5
-!             j=j+1
-!         end do
-!         numharm_R(numharm_count)=5
-!         nlims_R(2,numharm_count)=j-1
-!         wmin_R(numharm_count)=1000./(maxval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))+20)
-!         wmax_R(numharm_count)=1000./(minval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))-2)
-
         ndatad_R=j-1
         nharm_R=numharm_count
-!         wmin_R=1000./(maxval(peri_R(:ndatad_R))+20)
-!         wmax_R=1000./(minval(peri_R(:ndatad_R))-2)
         nmin_R=minval(n_R(:ndatad_R))
         nmax_R=maxval(n_R(:ndatad_R))
 
@@ -319,74 +249,8 @@ program RJ_MCMC
         wmin_L(numharm_count)=1000./(maxval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))+20)
         wmax_L(numharm_count)=1000./(minval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))-2)
 
-!         numharm_count=numharm_count+1
-!         nlims_L(1,numharm_count)=j
-!         do i=240,40,-10
-!             peri_L(j)=real(i)
-!             d_obsdcLe(j)=0.02
-!             n_L(j)=1
-!             j=j+1
-!         end do
-!         numharm_L(numharm_count)=1
-!         nlims_L(2,numharm_count)=j-1
-!         wmin_L(numharm_count)=1000./(maxval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))+20)
-!         wmax_L(numharm_count)=1000./(minval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))-2)
-
-!         numharm_count=numharm_count+1
-!         nlims_L(1,numharm_count)=j
-!         do i=160,40,-10
-!             peri_L(j)=real(i)
-!             d_obsdcLe(j)=0.02
-!             n_L(j)=2
-!             j=j+1
-!         end do
-!         numharm_L(numharm_count)=2
-!         nlims_L(2,numharm_count)=j-1
-!         wmin_L(numharm_count)=1000./(maxval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))+20)
-!         wmax_L(numharm_count)=1000./(minval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))-2)
-
-!         numharm_count=numharm_count+1
-!         nlims_L(1,numharm_count)=j
-!         do i=90,40,-10
-!             peri_L(j)=real(i)
-!             d_obsdcLe(j)=0.02
-!             n_L(j)=3
-!             j=j+1
-!         end do
-!         numharm_L(numharm_count)=3
-!         nlims_L(2,numharm_count)=j-1
-!         wmin_L(numharm_count)=1000./(maxval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))+20)
-!         wmax_L(numharm_count)=1000./(minval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))-2)
-
-!         numharm_count=numharm_count+1
-!         nlims_L(1,numharm_count)=j
-!         do i=50,40,-5
-!             peri_L(j)=real(i)
-!             d_obsdcLe(j)=0.02
-!             n_L(j)=4
-!             j=j+1
-!         end do
-!         numharm_L(numharm_count)=4
-!         nlims_L(2,numharm_count)=j-1
-!         wmin_L(numharm_count)=1000./(maxval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))+20)
-!         wmax_L(numharm_count)=1000./(minval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))-2)
-
-!         numharm_count=numharm_count+1
-!         nlims_L(1,numharm_count)=j
-!         do i=50,40,-5
-!             peri_L(j)=real(i)
-!             d_obsdcLe(j)=0.02
-!             n_L(j)=5
-!             j=j+1
-!         end do
-!         numharm_L(numharm_count)=5
-!         nlims_L(2,numharm_count)=j-1
-!         wmin_L(numharm_count)=1000./(maxval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))+20)
-!         wmax_L(numharm_count)=1000./(minval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))-2)
         ndatad_L=j-1
         nharm_L=numharm_count
-        wmin_L=1000./(maxval(peri_L(:ndatad_L))+20)
-        wmax_L=1000./(minval(peri_L(:ndatad_L))-2)
         nmin_L=minval(n_L(:ndatad_L))
         nmax_L=maxval(n_L(:ndatad_L))
 
@@ -399,31 +263,19 @@ program RJ_MCMC
         voro(1,1)=1 !depth of interface
         voro(1,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
         voro(1,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
-        voro(1,4)=0!0.3-0.5/33.*i !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in
+        voro(1,4)=0.0  !vph=vph_prem*(1+voro(i,4))
         npt=1
         do i=2,11
             voro(i,1)=30*(i-1) !depth of interface
             voro(i,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
             voro(i,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
-            voro(i,4)=0!0.3-0.5/33.*i !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in params.h
+            voro(i,4)=0.0  !vph=vph_prem*(1+voro(i,4))
             npt=npt+1
         end do
 
-!         voro(10,4)=0.3
-!         voro(11,4)=0.3
-!         voro(12,4)=0.3
-!         voro(13,4)=0.3
-!         voro(14,4)=0.3
-!         voro(15,4)=-0.3
-!         voro(16,4)=-0.3
-!         voro(17,4)=-0.3
-!         voro(18,4)=-0.3
-!         voro(19,4)=-0.3
-
-
         ! take voro, combine it with prem into a format suitable for minos
-        call combine_linear(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+        call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
 
         !calculate synthetic dispersion curves
         if (ndatad_R>0) then
@@ -502,7 +354,7 @@ program RJ_MCMC
         ! write synthetic model into a file
         open(65,file=dirname//'/true_model.out',status='replace')
         do i=1,nptfinal
-            write(65,*)(rearth-r(i))/1000,vsv(i),xi(i),vpvsv_data(i)
+            write(65,*)(rearth-r(i))/1000,vsv(i),xi(i),vp_data(i)
         enddo
         close(65)
 
@@ -521,35 +373,21 @@ program RJ_MCMC
         voro(1,1)=1 !depth of interface
         voro(1,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
         voro(1,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
-        voro(1,4)=0!0.3-0.5/33.*i !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in
+        voro(1,4)=0.0  !vph=vph_prem*(1+voro(i,4))
         do i=2,11
             voro(i,1)=30*(i-1) !depth of interface
             voro(i,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
             voro(i,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
-            voro(i,4)=0!0.3-0.5/33.*i !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in params.h
+            voro(i,4)=0.0  !vph=vph_prem*(1+voro(i,4))
             npt=npt+1
         end do
 
         voro(5,2)=voro(5,2)+0.05
         voro(6,2)=voro(6,2)-0.05
-!         do i=5,10
-!             voro(i,2)=voro(i,2)+0.05
-!         enddo
-!         voro(10,4)=0.3
-!         voro(11,4)=0.3
-!         voro(12,4)=0.3
-!         voro(13,4)=0.3
-!         voro(14,4)=0.3
-!         voro(15,4)=-0.3
-!         voro(16,4)=-0.3
-!         voro(17,4)=-0.3
-!         voro(18,4)=-0.3
-!         voro(19,4)=-0.3
-
 
         ! take voro, combine it with prem into a format suitable for minos
-        call combine_linear(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+        call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
 
         !calculate synthetic dispersion curves
         if (ndatad_R>0) then
@@ -608,13 +446,6 @@ program RJ_MCMC
                 do i=1,ndatad_L
                     d_obsdcL_alt(i,1)=d_obsdcL_alt(i,1)+gasdev(ra)*0.1
                 end do
-!                 do i=2,nbproc
-!                     call MPI_SEND(d_obsdcR_alt, ndatadmax*numdis_max, MPI_Real, i-1, 2, MPI_COMM_WORLD, ierror)
-!                     call MPI_SEND(d_obsdcL_alt, ndatadmax*numdis_max, MPI_Real, i-1, 2, MPI_COMM_WORLD, ierror)
-!                 enddo
-!             else
-!                 call MPI_RECV(d_obsdcR_alt, ndatadmax*numdis_max, MPI_Real, 0, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierror)
-!                 call MPI_RECV(d_obsdcL_alt, ndatadmax*numdis_max, MPI_Real, 0, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierror)
             endif
         else
             do i=1,ndatad_R
@@ -627,7 +458,7 @@ program RJ_MCMC
 
         open(65,file=dirname//'/true_model_1.out',status='replace')
         do i=1,nptfinal
-            write(65,*)(rearth-r(i))/1000,vsv(i),xi(i),vpvsv_data(i)
+            write(65,*)(rearth-r(i))/1000,vsv(i),xi(i),vp_data(i)
         enddo
         close(65)
 
@@ -653,24 +484,10 @@ program RJ_MCMC
 
         voro(5,2)=voro(5,2)-0.05
         voro(6,2)=voro(6,2)+0.05
-!         do i=5,10
-!             voro(i,2)=voro(i,2)-0.05
-!         enddo
-!         voro(10,4)=0.3
-!         voro(11,4)=0.3
-!         voro(12,4)=0.3
-!         voro(13,4)=0.3
-!         voro(14,4)=0.3
-!         voro(15,4)=-0.3
-!         voro(16,4)=-0.3
-!         voro(17,4)=-0.3
-!         voro(18,4)=-0.3
-!         voro(19,4)=-0.3
-
 
         ! take voro, combine it with prem into a format suitable for minos
-        call combine_linear(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+        call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
 
         !calculate synthetic dispersion curves
         if (ndatad_R>0) then
@@ -749,7 +566,7 @@ program RJ_MCMC
 
         open(65,file=dirname//'/true_model_2.out',status='replace')
         do i=1,nptfinal
-            write(65,*)(rearth-r(i))/1000,vsv(i),xi(i),vpvsv_data(i)
+            write(65,*)(rearth-r(i))/1000,vsv(i),xi(i),vp_data(i)
         enddo
         close(65)
 
@@ -890,12 +707,13 @@ program RJ_MCMC
 
 
     pxi = 0.4             ! proposal for change in xi
-    p_vp = 0.1           ! proposal for change in vp/vsv
+    p_vp = 0.1           ! proposal for change in vp
     pd = 10!0.2         ! proposal on change in position
     pv = 0.1!0.04     ! proposal on velocity
     pAd_R = 0.5        ! proposal for change in R noise
     pAd_L = 0.5        ! proposal for change in L noise
     sigmav=0.15         ! proposal for vsv when creating a new layer
+    sigmavp=0.15         ! proposal for vp when creating a new layer
 
 
 
@@ -936,14 +754,14 @@ program RJ_MCMC
                  voro(i,3)= -1
              endif
             !voro(i,3)=-1
-            voro(i,4)= vpvsv_min+(vpvsv_max-vpvsv_min)*ran3(ra)
+            voro(i,4)= vp_min+(vp_max-vp_min)*ran3(ra)
         enddo
 
         !write(*,*)voro
 
         !write(*,*)'before combine_linear'
-        call combine_linear(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+        call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
 
         !write(*,*)'after combine_linear'
 
@@ -1070,6 +888,7 @@ program RJ_MCMC
     Acnd_L=0
 
     sigmav_old=0
+    sigmavp_old=0
     Ar_birth_old=0
 
     ncell=0
@@ -1126,8 +945,8 @@ program RJ_MCMC
 
         ier=.false.
 
-        call combine_linear(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+        call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
 
         if (ndatad_R>0) then
 
@@ -1273,7 +1092,7 @@ program RJ_MCMC
         write(100,*)d_min,d_max
         write(100,*)width
         write(100,*)xi_min,xi_max
-        write(100,*)vpvs,vpvsv_min,vpvsv_max
+        write(100,*)vp_min,vp_max
         write(100,*)Ad_R_min,Ad_R_max
         write(100,*)Ad_L_min,Ad_L_max
         write(100,*)milay,malay
@@ -1292,34 +1111,59 @@ program RJ_MCMC
                 if ((Acnd_R/(Prnd_R+1))<0.34) pAd_R=pAd_R*(1-perturb)
                 if ((Acnd_L/(Prnd_L+1))>0.54) pAd_L=pAd_L*(1+perturb) ! for love waves
                 if ((Acnd_L/(Prnd_L+1))<0.34) pAd_L=pAd_L*(1-perturb)
-
-                if ((Acv/(Prv+1))>0.54) pv=pv*(1+perturb) ! 2 layers for vsv
+                if ((Acv/(Prv+1))>0.54) pv=pv*(1+perturb) ! for vsv
                 if ((Acv/(Prv+1))<0.34) pv=pv*(1-perturb)
-
-                if ((Acp/(Prp+1))>0.54) pd=pd*(1+perturb) ! 2 layers for changing depth
+                if ((Acp/(Prp+1))>0.54) pd=pd*(1+perturb) ! for depth
                 if ((Acp/(Prp+1))<0.34) pd=pd*(1-perturb)
 
-                ! UPDATE SIGMAV
+                ! UPDATE SIGMAV AND SIGMAVP
                 if ((abs((AcB/PrB)-Ar_birth_old)>2*abs((AcB/PrB)-(AcD/PrD))).and.&
                     (AcB.ne.0)) then !special treatement for adding/removing layers
 
+                    sigma_count=sigma_count+1
                     if ((AcB/PrB)>Ar_birth_old) then! Going in the right direction
-                        if (sigmav>sigmav_old) then !Going up
-                            sigmav_new=sigmav*(1+perturb)
-                        else !Going down
-                            sigmav_new=sigmav*(1-perturb)
+                        if (mod(int(sigma_count/switch_sigma),2)==0) then
+                            if (sigmav>sigmav_old) then !Going up
+                                sigmav_new=sigmav*(1+perturb)
+                            else !Going down
+                                sigmav_new=sigmav*(1-perturb)
+                            endif
+                            sigmavp_new=sigmavp
+                        else
+                            ! sigmavp
+                            if (sigmavp>sigmavp_old) then !Going up
+                                sigmavp_new=sigmavp*(1+perturb)
+                            else !Going down
+                                sigmavp_new=sigmavp*(1-perturb)
+                            endif
+                            sigmav_new=sigmav
                         endif
                     else ! Going in the wrong direction
-                        if (sigmav>sigmav_old) then !Going up
-                            sigmav_new=sigmav*(1-perturb)
+                        if (mod(int(sigma_count/switch_sigma),2)==0) then
+                            if (sigmav>sigmav_old) then !Going up
+                                sigmav_new=sigmav*(1-perturb)
+                            else
+                                sigmav_new=sigmav*(1+perturb)
+                            endif
+                            sigmavp_new=sigmavp
+
                         else
-                            sigmav_new=sigmav*(1+perturb)
+                            ! sigmavp
+                            if (sigmavp>sigmavp_old) then !Going up
+                                sigmavp_new=sigmavp*(1-perturb)
+                            else
+                                sigmavp_new=sigmavp*(1+perturb)
+                            endif
+                            sigmav_new=sigmav
                         endif
                     endif
                     !write(*,*)sigmav_new
                     !write(*,*)
                     sigmav_old=sigmav
                     sigmav=sigmav_new
+
+                    sigmavp_old=sigmavp
+                    sigmavp=sigmavp_new
                     Ar_birth_old=AcB/PrB
                     PrB=0
                     PrD=0
@@ -1452,7 +1296,7 @@ program RJ_MCMC
                     voro_prop(ind,4)=voro(ind,4)+gasdev(ra)*p_vp
 
                     !Check if oustide bounds of prior
-                    if ((voro_prop(ind,4)<=vpvsv_min).or.(voro_prop(ind,4)>=vpvsv_max)) out=0
+                    if ((voro_prop(ind,4)<=vp_min).or.(voro_prop(ind,4)>=vp_max)) out=0
 
                 endif
             elseif (u<0.3) then !change position--------------------------------------------
@@ -1523,17 +1367,17 @@ program RJ_MCMC
                     !voro_prop(npt_prop,2) = -width+2*width*ran3(ra) ! use completely random new value
                     voro_prop(npt_prop,3) = -1
                     !voro_prop(npt_prop,4) = voro(ind,4)+gasdev(ra)*p_vp
-                    voro_prop(npt_prop,4) = vpvsv_min+(vpvsv_max-vpvsv_min)*ran3(ra)
+                    voro_prop(npt_prop,4) = voro(ind,4)+gasdev(ra)*sigmavp ! sigmavpvs: special width for new layers
                     isoflag_prop(npt_prop) = .true.
 
                     logprob_vsv=log(1/(sigmav*sqrt(2*pi)))-((voro(ind,2)-voro_prop(npt_prop,2))**2)/(2*sigmav**2) ! correct acceptance rates because transdimensional
-                    !logprob_vp=log(1/(p_vp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(npt_prop,4))**2)/(2*p_vp**2)
+                    logprob_vp=log(1/(sigmavp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(npt_prop,4))**2)/(2*sigmavp**2)
 
                     !Check bounds
                     if ((voro_prop(npt_prop,2)<=-width).or.(voro_prop(npt_prop,2)>=width)) then
                         out=0
                     end if
-                    if ((voro_prop(npt_prop,4)<=vpvsv_min).or.(voro_prop(npt_prop,4)>=vpvsv_max)) then
+                    if ((voro_prop(npt_prop,4)<=vp_min).or.(voro_prop(npt_prop,4)>=vp_max)) then
                         out=0
                     end if
                 endif
@@ -1570,6 +1414,7 @@ program RJ_MCMC
                     call whichcell_d(voro(ind,1),voro_prop,npt_prop,ind2)
                     logprob_vsv=log(1/(sigmav*sqrt(2*pi)))-((voro(ind,2)-voro_prop(ind2,2))**2)/(2*sigmav**2) ! same as for birth
                     !logprob_vp=log(1/(p_vp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(ind2,4))**2)/(2*p_vp**2)
+                    logprob_vp=log(1/(sigmavp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(ind2,4))**2)/(2*sigmavp**2)
 
                 endif
             elseif (u<0.9) then !Birth an anisotropic layer----------------------------------------
@@ -1630,8 +1475,8 @@ program RJ_MCMC
 
             !**************************************************************************
             if (out==1) then ! maybe we don't need a forward calculation for changes in noise parameters
-                call combine_linear(model_ref,nptref,nic_ref,noc_ref,voro_prop,npt_prop,d_max,&
-                    r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+                call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro_prop,npt_prop,d_max,&
+                    r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
 
                 if (ndatad_R>0) then
 
@@ -1731,9 +1576,11 @@ program RJ_MCMC
             ! now check if we accept the new model - different treatement depending on the change
             if (birth) then!------------------------------------------------------------------
 
-                if (log(ran3(ra))<log(out) + log(real(npt)+1)-log(real(npt_prop)+1) -&
-                    log(2*width)-logprob_vsv&!-log(vpvsv_max-vpvsv_min)-logprob_vp&
+                if (log(ran3(ra))<log(out) + log(real(npt)+1)-log(real(npt_prop)+1)&
+                    -log(2*width)-logprob_vsv&
+                    -log(vp_max-vp_min)-logprob_vp&
                     -like_prop_w+like_w) then ! transdimensional case
+
                     accept=.true.
                     AcB=AcB+1
                 endif
@@ -1742,8 +1589,9 @@ program RJ_MCMC
 
                 if (log(ran3(ra))<log(out) + log(real(npt)+1)&
                     -log(real(npt_prop)+1) + &
-                    log(2*width)+logprob_vsv&!+log(vpvsv_max-vpvsv_min)+logprob_vp&
+                    log(2*width)+logprob_vsv+log(vp_max-vp_min)+logprob_vp&
                     -like_prop_w+like_w) then! transdimensional case
+
                     accept=.true.
                     AcD=AcD+1
                 endif
@@ -1855,7 +1703,8 @@ program RJ_MCMC
                     write(*,*)'AR_move',100*AcP/PrP
                     write(*,*)'AR_value',100*AcV/PrV
 
-                    write(*,*)'AR_Birth',100*AcB/PrB,'AR_Death',100*AcD/PrD,'sigmav',sigmav
+                    write(*,*)'AR_Birth',100*AcB/PrB,'AR_Death',100*AcD/PrD
+                    write(*,*)'sigmav',sigmav,'sigmavp',sigmavp
                     write(*,*)'AR_Birtha',100*AcBa/PrBa,'AR_Deatha',100*AcDa/PrDa
                     write(*,*)'AR_xi',100*Acxi/Prxi,'pxi',pxi
                     write(*,*)'AR__vp',100*Ac_vp/Pr_vp,'p_vp',p_vp
@@ -1933,19 +1782,19 @@ program RJ_MCMC
                     th = th + 1
                     th_all=th_all+1
 
-                    call combine_linear(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-                        r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+                    call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+                        r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
 
                     write(100,*)nptfinal-noc,npt,npt_ani
                     write(100,*)Ad_R,Ad_L
                     write(100,*)(rearth-r(nptfinal:1:-1))/1000.
                     write(100,*)vsv(nptfinal:1:-1)
                     write(100,*)xi(nptfinal:1:-1)
-                    write(100,*)vpvsv_data(nptfinal:1:-1)
+                    write(100,*)vp_data(nptfinal:1:-1)
 
 !                     do i=1,nptfinal-noc
 !                         write(100,*)(rearth-r(nptfinal+1-i))/1000.,vsv(nptfinal+1-i)&
-!                         ,xi(nptfinal+1-i),vpvsv_data(nptfinal+1-i)
+!                         ,xi(nptfinal+1-i),vp_data(nptfinal+1-i)
 !                     enddo
                     write(100,*)like_w
                     !write(100,*)logalpha(:numdis)
@@ -1971,7 +1820,7 @@ program RJ_MCMC
                     write(100,*)d_min,d_max
                     write(100,*)width
                     write(100,*)xi_min,xi_max
-                    write(100,*)vpvs,vpvsv_min,vpvsv_max
+                    write(100,*)vp_min,vp_max
                     write(100,*)Ad_R_min,Ad_R_max
                     write(100,*)Ad_L_min,Ad_L_max
                     write(100,*)milay,malay
@@ -2045,7 +1894,8 @@ program RJ_MCMC
                 write(*,*)'AR_move',100*AcP/PrP
                 write(*,*)'AR_value',100*AcV/PrV
 
-                write(*,*)'AR_Birth',100*AcB/PrB,'AR_Death',100*AcD/PrD,'sigmav',sigmav
+                write(*,*)'AR_Birth',100*AcB/PrB,'AR_Death',100*AcD/PrD
+                write(*,*)'sigmav',sigmav,'sigmavp',sigmavp
                 write(*,*)'AR_Birtha',100*AcBa/PrBa,'AR_Deatha',100*AcDa/PrDa
                 write(*,*)'AR_xi',100*Acxi/Prxi,'pxi',pxi
                 write(*,*)'AR__vp',100*Ac_vp/Pr_vp,'p_vp',p_vp
@@ -2232,6 +2082,7 @@ program RJ_MCMC
                 best_current_pv=pv
                 best_current_pd=pd
                 best_current_sigmav=sigmav
+                best_current_sigmavp=sigmavp
                 best_current_npt=npt
                 best_current_voro=voro
 

@@ -94,7 +94,7 @@ obj: params.h
 	$(F77) -c src/minos_bran.f
 	$(F77) -c src/dispersion_minos.f90
 	$(F77) -c src/interp.f90
-	$(F77) -c src/combine_linear.f90
+	$(F77) -c src/combine_linear_vp.f90
 	
 #obj_vp: params.h
 #	$(F77) -c src/whichcell_d.f90
@@ -115,7 +115,7 @@ obj: params.h
 #	matrixops.o readwrite.o spheror.o buildmod.o 
 #	\rm ./*.o
 
-	ar -r libroutines.a  whichcell_d.o minos_bran.o dispersion_minos.o interp.o combine_linear.o #combine.à
+	ar -r libroutines.a  whichcell_d.o minos_bran.o dispersion_minos.o interp.o combine_linear_vp.o #combine.à
 	# ar -r libroutines.a  whichcell_d.o minos_bran.o combine_linear_vp.o dispersion_minos.o interp.o
 	\rm ./*.o
 
