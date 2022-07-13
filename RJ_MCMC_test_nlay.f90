@@ -14,15 +14,16 @@ program RJ_MCMC
     implicit none
     ! include 'mpif.h'
     include 'params.h'
-    
+    include 'params_p.h'
     !             ----------------------------------
     !             BEGINING OF THE USER-DEFINED PARAMETERS
     !             ----------------------------------
 
-
     !-----------------------------------------
     ! Parameters of the Markov chain
     !-----------------------------------------
+    ! 1 Constrain using PsPp data, 0 leave it out.
+    integer, parameter :: PsPp_flag = 0
 
     ! 0 let Vp Free, 1 Scale Vp, 2 Fix Vp to ref.
     integer, parameter :: vp_flag = 0                  
@@ -32,10 +33,14 @@ program RJ_MCMC
     real, parameter :: vp_scale = 2.0                    
 
     character (len=*), parameter :: mods_dirname = 'MODS_OUT_TEST' ! This is where output info files are saved and input data files are taken.
-    real, parameter :: noise = 0.04                                ! Gaussian noise added to data ()>0). twice for Love.
+    real, parameter :: noise_dspd = 0.04                            ! Gaussian noise added to disp data (>0). twice for Love.
     real, parameter :: obs_err_R = 0.1                             ! Observational errors
     real, parameter :: obs_err_L = 0.2                             ! Observational errors
-    
+
+    character(len=64), parameter :: rp_file = 'rayp2.in'
+    real, parameter :: noise_PsPp = 0.04                              ! Gaussian noise added to travel time data (>0)
+    real, parameter :: obs_err_PsPp = 0.5                             ! Observational errors
+
     character (len=*), parameter :: dirname = 'OUT_TEST' ! This is where output info files are saved and input data files are taken.
     character*8, parameter :: storename = 'STORFFC1'     ! This is where output models are saved
     integer, parameter :: burn_in = 200000 ! 55000 !Burn-in period
@@ -68,6 +73,10 @@ program RJ_MCMC
 
     double precision, parameter ::    Ad_L_max = 25 ! bounds of the prior in Ad_L
     double precision, parameter ::    Ad_L_min = 0.0000002
+
+    !!!!!!!!!!!!!!! AL mods for P-wave stuff !!!!!!!!!!!!!!!!!
+    double precision, parameter ::    Ad_PsPp_max = 25 ! bounds of the prior in Ad_PsPp
+    double precision, parameter ::    Ad_PsPp_min = 0.0000002
 
     !-----------------------------------------
     ! Sdt for Proposal distributions
@@ -188,7 +197,7 @@ program RJ_MCMC
     real d_cRmoy(ndatadmax), d_cRmoys(ndatadmax), d_cLmoy(ndatadmax), d_cLmoys(ndatadmax) ! average dispersion curve
     real d_cRdelta(ndatadmax), d_cRdeltas(ndatadmax), d_cLdelta(ndatadmax), d_cLdeltas(ndatadmax) ! standart deviation of dispersion curve
     real model_ref(mk,9) ! reference model, all models are deviations from it
-    real,dimension(mk) :: r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,xi,vp_data ! input for forward modelling
+    real,dimension(mk) :: r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,xi,vp_data,vs_data ! input for forward modelling
     integer :: nptfinal,nic,noc,nic_ref,noc_ref,jcom ! more inputs
     integer :: nmodes,n_mode(nmodes_max),l_mode(nmodes_max) ! outputs of forward modelling
     real :: c_ph(nmodes_max),period(nmodes_max),raylquo(nmodes_max),tref ! more outputs, rayquo: error measurement, should be of the order of eps
@@ -197,6 +206,18 @@ program RJ_MCMC
     logical :: stuck
     integer :: nharm_R,nharm_L,iharm
     real :: dummy_d_obsdcR(ndatadmax), dummy_d_obsdcL(ndatadmax)
+    !!!!!!!!!!!!!!! AL mods for P-wave stuff !!!!!!!!!!!!!!!!!
+    real, dimension (nrays_max) :: rayp, d_obsPsPp, d_obsPsPpe, d_PsPp, d_obsPsPp_prop, d_PsPp_prop
+    integer :: nrays
+    logical :: PsPp_error, noisd_PsPp
+    real :: lsd_PsPp, liked_PsPp, lsd_PsPp_min, liked_PsPp_prop, lsd_PsPp_prop
+    double precision Ad_PsPp, Ad_PsPp_prop
+    real :: pAd_PsPp, Prnd_PsPp,Acnd_PsPp
+    real convAd_PsPp(nsample+burn_in),convAd_PsPps(nsample+burn_in) !variations of uncertainty parameters
+    real convd_PsPp(nsample+burn_in), convd_PsPps(nsample+burn_in) 
+    real ML_Ad_PsPp(disA),ML_Ad_PsPps(disA)!histogram of uncertainty parameters
+    real d_PsPpmoy(nrays_max), d_PsPpdelta(nrays_max), d_PsPpmoys(nrays_max), d_PsPpdeltas(nrays_max)
+    real,dimension(4) :: t
 
     ! For saving all models
     integer th_all
@@ -229,7 +250,10 @@ program RJ_MCMC
     pAd_L = 0.5        ! proposal for change in L noise
     sigmav=0.15        ! proposal for vsv when creating a new layer
     sigmavp=0.15     ! proposal for vp when creating a new layer
-      
+    if (PsPp_flag==1) then
+        pAd_PsPp = 0.5        ! proposal for change in PsPp tdiff noise
+    end if
+
     testing=.true.
     if (testing) write(*,*)'testing with synthetic model'
     ! write(*,*)'testing',maxrq
@@ -301,9 +325,18 @@ program RJ_MCMC
     d_cLdelta=0
     d_cRdeltas=0
     d_cLdeltas=0 
+
+    if (PsPp_flag==1) then
+        ML_Ad_PsPp=0
+        ML_Ad_PsPps=0
+        convAd_PsPp=0
+        convAd_PsPps=0
+        d_PsPpmoy=0
+        d_PsPpdelta=0
+    end if
+
     ier=.false.
- 
-    
+
     !************************************************************
     !                READ PREM 
     !************************************************************
@@ -364,8 +397,7 @@ program RJ_MCMC
             enddo
             nlims_cur=nlims_R(2,k)+1
         enddo
-        
-        
+                
         nlims_cur=1
         read(65,*,IOSTAT=io)ndatad_L ! number of Love modes
         read(65,*,IOSTAT=io)nharm_L ! number of harmonics
@@ -402,40 +434,38 @@ program RJ_MCMC
         if (ndatad_R>=ndatad_L) tref=sum(peri_R(:ndatad_R))/ndatad_R
         if (ndatad_L>ndatad_R) tref=sum(peri_L(:ndatad_L))/ndatad_L
 
-        
+        !!!!!!!!!!!!!!! AL mods for P-wave stuff !!!!!!!!!!!!!!!!!
+        if (PsPp_flag==1) then
+            call get_rayp(rp_file, nrays, rayp)
+            do i = 1, nrays
+                d_obsPsPpe(i) = obs_err_PsPp
+            end do
+        end if
+            
         !!!!!!!!!!!!!!!!!!!!!!!! create synthetic model !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         npt=0
-
-        voro(1,1)=1 !depth of interface
-        voro(1,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
-        voro(1,3)=-1   !0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
-        voro(1,4)=0.0  !vph=vph_prem*(1+voro(i,4))
+        
+        voro(npt+1,1)=0 !depth of interface
+        voro(npt+1,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
+        voro(npt+1,3)=-1   !0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
+        voro(npt+1,4)=0.0  !vph=vph_prem*(1+voro(i,4))
         npt=npt+1
-        do i=2,3
-            voro(i,1)=30*(i-1) !depth of interface
-            voro(i,2)=0.0    !0.1*(-1)**i  !vsv=vsv_prem*(1+voro(i,2))
-            voro(i,3)=-1    !0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
-            voro(i,4)=0.0   !vph=vph_prem*(1+voro(i,4))
-            npt=npt+1
-        end do
-        do i=4,8
-            voro(i,1)=30*(i-1) !depth of interface
-            voro(i,2)=0.0    !0.1*(-1)**i  !vsv=vsv_prem*(1+voro(i,2))
-            voro(i,3)=-1    !0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
-            voro(i,4)=0.0   !vph=vph_prem*(1+voro(i,4))
-            npt=npt+1
-        end do
-        do i=9,23
-            voro(i,1)=30*(i-1) !depth of interface
-            voro(i,2)=0.0    !0.1*(-1)**i  !vsv=vsv_prem*(1+voro(i,2))
-            voro(i,3)=-1    !0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
-            voro(i,4)=0.0   !vph=vph_prem*(1+voro(i,4))
-            npt=npt+1
-        end do
+
+        voro(npt+1,1)=100.0 !depth of interface
+        voro(npt+1,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
+        voro(npt+1,3)=-1   !0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
+        voro(npt+1,4)=0.05  !vph=vph_prem*(1+voro(i,4))
+        npt=npt+1
+        
+        voro(npt+1,1)=200.0 !depth of interface
+        voro(npt+1,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
+        voro(npt+1,3)=-1   !0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
+        voro(npt+1,4)=0.0  !vph=vph_prem*(1+voro(i,4))
+        npt=npt+1
         
         ! take voro, combine_linear_vp it with prem into a format suitable for minos
         call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
+            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,vs_data,xi,vp_data)
         
         !calculate synthetic dispersion curves
         if (ndatad_R>0) then
@@ -483,32 +513,68 @@ program RJ_MCMC
 
         d_obsdcR(:ndatad_R)=d_cR(:ndatad_R)
         d_obsdcL(:ndatad_L)=d_cL(:ndatad_L)
-        
+
+        !!!!!!!!!!!!!!! AL mods for P-wave stuff !!!!!!!!!!!!!!!!!
+        if (PsPp_flag==1) then
+            if (nrays>0) then
+                call sum_Ps_Pp_diff(r, vpv, vph, vsv, vsh, nptfinal, nrays, rayp, d_obsPsPp, PsPp_error)
+                if (PsPp_error) stop "INVALID INITIAL MODEL - PsPp - Gradient or Nan likely"
+                ! do i = 1, nrays
+                !     write(*,*) d_obsPsPp(i)
+                ! end do
+            end if
+        end if
+
         ! Add Gaussian errors to synthetic data
         
         IF (nbproc.gt.1) THEN
             IF (ran==0) THEN
                 do i=1,ndatad_R
-                    d_obsdcR(i)=d_obsdcR(i)+gasdev(ra)*noise
+                    d_obsdcR(i)=d_obsdcR(i)+gasdev(ra)*noise_dspd
                 end do
                 do i=1,ndatad_L
-                    d_obsdcL(i)=d_obsdcL(i)+gasdev(ra)*noise*2 ! Make the Love noise twice the Rayleigh
+                    d_obsdcL(i)=d_obsdcL(i)+gasdev(ra)*noise_dspd*2 ! Make the Love noise twice the Rayleigh
                 end do
+
+                if (PsPp_flag==1) then
+                    do i=1,nrays
+                        d_obsPsPp(i)=d_obsPsPp(i)+gasdev(ra)*noise_PsPp
+                    end do
+                end if
+
+
                 do i=2,nbproc
                     call MPI_SEND(d_obsdcR, ndatadmax, MPI_Real, i-1, 1, MPI_COMM_WORLD, ierror)
                     call MPI_SEND(d_obsdcL, ndatadmax, MPI_Real, i-1, 1, MPI_COMM_WORLD, ierror)
+
+                    if (PsPp_flag==1) then
+                        call MPI_SEND(d_obsPsPp, nrays_max, MPI_Real, i-1, 1, MPI_COMM_WORLD, ierror)
+                    end if
+
                 enddo
             else
                 call MPI_RECV(d_obsdcR, ndatadmax, MPI_Real, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierror)
                 call MPI_RECV(d_obsdcL, ndatadmax, MPI_Real, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierror)
+
+                if (PsPp_flag==1) then
+                    call MPI_RECV(d_obsPsPp, nrays_max, MPI_Real, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierror)
+                end if
+
             endif
         else
             do i=1,ndatad_R
-                d_obsdcR(i)=d_obsdcR(i)+gasdev(ra)*noise
+                d_obsdcR(i)=d_obsdcR(i)+gasdev(ra)*noise_dspd
             end do
             do i=1,ndatad_L
-                d_obsdcL(i)=d_obsdcL(i)+gasdev(ra)*noise*2 ! Make the Love noise twice the Rayleigh
+                d_obsdcL(i)=d_obsdcL(i)+gasdev(ra)*noise_dspd*2 ! Make the Love noise twice the Rayleigh
             end do
+
+            if (PsPp_flag==1) then
+                do i=1,nrays
+                    d_obsPsPp(i)=d_obsPsPp(i)+gasdev(ra)*noise_PsPp
+                end do
+            end if
+
         endif
 
         
@@ -581,6 +647,18 @@ program RJ_MCMC
         if (ndatad_L>ndatad_R) tref=sum(peri_L(:ndatad_L))/ndatad_L
         
 
+        ! ############# READ PsPp data here #######################
+        if (PsPp_flag==1) then
+            open(71,file=dirname//'/PsPp_obs.dat',status='old')
+            read(71,*,IOSTAT=io)nrays
+            do i=1,nrays
+                read(71,*)rayp(i),d_obsPsPp(i),d_obsPsPpe(i)
+                if ((rayp(i).gt.8.840).or.(rayp(i).lt.4.642)) then
+                    stop "INVALID rayp data in PsPp_obs.dat. Exiting......."
+                end if
+            enddo
+            close(71)
+        end if
         write(*,*) 'Finished reading data....'
 
     endif
@@ -597,6 +675,9 @@ program RJ_MCMC
     ! Initilalise sigma (noise parameter)
     Ad_R = Ad_R_max-pAd_R! Ad_min+ran3(ra)*(Ad_R_max-Ad_min)
     Ad_L = Ad_L_max-pAd_L
+    if (PsPp_flag==1) then
+        Ad_PsPp = Ad_PsPp_max-pAd_PsPp
+    end if
 
     ! Initial number of cells
     !------------------------------------
@@ -634,10 +715,18 @@ program RJ_MCMC
                 ! Vp Fixed to ref
                 voro(i,4) = 0.0
             end if
-
-
-            
+           
         enddo
+
+        ! ! Should not be necessary here.....
+        ! do i=1,npt
+        !     do k=1,npt-1 
+        !         if (voro(k,1).gt.voro(k+1,1)) then
+        !             t = voro(k,:);  voro(k,:) = voro(k+1,:);  voro(k+1,:) = t
+        !         ENDIF
+        !     ENDDO
+        ! ENDDO
+
 !         open(65,file=dirname//'/stuck_039.out',status='old')
 !         read(65,*,IOSTAT=io)npt
 !         do i=1,npt
@@ -646,7 +735,7 @@ program RJ_MCMC
 !         close(65)
 
         call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
+            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,vs_data,xi,vp_data)
         write(*,*)"Combined"
         if (ndatad_R>0) then
             
@@ -704,11 +793,21 @@ program RJ_MCMC
         
         endif
         
+        if (PsPp_flag==1) then
+            !!!!!!!!!!!!!!! AL mods for P-wave stuff !!!!!!!!!!!!!!!!!
+            if (nrays>0) then
+                call sum_Ps_Pp_diff(r, vpv, vph, vsv, vsh, nptfinal, nrays, rayp, d_PsPp, PsPp_error)
+    !             if (PsPp_error) tes=.false.
+                if (PsPp_error) then
+                    tes=.false.
+                    write(*,*)"INVALID PROPOSED MODEL - PsPp - Gradient or Nan likely"
+                end if
+            end if
+        end if
+
         if (j>250) stop "CAN'T INITIALIZE MODEL" ! if it doesn't work after 250 tries, give up
 
     enddo
-    
-    
 
     write(*,*)'DONE INITIALIZING STARTING MODEL'
     
@@ -732,6 +831,11 @@ program RJ_MCMC
     lsd_L=0
     liked_R=0
     liked_L=0
+
+    if (PsPp_flag==1) then
+        lsd_PsPp = 0
+        liked_PsPp = 0
+    end if
     
     do i=1,ndatad_R ! calculate misfit -> log-likelihood of initial model
         lsd_R=lsd_R+(d_obsdcR(i)-d_cR(i))**2                                ! Sum of squared misfits
@@ -741,12 +845,26 @@ program RJ_MCMC
         lsd_L=lsd_L+(d_obsdcL(i)-d_cL(i))**2
         liked_L=liked_L+(d_obsdcL(i)-d_cL(i))**2/(2*(Ad_L*d_obsdcLe(i))**2) 
     enddo
-    
+
+    if (PsPp_flag==1) then
+        do i=1,nrays
+            lsd_PsPp=lsd_PsPp+(d_obsPsPp(i)-d_PsPp(i))**2
+            liked_PsPp=liked_PsPp+(d_obsPsPp(i)-d_PsPp(i))**2/(2*(Ad_PsPp*d_obsPsPpe(i))**2)
+        enddo
+    end if
+
     lsd_R_min=lsd_R
     lsd_L_min=lsd_L
-    likemax=lsd_R+lsd_L
-    
-    like= liked_R + liked_L             ! Combined log likelihood for R and L
+
+    if (PsPp_flag==1) then
+        lsd_PsPp_min=lsd_PsPp
+        likemax=lsd_R+lsd_L+lsd_PsPp
+        like= liked_R + liked_L + liked_PsPp  ! Combined log likelihood for R, L PsPp
+    else
+        likemax=lsd_R+lsd_L
+        like= liked_R + liked_L             ! Combined log likelihood for R and L
+    end if
+
     
     write(*,*)like
     
@@ -776,6 +894,11 @@ program RJ_MCMC
     Prnd_L=0
     Acnd_L=0
 
+    if (PsPp_flag==1) then
+        Prnd_PsPp=0
+        Acnd_PsPp=0
+    end if
+
     sigmav_old=0
     sigmavp_old=0
     sigma_count=0
@@ -796,12 +919,12 @@ program RJ_MCMC
     write(100,*)vp_min,vp_max,vpref_min,vpref_max
     write(100,*)Ad_R_min,Ad_R_max
     write(100,*)Ad_L_min,Ad_L_max
+    ! write(100,*)Ad_PsPp_min,Ad_PsPp_max ! Cant do this without changing post processing.
 
     do while (sample<nsample) ! main loop, sample: number of sample post burn-in
         ount=ount+1
         malayv=malay
         if (mod(ount,every)==0) then ! check regularly if acceptance rates are in an acceptable range, else change proposal width.
-            
             if (vp_flag==0) then
                 ! Vp Free
                 if ((Ac_vp/(Pr_vp+1))>0.54) p_vp=p_vp*(1+perturb)! if not increase width of proposition density
@@ -813,15 +936,18 @@ program RJ_MCMC
                 ! Vp Fixed to ref
                 p_vp=p_vp
             end if
-            
-            
             if ((Acxi/(Prxi+1))>0.54) pxi=pxi*(1+perturb)
             if ((Acxi/(Prxi+1))<0.34) pxi=pxi*(1-perturb)
             if ((Acnd_R/(Prnd_R+1))>0.54) pAd_R=pAd_R*(1+perturb) ! for rayleigh waves
             if ((Acnd_R/(Prnd_R+1))<0.34) pAd_R=pAd_R*(1-perturb)
             if ((Acnd_L/(Prnd_L+1))>0.54) pAd_L=pAd_L*(1+perturb) ! for love waves
             if ((Acnd_L/(Prnd_L+1))<0.34) pAd_L=pAd_L*(1-perturb)
-      
+            
+            if (PsPp_flag==1) then
+                if ((Acnd_PsPp/(Prnd_PsPp+1))>0.54) pAd_PsPp=pAd_PsPp*(1+perturb) ! for PsPp
+                if ((Acnd_PsPp/(Prnd_PsPp+1))<0.34) pAd_PsPp=pAd_PsPp*(1-perturb)
+            end if
+
             if ((Acv/(Prv+1))>0.54) pv1=pv1*(1+perturb) ! 2 layers for vsv
             if ((Acv/(Prv+1))<0.34) pv1=pv1*(1-perturb)
       
@@ -843,13 +969,11 @@ program RJ_MCMC
                 !write(*,*)'update ---------------------'
                 !write(*,*)Ar_birth_old,100*AcB/PrB
                 !write(*,*)sigmav_old,sigmav
-                
-                
+                                
                 sigma_count=sigma_count+1
                 if (vp_flag==0) then
                     ! Vp Free
                     if ((AcB/PrB)>Ar_birth_old) then! Going in the right direction
-
                         if (mod(int(sigma_count/switch_sigma),2)==0) then
                             if (sigmav>sigmav_old) then !Going up
                                 sigmav_new=sigmav*(1+perturb)
@@ -866,10 +990,7 @@ program RJ_MCMC
                             endif
                             sigmav_new=sigmav
                         endif
-
-
                     else ! Going in the wrong direction
-
                         if (mod(int(sigma_count/switch_sigma),2)==0) then
                             if (sigmav>sigmav_old) then !Going up
                                 sigmav_new=sigmav*(1-perturb)
@@ -877,7 +998,6 @@ program RJ_MCMC
                                 sigmav_new=sigmav*(1+perturb)
                             endif
                             sigmavp_new=sigmavp
-
                         else
                             ! sigmavp
                             if (sigmavp>sigmavp_old) then !Going up
@@ -887,9 +1007,7 @@ program RJ_MCMC
                             endif
                             sigmav_new=sigmav
                         endif
-
                     endif
-             
                 else
                     if ((AcB/PrB)>Ar_birth_old) then! Going in the right direction
                         if (sigmav>sigmav_old) then !Going up
@@ -936,10 +1054,6 @@ program RJ_MCMC
                 endif
             end if
 
-
-
-
-            
             !-----------------------------------------------
 
             PrP=0
@@ -958,6 +1072,12 @@ program RJ_MCMC
             Pr_vp=0
             Prnd_L=0
             Acnd_L=0
+
+            if (PsPp_flag==1) then
+                Prnd_PsPp=0
+                Acnd_PsPp=0
+            end if
+
         endif
     
         isoflag_prop = isoflag
@@ -965,31 +1085,54 @@ program RJ_MCMC
         like_prop =like
         liked_R_prop=liked_R
         liked_L_prop=liked_L
-        
-    
         npt_prop = npt
-    
         lsd_R_prop = lsd_R
         lsd_L_prop = lsd_L
         Ad_R_prop = Ad_R
         Ad_L_prop = Ad_L
-        
-        ! Determine the random value used in proposals - need tos change to account for Vp.
-        
-        if (vp_flag==0) then
-            ! Vp Free
-            u=ran3(ra) * 1.0
-            if (u.ge.1.0) then
-                u=0.95
-            endif
-        elseif ((vp_flag==1).or.(vp_flag==2)) then
-            ! Vp scaled or Fixed to ref
-            u=ran3(ra) * 0.9 ! We don't make a Vp change proposal in this case.
-            if (u.ge.0.9) then
-                u=0.85
-            endif
+
+        if (PsPp_flag==1) then
+            liked_PsPp_prop=liked_PsPp
+            lsd_PsPp_prop =lsd_PsPp
+            Ad_PsPp_prop = Ad_PsPp
         end if
 
+        ! Determine the random value used in proposals - need to change to account for Vp and PsPp.
+        if (PsPp_flag==1) then
+            if (vp_flag==0) then
+                ! Vp Free
+                u=ran3(ra) * 1.1
+                if (u.ge.1.1) then
+                    u=1.05
+                endif
+            elseif ((vp_flag==1).or.(vp_flag==2)) then
+                ! Vp scaled or Fixed to ref
+                u=ran3(ra) * 1.0 ! We don't make a Vp change proposal in this case.
+                if (u.ge.1.0) then
+                    u=0.95
+                endif
+            end if
+        elseif (PsPp_flag==0) then
+            if (vp_flag==0) then
+                ! Vp Free
+                u=0.1+(ran3(ra) * 1.0)
+                if (u.lt.0.1) then
+                    u=0.15
+                endif
+                if (u.ge.1.1) then
+                    u=1.05
+                endif
+            elseif ((vp_flag==1).or.(vp_flag==2)) then
+                ! Vp scaled or Fixed to ref
+                u=0.1+(ran3(ra) * 0.9) ! We don't make a Vp change proposal in this case.
+                if (u.lt.0.1) then
+                    u=0.15
+                endif
+                if (u.ge.1.0) then
+                    u=0.95
+                endif
+            end if
+        end if
 
         ind=1
         out=1 ! indicates if change is acceptable, i. e. not out of bounds etc.
@@ -1005,7 +1148,10 @@ program RJ_MCMC
         logprob_vp=0
         ani=.false.
         change_vp=.false.
-        
+
+        if (PsPp_flag==1) then
+            noisd_PsPp=.false.
+        end if
 
         npt_ani=0
         npt_iso=0
@@ -1021,7 +1167,23 @@ program RJ_MCMC
         !                   Propose a new model
 
         !*************************************************************
-        if (u<0.1) then !change xi--------------------------------------------
+
+        if (u<0.1) then ! Change noise parameter for PsPp waves
+            noisd_PsPp=.true.
+            Prnd_PsPp = Prnd_PsPp + 1
+            Ad_PsPp_prop = Ad_PsPp+gasdev(ra)*pAd_PsPp
+            !Check if oustide bounds of prior
+            if ((Ad_PsPp_prop<=Ad_PsPp_min).or.(Ad_PsPp_prop>=Ad_PsPp_max)) then
+                out=0
+            endif
+            
+            if (PsPp_flag==0) then
+                ! Code should not get here....
+                ! Write some exit statement....
+                stop "Incorrect place for noisd_PsPp proposal change when PsPp_flag==0"
+            end if
+
+        elseif (u<0.2) then !change xi--------------------------------------------
             Prxi=Prxi+1 !increase counter to calculate acceptance rates
             ani=.true.
             if (npt_ani.ne.0) then
@@ -1043,8 +1205,16 @@ program RJ_MCMC
                 voro_prop(ind,3)=voro(ind,3)+gasdev(ra)*pxi
                 if (isoflag(ind).eqv..true.) stop "isoflag1"
                 
+                ! Check prior on velocity when moving cell location - this is not necessary so comment...
+                if ((voro_prop(ind,2)<=-width).or.(voro_prop(ind,2)>=width)) then
+                    out=0
+                endif
                 !Check if oustide bounds of prior
                 if ((voro_prop(ind,3)<=xi_min).or.(voro_prop(ind,3)>=xi_max)) then
+                    out=0
+                endif
+                !Check if scaled vph oustide bounds of prior - should not happen.
+                if ((voro_prop(ind,4)<=vp_min).or.(voro_prop(ind,4)>=vp_max)) then
                     out=0
                 endif
 
@@ -1052,7 +1222,7 @@ program RJ_MCMC
                 out=0
             endif
 
-        elseif (u<0.2) then !change position--------------------------------------------
+        elseif (u<0.3) then !change position--------------------------------------------
             move=.true.
 
             ind=1+ceiling(ran3(ra)*(npt-1))
@@ -1064,11 +1234,15 @@ program RJ_MCMC
                 out=0
             endif
             ! Check prior on velocity when moving cell location - this is not necessary so comment...
-            ! if ((voro_prop(ind,2)<=-width).or.(voro_prop(ind,2)>=width)) then
-            !     out=0
-            ! endif
+            if ((voro_prop(ind,2)<=-width).or.(voro_prop(ind,2)>=width)) then
+                out=0
+            endif
+            !Check if scaled vph oustide bounds of prior - should not happen.
+            if ((voro_prop(ind,4)<=vp_min).or.(voro_prop(ind,4)>=vp_max)) then
+                out=0
+            endif
 
-        elseif (u<0.3) then ! Change noise parameter for rayleigh waves
+        elseif (u<0.4) then ! Change noise parameter for rayleigh waves
             noisd_R=.true.
             Prnd_R = Prnd_R + 1
             Ad_R_prop = Ad_R+gasdev(ra)*pAd_R
@@ -1076,16 +1250,16 @@ program RJ_MCMC
             if ((Ad_R_prop<=Ad_R_min).or.(Ad_R_prop>=Ad_R_max)) then
                 out=0
             endif
-        elseif (u<0.4) then ! Change noise parameter for love waves
+        elseif (u<0.5) then ! Change noise parameter for love waves
             noisd_L=.true.
             Prnd_L = Prnd_L + 1
             Ad_L_prop = Ad_L+gasdev(ra)*pAd_L
             !Check if oustide bounds of prior
             if ((Ad_L_prop<=Ad_L_min).or.(Ad_L_prop>=Ad_L_max)) then
                 out=0
-            endif         
-        
-        elseif (u<0.5) then ! change vsv-----------------------------------
+            endif
+
+        elseif (u<0.6) then ! change vsv-----------------------------------
             
             value=.true.
             ind=ceiling(ran3(ra)*npt)
@@ -1115,8 +1289,7 @@ program RJ_MCMC
                 voro_prop(ind,4) = 0.0
             end if
 
-
-            !Check if vsv oustide bounds of prior, width relates to vsv.
+            ! Check prior on velocity 
             if ((voro_prop(ind,2)<=-width).or.(voro_prop(ind,2)>=width)) then
                 out=0
             endif
@@ -1125,9 +1298,7 @@ program RJ_MCMC
                 out=0
             endif
 
-
-
-        elseif (u<0.6) then !Birth of an isotropic cell -------------------------------------
+        elseif (u<0.7) then !Birth of an isotropic cell -------------------------------------
             birth = .true.
             PrB = PrB + 1
             npt_prop = npt + 1
@@ -1167,8 +1338,12 @@ program RJ_MCMC
                 if ((voro_prop(npt_prop,4)<=vp_min).or.(voro_prop(npt_prop,4)>=vp_max)) then
                     out=0
                 end if
+
+
+
+
             endif
-        elseif (u<0.7) then !death of an isotropic cell !---------------------------------------    !
+        elseif (u<0.8) then !death of an isotropic cell !---------------------------------------    !
 
             death = .true.
             PrD = PrD + 1
@@ -1209,9 +1384,8 @@ program RJ_MCMC
                     logprob_vp = 1.0 
                 end if
                 
-                
             endif
-        elseif (u<0.8) then !Birth of an anisotropic layer----------------------------------------
+        elseif (u<0.9) then !Birth of an anisotropic layer----------------------------------------
             birtha = .true.
             PrBa = PrBa + 1    
             if (npt_iso==0) then
@@ -1231,12 +1405,12 @@ program RJ_MCMC
                 voro_prop(ind,3) =  xi_min+(xi_max-xi_min)*ran3(ra) ! Seems quite wild to guess over this whole range.
                 if (voro(ind,3).NE.-1) stop "1130"
                 if ((voro_prop(ind,3)<=xi_min).or.(voro_prop(ind,3)>=xi_max)) then
-                    write(*,*)'anisotropy out of bounds'
+                    ! write(*,*)'anisotropy out of bounds'
                     out=0
                 endif
                 isoflag_prop(ind)=.false.
             endif
-        elseif (u<0.9) then !death of an anisotropic layer!---------------------------------------    
+        elseif (u<1.0) then !death of an anisotropic layer!---------------------------------------    
             deatha = .true.
             PrDa = PrDa + 1
             if (npt_ani==0) then
@@ -1257,8 +1431,8 @@ program RJ_MCMC
                 isoflag_prop(ind)=.true.
             endif
         
-        ! Will never be above 1 so can use 1.1 below.
-        elseif (u<1.1) then !change vp --------------------------------------------
+        ! Will never be above 1.1 so can use 1.2 below.
+        elseif (u<1.2) then !change vp --------------------------------------------
             if (vp_flag==0) then
                 ! Vp Free
                 change_vp=.true.
@@ -1277,6 +1451,9 @@ program RJ_MCMC
                     if ((voro_prop(ind,4)<=vp_min).or.(voro_prop(ind,4)>=vp_max)) then
                         out=0
                     endif
+                    if ((voro_prop(ind,2)<=-width).or.(voro_prop(ind,2)>=width)) then
+                        out=0
+                    end if
                 endif
 
             elseif ((vp_flag==1).or.(vp_flag==2)) then
@@ -1284,11 +1461,8 @@ program RJ_MCMC
                 ! Write some exit statement....
                 stop "Incorrect place for vph proposal change..."
             end if
-   
-
         else
             out=0
-            
         endif
         
         !**************************************************************************
@@ -1298,7 +1472,7 @@ program RJ_MCMC
         !**************************************************************************
         if (out==1) then
             call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro_prop,npt_prop,d_max,&
-                r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
+                r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,vs_data,xi,vp_data)
             
             if (ndatad_R>0) then
                 
@@ -1387,10 +1561,36 @@ program RJ_MCMC
                 lsd_L_prop=lsd_L_prop+(d_obsdcL(i)-d_cL_prop(i))**2
                 liked_L_prop=liked_L_prop+(d_obsdcL(i)-d_cL_prop(i))**2/(2*(Ad_L_prop*d_obsdcLe(i))**2) ! prendre en compte erreurs mesurées / include measurement errors
             end do
+
+
+            if (PsPp_flag==1) then
+                !!!!!!!!!!!!!!! AL mods for P-wave stuff !!!!!!!!!!!!!!!!!
+                if (nrays>0) then
+                    call sum_Ps_Pp_diff(r, vpv, vph, vsv, vsh, nptfinal, nrays, rayp, d_PsPp_prop, PsPp_error)
+                    if (PsPp_error)  then
+                        out=0
+                        write(*,*)"INVALID PROPOSED MODEL - PsPp - Gradient or Nan likely"
+                        goto 1142
+                    end if
+                end if
+
+                lsd_PsPp_prop = 0
+                liked_PsPp_prop = 0
+                do i=1,nrays
+                    lsd_PsPp_prop=lsd_PsPp_prop+(d_obsPsPp(i)-d_PsPp_prop(i))**2
+                    liked_PsPp_prop=liked_PsPp_prop+(d_obsPsPp(i)-d_PsPp_prop(i))**2/(2*(Ad_PsPp_prop*d_obsPsPpe(i))**2)
+                enddo
+            end if
+
             
         endif 
         
-        like_prop=liked_R_prop+liked_L_prop !log-likelihood of the proposed model
+
+        if (PsPp_flag==1) then
+            like_prop=liked_R_prop+liked_L_prop+liked_PsPp_prop !log-likelihood of the proposed model
+        else
+            like_prop=liked_R_prop+liked_L_prop !log-likelihood of the proposed model
+        end if
         
    1142 Accept = .false.
         
@@ -1448,7 +1648,18 @@ program RJ_MCMC
             if (log(ran3(ra))<logrsig+log(out)-like_prop+like) then ! hierarchical case
                 accept=.true.
                 Acnd_L=Acnd_L+1
-            endif            
+            endif
+
+        elseif (noisd_PsPp) then !@@@@@@@@@@@@@@@@@@@@@@@@@@@@ logrsig  @@@@@@@@@@@@
+            if (PsPp_flag==0) then
+                stop  'Should never go here if PsPp_flag==0'
+            end if
+            logrsig=nrays*log(Ad_PsPp/Ad_PsPp_prop) ! ATTENTION avc ld 2
+            if (log(ran3(ra))<logrsig+log(out)-like_prop+like) then ! hierarchical case
+                accept=.true.
+                Acnd_PsPp=Acnd_PsPp+1
+            endif     
+   
         else !NO JUMP-------------------------------------------------------------------
     
             if (log(ran3(ra))<log(out)-like_prop+like)then
@@ -1497,21 +1708,37 @@ program RJ_MCMC
                 lsd_L_min = lsd_L
             endif
             
+            if (PsPp_flag==1) then
+                liked_PsPp=liked_PsPp_prop
+                lsd_PsPp=lsd_PsPp_prop
+                Ad_PsPp=Ad_PsPp_prop
+                d_PsPp=d_PsPp_prop
+
+                if (lsd_PsPp<lsd_PsPp_min)then
+                    lsd_PsPp_min = lsd_PsPp
+                endif
+            end if
+
             !**********************************************************************
                 
             !       Save best model
             
             !**********************************************************************
             
-            if ((lsd_L+lsd_R).lt.likemax) then
-                
-                voromax=voro
-                nptmax=npt
-                likemax=(lsd_L+lsd_R)
-            endif
-        
-        
-        
+            if (PsPp_flag==1) then
+                if ((lsd_L + lsd_R + lsd_PsPp).lt.likemax) then
+                    voromax=voro
+                    nptmax=npt
+                    likemax=(lsd_L+lsd_R+lsd_PsPp)
+                endif
+            else
+                if ((lsd_L+lsd_R).lt.likemax) then
+                    voromax=voro
+                    nptmax=npt
+                    likemax=(lsd_L+lsd_R)
+                endif
+            end if
+
         endif
 
         npt_ani=0
@@ -1548,11 +1775,11 @@ program RJ_MCMC
                 th_all=th_all+1
                 
                 call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-                r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)   
+                r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,vs_data,xi,vp_data)   
 
 
                 write(100,*)nptfinal-noc,npt,npt_ani
-                write(100,*)Ad_R,Ad_L
+                write(100,*)Ad_R,Ad_L !,Ad_PsPp ! Need a new post processing again.
                 do i=1,nptfinal-noc
                     write(100,*)(rearth-r(nptfinal+1-i))/1000.,vsv(nptfinal+1-i)&
                     ,xi(nptfinal+1-i),vph(nptfinal+1-i) ! vp_data(nptfinal+1-i) instead
@@ -1583,6 +1810,7 @@ program RJ_MCMC
                 write(100,*)vp_min,vp_max,vpref_min,vpref_max
                 write(100,*)Ad_R_min,Ad_R_max
                 write(100,*)Ad_L_min,Ad_L_max
+                ! write(100,*)Ad_PsPp_min,Ad_PsPp_max ! Cant do this without changing post processing.
                 endif
 
                 ! average dispersion curve and variance
@@ -1590,12 +1818,17 @@ program RJ_MCMC
                 d_cLmoy=d_cLmoy+d_cL*thin/nsample
                 d_cRdelta=d_cRdelta+(d_cR**2)*thin/nsample
                 d_cLdelta=d_cLdelta+(d_cL**2)*thin/nsample
-                
+              
+                if (PsPp_flag==1) then
+                    d_PsPpmoy=d_PsPpmoy+d_PsPp*thin/nsample
+                    d_PsPpdelta=d_PsPpdelta+(d_PsPp**2)*thin/nsample
+                end if
+
                 th = th + 1
                 histo(npt)=histo(npt)+1 !histogram of number of layers
                 
                 ! call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-                !     r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)   
+                !     r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,vs_data,xi,vp_data)   
                 j=1
                 do i=disd,1,-1 ! average model
                     d=rearth-((i-1)*prof/real(disd-1))*1000.
@@ -1625,7 +1858,7 @@ program RJ_MCMC
                     end do
                     ind_vsv=ceiling((interp(r(j-1),r(j),vsv(j-1),vsv(j),d)-vsref_min)*disv/(vsref_max-vsref_min))
                     if (ind_vsv==0) ind_vsv=1
-                    ind_xi=ceiling(((interp(r(j-1),r(j),xi(j-1),xi(j),d))-xi_min)*disv/(xi_max-xi_min))
+                    ind_xi =ceiling((interp(r(j-1),r(j),xi(j-1),xi(j),d)-xi_min)*disv/(xi_max-xi_min))
                     if (ind_xi==0) ind_xi=1
                     ! ind_vp=ceiling((interp(r(j-1),r(j),vp_data(j-1),vp_data(j),d)-vp_min)*disv/(vp_max-vp_min))
                     ind_vp=ceiling((interp(r(j-1),r(j),vph(j-1),vph(j),d)-vpref_min)*disv/(vpref_max-vpref_min))
@@ -1633,13 +1866,14 @@ program RJ_MCMC
                     if (ind_vp==0) ind_vp=1
                     if (ind_vsv<1)then
                         write(*,*)'ICI ICI ICI'
+                        write(*,*)r(j-1),r(j),vsv(j-1),vsv(j),d
                         write(*,*)ind_vsv,i,interp(r(j-1),r(j),vsv(j-1),vsv(j),d),vsref_min,vsref_max,d
                         stop "vsv<disv"
                     endif
                     if (ind_vsv>disv) then
                         write(*,*)"vsv>disv"
                         write(*,*)interp(r(j-1),r(j),vsv(j-1),vsv(j),d),vsref_min,vsref_max
-                        write(*,*)r(j-1),r(j),vsv(j-1),vsv(j)
+                        write(*,*)r(j-1),r(j),vsv(j-1),vsv(j),d
                         write(*,*)npt
                         write(*,*)voro(:,2)
                         stop "vsv>disv"
@@ -1650,8 +1884,7 @@ program RJ_MCMC
                         ! write(*,*)interp(r(j-1),r(j),vp_data(j-1),vp_data(j),d),vp_min,vp_max
                         write(*,*)interp(r(j-1),r(j),vph(j-1),vph(j),d),vpref_min,vpref_max
                         write(*,*)voro(:,4)
-                        ! write(*,*)r(j-1),r(j),vpv(j-1),vpv(j)
-                        write(*,*)r(j-1),r(j),vph(j-1),vph(j)
+                        write(*,*)r(j-1),r(j),vph(j-1),vph(j),d
                         write(*,*)vp_data
                         write(*,*)j,i
                         stop "vp>disv"
@@ -1661,6 +1894,7 @@ program RJ_MCMC
                         write(*,*)"xi>disv"
                         write(*,*)(interp(r(j-1),r(j),xi(j-1),xi(j),d)),xi_min,xi_max
                         write(*,*)voro(:,3)
+                        write(*,*)r(j-1),r(j),xi(j-1),xi(j),d
                         write(*,*)xi
                         write(*,*)j,i
                         stop "xi>disv"
@@ -1677,6 +1911,11 @@ program RJ_MCMC
                 i=ceiling((Ad_L-Ad_L_min)*disA/(Ad_L_max-Ad_L_min)) !histogram of Ad_L
                 ML_Ad_L(i) = ML_Ad_L(i)+1
     
+                if (PsPp_flag==1) then
+                    i=ceiling((Ad_PsPp-Ad_PsPp_min)*disA/(Ad_PsPp_max-Ad_PsPp_min)) !histogram of Ad_PsPp
+                    ML_Ad_PsPp(i) = ML_Ad_PsPp(i)+1
+                end if
+
                 !Get distribution on changepoint locations.
                 
                 do i=2,npt
@@ -1710,8 +1949,12 @@ program RJ_MCMC
             ncell(ount)=npt
             convAd_R(ount)=Ad_R
             convAd_L(ount)=Ad_L
- 
- 
+
+            if (PsPp_flag==1) then
+                convd_PsPp(ount)=lsd_PsPp
+                convAd_PsPp(ount)=Ad_PsPp
+            end if
+
             do i=1,disd
                 if (histoch(i)<0) write(*,*)'hahahahahahahahahh' !lol
             enddo
@@ -1723,10 +1966,6 @@ program RJ_MCMC
 
             !**********************************************************************
 
-
-
-            
-
         !write(*,*)ount
 
         endif
@@ -1736,7 +1975,11 @@ program RJ_MCMC
             write(*,*)'processor number',ran+1,'/',nbproc
             write(*,*)'sample:',ount,'/',burn_in+nsample
             write(*,*)'number of cells:',npt
-            write(*,*)'Ad_R',Ad_R,'Ad_L',Ad_L
+            if (PsPp_flag==1) then
+                write(*,*)'Ad_R',Ad_R,'Ad_L',Ad_L,'Ad_PsPp',Ad_PsPp
+            else
+                write(*,*)'Ad_R',Ad_R,'Ad_L',Ad_L
+            end if
             write(*,*)'Acceptance rates'
             write(*,*)'AR_move',100*AcP/PrP
             write(*,*)'AR_value',100*AcV/PrV
@@ -1752,6 +1995,9 @@ program RJ_MCMC
             end if
             write(*,*)'AR_Ad_R',100*Acnd_R/Prnd_R,'pAd_R',pAd_R
             write(*,*)'AR_Ad_L',100*Acnd_L/Prnd_L,'pAd_L',pAd_L
+            if (PsPp_flag==1) then
+                write(*,*)'AR_Ad_PsPp',100*Acnd_PsPp/Prnd_PsPp,'pAd_PsPp',pAd_PsPp
+            end if
             write(*,*)'npt_iso',npt_iso,'npt_ani',npt_ani
             write(*,*)'recalculated',recalculated
             !write(*,*)Ar_birth_old,sigmav_old,sigmav
@@ -1872,6 +2118,16 @@ program RJ_MCMC
         call MPI_REDUCE(d_cRdelta,d_cRdeltas,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(d_cLdelta,d_cLdeltas,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
 
+
+        if (PsPp_flag==1) then
+            call MPI_REDUCE(ML_Ad_PsPp,ML_Ad_PsPps,disA,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+            call MPI_REDUCE(convd_PsPp,convd_PsPps,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+            call MPI_REDUCE(convAd_PsPp,convAd_PsPps,nsample+burn_in,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+            call MPI_REDUCE(d_PsPpmoy,d_PsPpmoys,nrays_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+            call MPI_REDUCE(d_PsPpdelta,d_PsPpdeltas,nrays_max,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        end if
+
+
         do i=1,disd
             if (histochs(i)<0) write(*,*)'hiiiiiiiiiiiiiiiii'
         enddo
@@ -1881,6 +2137,11 @@ program RJ_MCMC
         d_cRdeltas=sqrt(d_cRdeltas/j-d_cRmoys**2)
         d_cLdeltas=sqrt(d_cLdeltas/j-d_cLmoys**2)
         
+        if (PsPp_flag==1) then
+            d_PsPpmoys=d_PsPpmoys/j
+            d_PsPpdeltas=sqrt(d_PsPpdeltas/j-d_PsPpmoys**2)
+        end if
+
         convPs=convPs/j
         convBs=convBs/j
         convBas=convBas/j
@@ -1907,6 +2168,11 @@ program RJ_MCMC
         convAd_Rs=convAd_Rs/j
         convAd_Ls=convAd_Ls/j
         ncells=ncells/j
+
+        if (PsPp_flag==1) then
+            convd_PsPps=convd_PsPps/j
+            convAd_PsPps=convAd_PsPps/j
+        end if
 
     endif
 
@@ -1995,7 +2261,11 @@ program RJ_MCMC
         open(54,file=dirname//'/Convergence_misfit.out',status='replace')
         write(54,*)burn_in,nsample,burn_in,nsample
         do i=1,nsample+burn_in
-            write(54,*)convd_R(i),convd_Rs(i),convd_L(i),convd_Ls(i)
+            if (PsPp_flag==1) then
+                write(54,*)convd_R(i),convd_Rs(i),convd_L(i),convd_Ls(i),convd_PsPp(i),convd_PsPps(i)
+            else
+                write(54,*)convd_R(i),convd_Rs(i),convd_L(i),convd_Ls(i)
+            end if        
         enddo
         close(54)
 
@@ -2068,14 +2338,43 @@ program RJ_MCMC
             write(*,*)'No Convergence_vp file to write...'
         end if
 
-
-        
         open(54,file=dirname//'/Convergence_xi.out',status='replace')
         write(54,*)burn_in,nsample,burn_in,nsample
         do i=1,nsample+burn_in
             write(54,*)convxi(i),convxis(i)
         enddo
         close(54)
+
+        if (PsPp_flag==1) then
+            open(88,file=dirname//'/Sigmad_PsPp.out',status='replace')
+            write(88,*)Ad_PsPp_min,Ad_PsPp_max,disa
+            do i=1,disA
+                d=Ad_PsPp_min+(i-0.5)*(Ad_PsPp_max-Ad_PsPp_min)/real(disA)
+                write(88,*)d,ML_Ad_PsPps(i)
+            enddo
+            close(88)
+
+            open(66,file=dirname//'/Convergence_sigma_PsPp.out',status='replace')
+            write(66,*)burn_in,nsample
+            do i=1,nsample+burn_in
+                write(66,*)convAd_PsPp(i),convAd_PsPps(i)
+            enddo
+            close(66)
+
+            open(71,file=dirname//'/PsPp_obs.out',status='replace')
+            write(71,*)nrays
+            do i=1,nrays
+                write(71,*)rayp(i)*pi/180.0,d_obsPsPp(i),d_obsPsPpe(i)
+            enddo
+            close(71)
+
+            open(71,file=dirname//'/PsPp_mean.out',status='replace')
+            write(71,*)nrays
+            do i=1,nrays
+                write(71,*)rayp(i)*pi/180.0,d_PsPpmoys(i),d_PsPpdeltas(i)
+            enddo
+            close(71)
+        end if
 
     endif
     CALL cpu_time(t2)
