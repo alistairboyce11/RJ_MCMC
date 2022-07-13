@@ -981,7 +981,16 @@ def write_posterior_corr_dict(output_directory,input,params_inversion):
 
 def main():
     print('start')
-    model_ref=get_model_ref()
+    if os.path.isfile('Model_PREM_DISC_20.in'):
+        model_ref=get_model_ref(filename='Model_PREM_DISC_20.in')    
+    elif os.path.isfile('Model_PREM_DISC_10.in'):
+        model_ref=get_model_ref(filename='Model_PREM_DISC_10.in')
+    elif os.path.isfile('Model_PREM_SIMPLE.in'):
+        model_ref=get_model_ref(filename='Model_PREM_SIMPLE.in')
+    else:
+        sys.exit('Ref model not found... exit')
+        
+
     print('got model ref')
     params_inversion=get_metadata(input_directory)
     print('got metadata')
