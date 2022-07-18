@@ -7,11 +7,21 @@
 
 import numpy
 import random
+import sys
+
+if len(sys.argv)!=3:
+    print('>>    python mk_rayp.py <LENGTH> <FILENAME>')
+    print('>>    python mk_rayp.py 100 rayp2.in')
+    print('Length or rayp-filename missing....')
+    sys.exit('Not enough arguments...')
+else:
+    length=int(sys.argv[1])
+    file_name=str(sys.argv[2])
 
 ############################################################################
 
-file_name='rayp2.in'
-length = 100
+# file_name='rayp2.in'
+# length = 100
 max = 8.840
 min = 4.642
 ran_floats = numpy.random.rand(length) * (max-min) + min
