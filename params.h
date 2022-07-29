@@ -9,24 +9,24 @@
       integer namelen, maxlay,maxtr,maxseg,maxph
       integer buffsize,milay,malay,ndatadmax
       integer mk
-      parameter (namelen=40, milay = 5, malay=80)
+      parameter (namelen=40, milay = 1, malay=80)
       parameter (maxlay=300, maxtr=13, maxseg=45)
       parameter (maxph=40000,buffsize=120)
-      parameter (ndatadmax=500)
+      parameter (ndatadmax=50)
       parameter (mk=350)
-      
+
       integer invertype
-      parameter (invertype=1)! 1:Only P 2: P&S  
-      
+      parameter (invertype=1)! 1:Only P 2: P&S
+
 
 ! Units for reading and writing
       integer iounit1,iounit2
       parameter (iounit1=1,iounit2=2)
-      
+
 ! pi: duh. ztol: tolerance considered to be equiv. to zero.
       real pi,ztol
       parameter (pi=3.141592653589793,ztol=1.e-7)
-      
+
 ! nsamp is the number of samples per trace.
       integer maxsamp
       parameter (maxsamp=5000)
@@ -34,27 +34,27 @@
 ! P anisotropy ratio (w.r.t S)
       real S2P_aniso
       parameter (S2P_aniso=1.)
-      
+
       real widthh, shifttp,shiftts
       parameter (widthh=0.1,shifttp=20,shiftts=20)
 
-! Rotation to output: 0 is EW/Z/NS, 1 is T/Z/R, 2 is SV/SH/P   
+! Rotation to output: 0 is EW/Z/NS, 1 is T/Z/R, 2 is SV/SH/P
       integer out_rott
-      parameter (out_rott=1)     
-      
-! Thickness minimum for one layer   
+      parameter (out_rott=1)
+
+! Thickness minimum for one layer
       real thickmin
-      parameter (thickmin=2)  
-      
-      
-! For De-homo      
+      parameter (thickmin=2)
+
+
+! For De-homo
        integer cut
        real dH_min, DH_max
        parameter  (cut = 4)
         parameter (dH_min = 0)
        parameter (dH_max = 350)
-       
-! Scaling Parameters      
+
+! Scaling Parameters
        real vpvs
        parameter  (vpvs = 1.73)
 
