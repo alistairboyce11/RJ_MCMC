@@ -15,7 +15,7 @@ program postprocess_binary_outputs
     integer milay_2,malay_2,mk_2,ndatadmax_2
     integer nptfinal,npt,npt_ani,nic,noc
     DOUBLE PRECISION Ad_R,Ad_L
-    real, DIMENSION(mk) :: r,vsv,xi,vp_data
+    real, DIMENSION(mk) :: r,vsv,xi,vpv
     real like_w
     integer ndatad_R,ndatad_L
     real, DIMENSION(ndatadmax) :: d_cR,d_cL
@@ -129,12 +129,12 @@ program postprocess_binary_outputs
                 read(100,IOSTAT=io)xi
                 if (io/=0) goto 500
 
-                write(200,*)xi(nptfinal:noc+1:-1)/1000.
+                write(200,*)xi(nptfinal:noc+1:-1)
 
-                read(100,IOSTAT=io)vp_data
+                read(100,IOSTAT=io)vpv ! careful! We store vpv, so we need to check it for the python postprocessing
                 if (io/=0) goto 500
 
-                write(200,*)vp_data(nptfinal:noc+1:-1)/1000.
+                write(200,*)vpv(nptfinal:noc+1:-1)/1000.
 
                 read(100,IOSTAT=io)like_w
                 if (io/=0) goto 500

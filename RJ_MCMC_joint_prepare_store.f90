@@ -74,7 +74,7 @@ program RJ_MCMC
     integer nptmax ! number of layers of the best model
     character filenamemax*300  !filename for writing the best model
     real model_ref(mk,9) ! reference model, all models are deviations from it
-    real,dimension(mk) :: r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,xi,vp_data ! input for forward modelling
+    real,dimension(mk) :: r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,vs_data,xi,vp_data ! input for forward modelling
     integer nptfinal,nic,noc,nic_ref,noc_ref,jcom ! more inputs
     integer nmodes,n_mode(nmodes_max),l_mode(nmodes_max) ! outputs of forward modelling
     real c_ph(nmodes_max),period(nmodes_max),raylquo(nmodes_max),tref ! more outputs, rayquo: error measurement, should be of the order of eps
@@ -295,7 +295,7 @@ program RJ_MCMC
 
         ! take voro, combine it with prem into a format suitable for minos
         call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
+            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,vs_data,xi,vp_data)
 
         !calculate synthetic dispersion curves
         if (ndatad_R>0) then
@@ -407,7 +407,7 @@ program RJ_MCMC
 
         ! take voro, combine it with prem into a format suitable for minos
         call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
+            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,vs_data,xi,vp_data)
 
         !calculate synthetic dispersion curves
         if (ndatad_R>0) then
@@ -507,7 +507,7 @@ program RJ_MCMC
 
         ! take voro, combine it with prem into a format suitable for minos
         call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
+            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,vs_data,xi,vp_data)
 
         !calculate synthetic dispersion curves
         if (ndatad_R>0) then
@@ -781,7 +781,7 @@ program RJ_MCMC
 
         !write(*,*)'before combine_linear'
         call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
+            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,vs_data,xi,vp_data)
 
         !write(*,*)'after combine_linear'
 
@@ -966,7 +966,7 @@ program RJ_MCMC
         ier=.false.
 
         call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
+            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,vs_data,xi,vp_data)
 
         if (ndatad_R>0) then
 
@@ -1562,7 +1562,7 @@ program RJ_MCMC
             !**************************************************************************
             if (out==1) then ! maybe we don't need a forward calculation for changes in noise parameters
                 call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro_prop,npt_prop,d_max,&
-                    r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
+                    r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,vs_data,xi,vp_data)
 
                 if (ndatad_R>0) then
 
@@ -1869,7 +1869,7 @@ program RJ_MCMC
                     th_all=th_all+1
 
                     call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-                        r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
+                        r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,vs_data,xi,vp_data)
 
 
 
@@ -2011,7 +2011,7 @@ program RJ_MCMC
                     status_write_mpi,ierror)
                     position_file=position_file+mk*nb_bytes_real
 
-                    call MPI_FILE_WRITE_AT(filehandle,position_file,vp_data,mk,MPI_REAL, &
+                    call MPI_FILE_WRITE_AT(filehandle,position_file,vpv,mk,MPI_REAL, &
                     status_write_mpi,ierror)
                     position_file=position_file+mk*nb_bytes_real
 
