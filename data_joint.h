@@ -4,7 +4,7 @@
     integer, parameter :: burn_in = 100000! 55000 !Burn-in period
     integer, parameter :: nsample = 500000! 50000!Post burn-in
 
-    integer, parameter :: thin = 20    !Thinning of the chain
+    integer, parameter :: thin = 40    !Thinning of the chain
 
     integer, parameter :: Scratch = 1     ! 0: Start from Stored model 1: Start from scratch
     integer, parameter :: store = 99999999    !Store models every "store" iteration.
@@ -20,8 +20,8 @@
 
     real, parameter :: width = 0.4 ! width of the prior in vsv
 
-    real, parameter :: vpvsv_min = -0.4 ! bounds of the prior in vp/vs
-    real, parameter :: vpvsv_max = 0.4
+    real, parameter :: vp_min = -0.4 ! bounds of the prior in vp/vs
+    real, parameter :: vp_max = 0.4
 
     real, parameter :: xi_min = 0.5 ! bounds of the prior in xi
     real, parameter :: xi_max = 1.5
@@ -45,6 +45,7 @@
     ! If AR_* smaller than 44%, decrease the Sdt for more
     real, parameter :: perturb = 0.35  ! standard deviation (I guess)
     integer, parameter :: every = 1001 ! we do something every 'every' ??
+    integer, parameter :: switch_sigma = 10
 
     !--------------------------------------------
     ! Parameters for Displaying results
@@ -79,13 +80,13 @@
     real, parameter :: logalpha_max=5
     integer, parameter :: num_logalpha=200
     real, parameter :: widening_start=1.
-    integer, parameter :: n_w=10
-    real,parameter :: widening_step=1.
-    integer,parameter :: nsample_widening=100000! 50000!Post burn-in
+    integer, parameter :: n_w=15
+    real,parameter :: widening_step=0.5
+    integer,parameter :: nsample_widening=200000! 50000!Post burn-in
     integer,parameter :: burn_in_widening=100000! 50000!Post burn-in
 
     logical :: getting_old
 
-    real :: num_cluster=2
+    real :: num_cluster=1
 
     integer :: everyall=10000
