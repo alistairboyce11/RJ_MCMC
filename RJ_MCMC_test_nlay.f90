@@ -195,6 +195,8 @@ program RJ_MCMC
     real voromax(malay,4) ! best model
     character filenamemax*30  !filename for writing the best model
     real d_cRmoy(ndatadmax), d_cRmoys(ndatadmax), d_cLmoy(ndatadmax), d_cLmoys(ndatadmax) ! average dispersion curve
+    real d_cRmoy_shift(ndatadmax), d_cRmoys_shift(ndatadmax)
+    real d_cLmoy_shift(ndatadmax), d_cLmoys_shift(ndatadmax) ! shifted average dispersion curve
     real d_cRdelta(ndatadmax), d_cRdeltas(ndatadmax), d_cLdelta(ndatadmax), d_cLdeltas(ndatadmax) ! standart deviation of dispersion curve
     real model_ref(mk,9) ! reference model, all models are deviations from it
     real,dimension(mk) :: r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,xi,vp_data,vs_data ! input for forward modelling
@@ -321,6 +323,10 @@ program RJ_MCMC
     d_cLmoy=0
     d_cRmoys=0
     d_cLmoys=0
+    d_cRmoy_shift=0
+    d_cLmoy_shift=0
+    d_cRmoys_shift=0
+    d_cLmoys_shift=0
     d_cRdelta=0
     d_cLdelta=0
     d_cRdeltas=0
@@ -2115,6 +2121,8 @@ program RJ_MCMC
         ! 
         call MPI_REDUCE(d_cRmoy,d_cRmoys,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(d_cLmoy,d_cLmoys,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(d_cRmoy_shift,d_cRmoys_shift,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
+        call MPI_REDUCE(d_cLmoy_shift,d_cLmoys_shift,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(d_cRdelta,d_cRdeltas,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(d_cLdelta,d_cLdeltas,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
 
@@ -2134,8 +2142,11 @@ program RJ_MCMC
 
         d_cRmoys=d_cRmoys/j
         d_cLmoys=d_cLmoys/j
-        d_cRdeltas=sqrt(d_cRdeltas/j-d_cRmoys**2)
-        d_cLdeltas=sqrt(d_cLdeltas/j-d_cLmoys**2)
+        
+        d_cRmoys_shift=d_cRmoys_shift/j
+        d_cLmoys_shift=d_cLmoys_shift/j
+        d_cRdeltas=sqrt(d_cRdeltas/j-d_cRmoys_shift**2)
+        d_cLdeltas=sqrt(d_cLdeltas/j-d_cLmoys_shift**2)
         
         if (PsPp_flag==1) then
             d_PsPpmoys=d_PsPpmoys/j

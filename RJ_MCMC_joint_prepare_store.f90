@@ -51,6 +51,8 @@ program RJ_MCMC
         liked_R_prop,liked_R,liked_L_prop,liked_L
     double precision logrsig,Ad_R,Ad_R_prop,Ad_L,Ad_L_prop !uncertainty parameters
     real sigmav,sigmav_old,sigmav_new,AR_birth_old   !proposal on velocity when Birth move
+    real sigmavp,sigmavp_old,sigmavp_new       !proposal on vp when Birth move
+    integer sigma_count                              ! Count Sigmav & sigmavp perturbations
     real d_obsdcR(ndatadmax),d_obsdcL(ndatadmax),d_obsdcRe(ndatadmax),d_obsdcLe(ndatadmax) !observed data
     integer inorout(21000),inorouts(21000),members(21000),io ! mpi related variables
     integer ndatad_R,ndatad_L,ndatad_R_tmp,ndatad_L_tmp !number of observed data points
@@ -72,7 +74,7 @@ program RJ_MCMC
     integer nptmax ! number of layers of the best model
     character filenamemax*300  !filename for writing the best model
     real model_ref(mk,9) ! reference model, all models are deviations from it
-    real,dimension(mk) :: r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,xi,vpvsv_data ! input for forward modelling
+    real,dimension(mk) :: r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,xi,vp_data ! input for forward modelling
     integer nptfinal,nic,noc,nic_ref,noc_ref,jcom ! more inputs
     integer nmodes,n_mode(nmodes_max),l_mode(nmodes_max) ! outputs of forward modelling
     real c_ph(nmodes_max),period(nmodes_max),raylquo(nmodes_max),tref ! more outputs, rayquo: error measurement, should be of the order of eps
@@ -117,7 +119,7 @@ program RJ_MCMC
     ! to save the current state
     real best_current_Ad_R,best_current_Ad_L,best_current_pxi,best_current_p_vp
     real best_current_pAd_R,best_current_pAd_L,best_current_pv
-    real best_current_pd,best_current_sigmav
+    real best_current_pd,best_current_sigmav,best_current_sigmavp
     integer best_current_npt
     real best_current_voro(malay,4)
     logical burnin_in_progress
@@ -159,6 +161,21 @@ program RJ_MCMC
 
     integer th_all
 
+    ! for mpi write purposes
+    integer filehandle
+    integer, dimension(MPI_STATUS_SIZE) :: status_write_mpi
+    integer nb_bytes_integer,nb_bytes_real,nb_bytes_double
+    integer nb_bytes_header,nb_bytes_model
+    integer(kind=MPI_OFFSET_KIND) :: position_file
+
+!     integer, parameter :: nb_valeurs=1
+!     integer :: iiii,rang,descripteur,code,nb_octets_entier
+!     integer(kind=MPI_OFFSET_KIND) :: position_fichier
+!     !integer, dimension(nb_valeurs) :: valeurs
+!     !integer, dimension(MPI_STATUS_SIZE) :: statut
+!     integer :: statut !, dimension(MPI_REQUEST_SIZE)
+!     integer tmp,valeurs
+
 
     ! todo: implement a test with raylquo
 1000 format(I4)
@@ -173,12 +190,16 @@ program RJ_MCMC
     call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierror) ! https://www.open-mpi.org/doc/v4.0/man3/MPI_Comm_rank.3.php
     call MPI_Comm_group(MPI_COMM_WORLD,group_world,ierror) ! https://www.open-mpi.org/doc/v3.0/man3/MPI_Comm_group.3.php
 
+    ! Get byte size of different types
+    call MPI_TYPE_SIZE(MPI_INTEGER,nb_bytes_integer,ierror)
+    call MPI_TYPE_SIZE(MPI_REAL,nb_bytes_real,ierror)
+    call MPI_TYPE_SIZE(MPI_DOUBLE_PRECISION,nb_bytes_double,ierror)
+
 
     !Start Parralelization of the code. From now on, the code is run on each
     !processor independently, with ra = the number of the proc.
 
     !-!
-
 
 
     testing=.false.
@@ -207,8 +228,8 @@ program RJ_MCMC
     vsref_min=minval(model_ref(j:nptref,4)*(1-width)) ! setting min/max velocities for writing later
     vsref_max=maxval(model_ref(j:nptref,4)*(1+width))
 
-    vpref_min=minval(model_ref(j:nptref,4)*vpvs*(1+vpvsv_min/100.)*(1-width))
-    vpref_max=maxval(model_ref(j:nptref,4)*vpvs*(1+vpvsv_max/100.)*(1+width))
+    vpref_min=minval(model_ref(j:nptref,7)*(1-vp_max)) ! setting min/max velocities for writing later
+    vpref_max=maxval(model_ref(j:nptref,7)*(1+vp_max))
 
 
     if (testing) then !!!!!!!testing: create synthetic model
@@ -228,80 +249,8 @@ program RJ_MCMC
         wmin_R(numharm_count)=1000./(maxval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))+20)
         wmax_R(numharm_count)=1000./(minval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))-2)
 
-!         numharm_count=numharm_count+1
-!         nlims_R(1,numharm_count)=j
-!         do i=240,40,-10
-!
-!             peri_R(j)=real(i)
-!             d_obsdcRe(j)=0.01
-!             n_R(j)=1
-!             j=j+1
-!         end do
-!         numharm_R(numharm_count)=1
-!         nlims_R(2,numharm_count)=j-1
-!         wmin_R(numharm_count)=1000./(maxval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))+20)
-!         wmax_R(numharm_count)=1000./(minval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))-2)
-
-!         numharm_count=numharm_count+1
-!         nlims_R(1,numharm_count)=j
-!         do i=160,40,-10
-!
-!             peri_R(j)=real(i)
-!             d_obsdcRe(j)=0.01
-!             n_R(j)=2
-!             j=j+1
-!         end do
-!         numharm_R(numharm_count)=2
-!         nlims_R(2,numharm_count)=j-1
-!         wmin_R(numharm_count)=1000./(maxval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))+20)
-!         wmax_R(numharm_count)=1000./(minval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))-2)
-
-!         numharm_count=numharm_count+1
-!         nlims_R(1,numharm_count)=j
-!         do i=90,40,-10
-!
-!             peri_R(j)=real(i)
-!             d_obsdcRe(j)=0.01
-!             n_R(j)=3
-!             j=j+1
-!         end do
-!         numharm_R(numharm_count)=3
-!         nlims_R(2,numharm_count)=j-1
-!         wmin_R(numharm_count)=1000./(maxval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))+20)
-!         wmax_R(numharm_count)=1000./(minval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))-2)
-
-!         numharm_count=numharm_count+1
-!         nlims_R(1,numharm_count)=j
-!         do i=50,40,-5
-!
-!             peri_R(j)=real(i)
-!             d_obsdcRe(j)=0.01
-!             n_R(j)=4
-!             j=j+1
-!         end do
-!         numharm_R(numharm_count)=4
-!         nlims_R(2,numharm_count)=j-1
-!         wmin_R(numharm_count)=1000./(maxval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))+20)
-!         wmax_R(numharm_count)=1000./(minval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))-2)
-
-!         numharm_count=numharm_count+1
-!         nlims_R(1,numharm_count)=j
-!         do i=50,40,-5
-!
-!             peri_R(j)=real(i)
-!             d_obsdcRe(j)=0.01
-!             n_R(j)=5
-!             j=j+1
-!         end do
-!         numharm_R(numharm_count)=5
-!         nlims_R(2,numharm_count)=j-1
-!         wmin_R(numharm_count)=1000./(maxval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))+20)
-!         wmax_R(numharm_count)=1000./(minval(peri_R(nlims_R(1,numharm_count):nlims_R(2,numharm_count)))-2)
-
         ndatad_R=j-1
         nharm_R=numharm_count
-!         wmin_R=1000./(maxval(peri_R(:ndatad_R))+20)
-!         wmax_R=1000./(minval(peri_R(:ndatad_R))-2)
         nmin_R=minval(n_R(:ndatad_R))
         nmax_R=maxval(n_R(:ndatad_R))
 
@@ -320,74 +269,8 @@ program RJ_MCMC
         wmin_L(numharm_count)=1000./(maxval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))+20)
         wmax_L(numharm_count)=1000./(minval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))-2)
 
-!         numharm_count=numharm_count+1
-!         nlims_L(1,numharm_count)=j
-!         do i=240,40,-10
-!             peri_L(j)=real(i)
-!             d_obsdcLe(j)=0.02
-!             n_L(j)=1
-!             j=j+1
-!         end do
-!         numharm_L(numharm_count)=1
-!         nlims_L(2,numharm_count)=j-1
-!         wmin_L(numharm_count)=1000./(maxval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))+20)
-!         wmax_L(numharm_count)=1000./(minval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))-2)
-
-!         numharm_count=numharm_count+1
-!         nlims_L(1,numharm_count)=j
-!         do i=160,40,-10
-!             peri_L(j)=real(i)
-!             d_obsdcLe(j)=0.02
-!             n_L(j)=2
-!             j=j+1
-!         end do
-!         numharm_L(numharm_count)=2
-!         nlims_L(2,numharm_count)=j-1
-!         wmin_L(numharm_count)=1000./(maxval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))+20)
-!         wmax_L(numharm_count)=1000./(minval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))-2)
-
-!         numharm_count=numharm_count+1
-!         nlims_L(1,numharm_count)=j
-!         do i=90,40,-10
-!             peri_L(j)=real(i)
-!             d_obsdcLe(j)=0.02
-!             n_L(j)=3
-!             j=j+1
-!         end do
-!         numharm_L(numharm_count)=3
-!         nlims_L(2,numharm_count)=j-1
-!         wmin_L(numharm_count)=1000./(maxval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))+20)
-!         wmax_L(numharm_count)=1000./(minval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))-2)
-
-!         numharm_count=numharm_count+1
-!         nlims_L(1,numharm_count)=j
-!         do i=50,40,-5
-!             peri_L(j)=real(i)
-!             d_obsdcLe(j)=0.02
-!             n_L(j)=4
-!             j=j+1
-!         end do
-!         numharm_L(numharm_count)=4
-!         nlims_L(2,numharm_count)=j-1
-!         wmin_L(numharm_count)=1000./(maxval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))+20)
-!         wmax_L(numharm_count)=1000./(minval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))-2)
-
-!         numharm_count=numharm_count+1
-!         nlims_L(1,numharm_count)=j
-!         do i=50,40,-5
-!             peri_L(j)=real(i)
-!             d_obsdcLe(j)=0.02
-!             n_L(j)=5
-!             j=j+1
-!         end do
-!         numharm_L(numharm_count)=5
-!         nlims_L(2,numharm_count)=j-1
-!         wmin_L(numharm_count)=1000./(maxval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))+20)
-!         wmax_L(numharm_count)=1000./(minval(peri_L(nlims_L(1,numharm_count):nlims_L(2,numharm_count)))-2)
         ndatad_L=j-1
         nharm_L=numharm_count
-        wmin_L=1000./(maxval(peri_L(:ndatad_L))+20)
-        wmax_L=1000./(minval(peri_L(:ndatad_L))-2)
         nmin_L=minval(n_L(:ndatad_L))
         nmax_L=maxval(n_L(:ndatad_L))
 
@@ -400,30 +283,19 @@ program RJ_MCMC
         voro(1,1)=1 !depth of interface
         voro(1,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
         voro(1,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
-        voro(1,4)=0!0.3-0.5/33.*i !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in
+        voro(1,4)=0.0  !vph=vph_prem*(1+voro(i,4))
         npt=1
         do i=2,11
             voro(i,1)=30*(i-1) !depth of interface
             voro(i,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
             voro(i,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
-            voro(i,4)=0!0.3-0.5/33.*i !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in params.h
+            voro(i,4)=0.0  !vph=vph_prem*(1+voro(i,4))
             npt=npt+1
         end do
 
-!         voro(10,4)=0.3
-!         voro(11,4)=0.3
-!         voro(12,4)=0.3
-!         voro(13,4)=0.3
-!         voro(14,4)=0.3
-!         voro(15,4)=-0.3
-!         voro(16,4)=-0.3
-!         voro(17,4)=-0.3
-!         voro(18,4)=-0.3
-!         voro(19,4)=-0.3
-
         ! take voro, combine it with prem into a format suitable for minos
-        call combine_linear(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+        call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
 
         !calculate synthetic dispersion curves
         if (ndatad_R>0) then
@@ -457,9 +329,9 @@ program RJ_MCMC
                     wmin_L(iharm),wmax_L(iharm),numharm_L(iharm),numharm_L(iharm),&
                     nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
                 if (error_flag) stop "INVALID INITIAL MODEL - LOVE - minos_bran.f FAIL 002"
-                peri_L_tmp=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                peri_L_tmp(:nlims_L(2,iharm)-nlims_L(1,iharm)+1)=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
                 ndatad_L_tmp=nlims_L(2,iharm)-nlims_L(1,iharm)+1 ! fortran slices take the first and the last element
-                n_L_tmp(:ndatad_L_tmp)=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                n_L_tmp(:nlims_L(2,iharm)-nlims_L(1,iharm)+1)=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
 
                 call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
                     peri_L_tmp,n_L_tmp,d_cL_tmp,rq_L,ndatad_L_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
@@ -502,7 +374,7 @@ program RJ_MCMC
         ! write synthetic model into a file
         open(65,file=dirname//'/true_model.out',status='replace')
         do i=1,nptfinal
-            write(65,*)(rearth-r(i))/1000,vsv(i),xi(i),vpvsv_data(i)
+            write(65,*)(rearth-r(i))/1000,vsv(i),xi(i),vp_data(i)
         enddo
         close(65)
 
@@ -521,35 +393,21 @@ program RJ_MCMC
         voro(1,1)=1 !depth of interface
         voro(1,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
         voro(1,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
-        voro(1,4)=0!0.3-0.5/33.*i !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in
+        voro(1,4)=0.0  !vph=vph_prem*(1+voro(i,4))
         do i=2,11
             voro(i,1)=30*(i-1) !depth of interface
             voro(i,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
             voro(i,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
-            voro(i,4)=0!0.3-0.5/33.*i !vpv=vsv*vpvs*(1+voro(i,4)), vpvs set to 1.73 in params.h
+            voro(i,4)=0.0  !vph=vph_prem*(1+voro(i,4))
             npt=npt+1
         end do
 
         voro(5,2)=voro(5,2)+0.05
         voro(6,2)=voro(6,2)-0.05
-!         do i=5,10
-!             voro(i,2)=voro(i,2)+0.05
-!         enddo
-!         voro(10,4)=0.3
-!         voro(11,4)=0.3
-!         voro(12,4)=0.3
-!         voro(13,4)=0.3
-!         voro(14,4)=0.3
-!         voro(15,4)=-0.3
-!         voro(16,4)=-0.3
-!         voro(17,4)=-0.3
-!         voro(18,4)=-0.3
-!         voro(19,4)=-0.3
-
 
         ! take voro, combine it with prem into a format suitable for minos
-        call combine_linear(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+        call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
 
         !calculate synthetic dispersion curves
         if (ndatad_R>0) then
@@ -583,9 +441,9 @@ program RJ_MCMC
                     wmin_L(iharm),wmax_L(iharm),numharm_L(iharm),numharm_L(iharm),&
                     nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
                 if (error_flag) stop "INVALID INITIAL MODEL - LOVE - minos_bran.f FAIL 002"
-                peri_L_tmp=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                peri_L_tmp(:nlims_L(2,iharm)-nlims_L(1,iharm)+1)=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
                 ndatad_L_tmp=nlims_L(2,iharm)-nlims_L(1,iharm)+1 ! fortran slices take the first and the last elementwrite(*,*)'now here',rank
-                n_L_tmp(:ndatad_L_tmp)=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                n_L_tmp(:nlims_L(2,iharm)-nlims_L(1,iharm)+1)=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
 
                 call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
                     peri_L_tmp,n_L_tmp,d_cL_tmp,rq_L,ndatad_L_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
@@ -608,13 +466,6 @@ program RJ_MCMC
                 do i=1,ndatad_L
                     d_obsdcL_alt(i,1)=d_obsdcL_alt(i,1)+gasdev(ra)*0.1
                 end do
-!                 do i=2,nbproc
-!                     call MPI_SEND(d_obsdcR_alt, ndatadmax*numdis_max, MPI_Real, i-1, 2, MPI_COMM_WORLD, ierror)
-!                     call MPI_SEND(d_obsdcL_alt, ndatadmax*numdis_max, MPI_Real, i-1, 2, MPI_COMM_WORLD, ierror)
-!                 enddo
-!             else
-!                 call MPI_RECV(d_obsdcR_alt, ndatadmax*numdis_max, MPI_Real, 0, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierror)
-!                 call MPI_RECV(d_obsdcL_alt, ndatadmax*numdis_max, MPI_Real, 0, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierror)
             endif
         else
             do i=1,ndatad_R
@@ -627,7 +478,7 @@ program RJ_MCMC
 
         open(65,file=dirname//'/true_model_1.out',status='replace')
         do i=1,nptfinal
-            write(65,*)(rearth-r(i))/1000,vsv(i),xi(i),vpvsv_data(i)
+            write(65,*)(rearth-r(i))/1000,vsv(i),xi(i),vp_data(i)
         enddo
         close(65)
 
@@ -653,24 +504,10 @@ program RJ_MCMC
 
         voro(5,2)=voro(5,2)-0.05
         voro(6,2)=voro(6,2)+0.05
-!         do i=5,10
-!             voro(i,2)=voro(i,2)-0.05
-!         enddo
-!         voro(10,4)=0.3
-!         voro(11,4)=0.3
-!         voro(12,4)=0.3
-!         voro(13,4)=0.3
-!         voro(14,4)=0.3
-!         voro(15,4)=-0.3
-!         voro(16,4)=-0.3
-!         voro(17,4)=-0.3
-!         voro(18,4)=-0.3
-!         voro(19,4)=-0.3
-
 
         ! take voro, combine it with prem into a format suitable for minos
-        call combine_linear(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+        call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
 
         !calculate synthetic dispersion curves
         if (ndatad_R>0) then
@@ -704,9 +541,9 @@ program RJ_MCMC
                     wmin_L(iharm),wmax_L(iharm),numharm_L(iharm),numharm_L(iharm),&
                     nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
                 if (error_flag) stop "INVALID INITIAL MODEL - LOVE - minos_bran.f FAIL 002"
-                peri_L_tmp=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                peri_L_tmp(:nlims_L(2,iharm)-nlims_L(1,iharm)+1)=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
                 ndatad_L_tmp=nlims_L(2,iharm)-nlims_L(1,iharm)+1 ! fortran slices take the first and the last element
-                n_L_tmp(:ndatad_L_tmp)=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                n_L_tmp(:nlims_L(2,iharm)-nlims_L(1,iharm)+1)=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
 
                 call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
                     peri_L_tmp,n_L_tmp,d_cL_tmp,rq_L,ndatad_L_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
@@ -749,7 +586,7 @@ program RJ_MCMC
 
         open(65,file=dirname//'/true_model_2.out',status='replace')
         do i=1,nptfinal
-            write(65,*)(rearth-r(i))/1000,vsv(i),xi(i),vpvsv_data(i)
+            write(65,*)(rearth-r(i))/1000,vsv(i),xi(i),vp_data(i)
         enddo
         close(65)
 
@@ -880,7 +717,7 @@ program RJ_MCMC
     !**************************************************************
 
     write(*,*)dirname
-    write(1000*rank,*)dirname
+    !write(1000*rank,*)dirname
 
     widening_prop=widening_start
 
@@ -890,12 +727,13 @@ program RJ_MCMC
 
 
     pxi = 0.4             ! proposal for change in xi
-    p_vp = 0.1           ! proposal for change in vp/vsv
+    p_vp = 0.1           ! proposal for change in vp
     pd = 10!0.2         ! proposal on change in position
     pv = 0.1!0.04     ! proposal on velocity
     pAd_R = 0.5        ! proposal for change in R noise
     pAd_L = 0.5        ! proposal for change in L noise
     sigmav=0.15         ! proposal for vsv when creating a new layer
+    sigmavp=0.15         ! proposal for vp when creating a new layer
 
 
 
@@ -936,11 +774,16 @@ program RJ_MCMC
                  voro(i,3)= -1
              endif
             !voro(i,3)=-1
-            voro(i,4)= vpvsv_min+(vpvsv_max-vpvsv_min)*ran3(ra)
+            voro(i,4)= vp_min+(vp_max-vp_min)*ran3(ra)
         enddo
 
-        call combine_linear(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+        !write(*,*)voro
+
+        !write(*,*)'before combine_linear'
+        call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
+
+        !write(*,*)'after combine_linear'
 
         if (ndatad_R>0) then
 
@@ -956,12 +799,12 @@ program RJ_MCMC
                     tes=.false.
                     write(*,*)"Minos_bran FAILED for RAYLEIGH 004"
                 end if
-                peri_R_tmp=peri_R(nlims_R(1,iharm):nlims_R(2,iharm))
-                n_R_tmp=n_R(nlims_R(1,iharm):nlims_R(2,iharm))
+                peri_R_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)=peri_R(nlims_R(1,iharm):nlims_R(2,iharm))
+                n_R_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)=n_R(nlims_R(1,iharm):nlims_R(2,iharm))
                 ndatad_R_tmp=nlims_R(2,iharm)-nlims_R(1,iharm)+1 ! fortran slices take the first and the last element
                 call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
                     peri_R_tmp,n_R_tmp,d_cR_tmp,rq_R,ndatad_R_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
-                d_cR(nlims_R(1,iharm):nlims_R(2,iharm))=d_cR_tmp
+                d_cR(nlims_R(1,iharm):nlims_R(2,iharm))=d_cR_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)
                 if (ier) tes=.false.
                 if (maxval(abs(rq_R(:ndatad_R_tmp)))>maxrq*eps) tes=.false.
             enddo
@@ -980,12 +823,12 @@ program RJ_MCMC
                     tes=.false.
                     write(*,*)"Minos_bran FAILED for LOVE 004"
                 end if
-                peri_L_tmp=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
-                n_L_tmp=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                peri_L_tmp(:nlims_L(2,iharm)-nlims_L(1,iharm)+1)=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                n_L_tmp(:nlims_L(2,iharm)-nlims_L(1,iharm)+1)=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
                 ndatad_L_tmp=nlims_L(2,iharm)-nlims_L(1,iharm)+1 ! fortran slices take the first and the last element
                 call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
                 peri_L_tmp,n_L_tmp,d_cL_tmp,rq_L,ndatad_L_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
-                d_cL(nlims_L(1,iharm):nlims_L(2,iharm))=d_cL_tmp
+                d_cL(nlims_L(1,iharm):nlims_L(2,iharm))=d_cL_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)
                 if (ier) tes=.false.
                 if (maxval(abs(rq_L(:ndatad_L_tmp)))>maxrq*eps) tes=.false.
             enddo
@@ -1065,6 +908,7 @@ program RJ_MCMC
     Acnd_L=0
 
     sigmav_old=0
+    sigmavp_old=0
     Ar_birth_old=0
 
     ncell=0
@@ -1094,6 +938,8 @@ program RJ_MCMC
 
     bestmean=-100000000000.
 
+    write(*,*)'start loop'
+
 
     burnin_in_progress=.true.
     do i_w=1,n_w
@@ -1112,15 +958,15 @@ program RJ_MCMC
 
 
 
-        ra=rank !seed for RNG
+        ra=rank+100 !seed for RNG
         ran=rank
         inorout=0
         inorouts=0
 
         ier=.false.
 
-        call combine_linear(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+        call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
 
         if (ndatad_R>0) then
 
@@ -1136,12 +982,12 @@ program RJ_MCMC
                     tes=.false.
                     write(*,*)"Minos_bran FAILED for RAYLEIGH 004"
                 end if
-                peri_R_tmp=peri_R(nlims_R(1,iharm):nlims_R(2,iharm))
-                n_R_tmp=n_R(nlims_R(1,iharm):nlims_R(2,iharm))
+                peri_R_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)=peri_R(nlims_R(1,iharm):nlims_R(2,iharm))
+                n_R_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)=n_R(nlims_R(1,iharm):nlims_R(2,iharm))
                 ndatad_R_tmp=nlims_R(2,iharm)-nlims_R(1,iharm)+1 ! fortran slices take the first and the last element
                 call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
                     peri_R_tmp,n_R_tmp,d_cR_tmp,rq_R,ndatad_R_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
-                d_cR(nlims_R(1,iharm):nlims_R(2,iharm))=d_cR_tmp
+                d_cR(nlims_R(1,iharm):nlims_R(2,iharm))=d_cR_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)
                 if (ier) then
                     tes=.false.
                     write(*,*)'Disperdion_minos RAYLEIGH error'
@@ -1166,12 +1012,12 @@ program RJ_MCMC
                     tes=.false.
                     write(*,*)"Minos_bran FAILED for LOVE 004"
                 end if
-                peri_L_tmp=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
-                n_L_tmp=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                peri_L_tmp(:nlims_L(2,iharm)-nlims_L(1,iharm)+1)=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                n_L_tmp(:nlims_L(2,iharm)-nlims_L(1,iharm)+1)=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
                 ndatad_L_tmp=nlims_L(2,iharm)-nlims_L(1,iharm)+1 ! fortran slices take the first and the last element
                 call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
                 peri_L_tmp,n_L_tmp,d_cL_tmp,rq_L,ndatad_L_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
-                d_cL(nlims_L(1,iharm):nlims_L(2,iharm))=d_cL_tmp
+                d_cL(nlims_L(1,iharm):nlims_L(2,iharm))=d_cL_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)
                 if (ier) then
                     tes=.false.
                     write(*,*)'Disperdion_minos LOVE error'
@@ -1259,19 +1105,100 @@ program RJ_MCMC
         sigmav_old=0
         Ar_birth_old=0
 
-        write(filenamemax,"('/All_models_prepare_',I3.3,'_',I3.3,'_',f5.2,'.out')")rank,sample/everyall,widening_prop
-        open(100,file=dirname//filenamemax,status='replace')
-        write(100,*)rank,sample/everyall,everyall
-        write(100,*)burn_in,nsample_widening,widening_prop,thin
-        write(100,*)d_min,d_max
-        write(100,*)width
-        write(100,*)xi_min,xi_max
-        write(100,*)vpvs,vpvsv_min,vpvsv_max
-        write(100,*)Ad_R_min,Ad_R_max
-        write(100,*)Ad_L_min,Ad_L_max
-        write(100,*)milay,malay
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! Create a file with MPI to store the accepted models
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+        write(filenamemax,"('/All_models_prepare_',I3.3,'_',f5.2,'.out')")sample*nbproc/everyall/thin,widening_prop
+
+        write(*,*)filenamemax
+        call MPI_FILE_OPEN(MPI_COMM_WORLD,dirname//filenamemax,MPI_MODE_WRONLY + MPI_MODE_CREATE, &
+        MPI_INFO_NULL,filehandle,ierror)
+        if (rank==0) then
+
+            ! Header
+
+            position_file=0 !position in the file at which variables are written
+
+            call MPI_FILE_WRITE_AT(filehandle,position_file,sample*nbproc/everyall/thin,1,MPI_INTEGER, &
+            status_write_mpi,ierror)
+            position_file=position_file+nb_bytes_integer ! increment the position by what we just wrote
+
+            call MPI_FILE_WRITE_AT(filehandle,position_file,everyall,1,MPI_INTEGER, &
+            status_write_mpi,ierror)
+            position_file=position_file+nb_bytes_integer
+
+            call MPI_FILE_WRITE_AT(filehandle,position_file,burn_in,1,MPI_INTEGER, &
+            status_write_mpi,ierror)
+            position_file=position_file+nb_bytes_integer
+            call MPI_FILE_WRITE_AT(filehandle,position_file,widening_prop,1,MPI_REAL, &
+            status_write_mpi,ierror)
+            position_file=position_file+nb_bytes_real
+            call MPI_FILE_WRITE_AT(filehandle,position_file,thin,1,MPI_INTEGER, &
+            status_write_mpi,ierror)
+            position_file=position_file+nb_bytes_integer
+
+            call MPI_FILE_WRITE_AT(filehandle,position_file,d_min,1,MPI_REAL, &
+            status_write_mpi,ierror)
+            position_file=position_file+nb_bytes_real
+            call MPI_FILE_WRITE_AT(filehandle,position_file,d_max,1,MPI_REAL, &
+            status_write_mpi,ierror)
+            position_file=position_file+nb_bytes_real
+
+            call MPI_FILE_WRITE_AT(filehandle,position_file,width,1,MPI_REAL, &
+            status_write_mpi,ierror)
+            position_file=position_file+nb_bytes_real
+
+            call MPI_FILE_WRITE_AT(filehandle,position_file,xi_min,1,MPI_REAL, &
+            status_write_mpi,ierror)
+            position_file=position_file+nb_bytes_real
+            call MPI_FILE_WRITE_AT(filehandle,position_file,xi_max,1,MPI_REAL, &
+            status_write_mpi,ierror)
+            position_file=position_file+nb_bytes_real
+
+            call MPI_FILE_WRITE_AT(filehandle,position_file,vp_min,1,MPI_REAL, &
+            status_write_mpi,ierror)
+            position_file=position_file+nb_bytes_real
+            call MPI_FILE_WRITE_AT(filehandle,position_file,vp_max,1,MPI_REAL, &
+            status_write_mpi,ierror)
+            position_file=position_file+nb_bytes_real
+
+            call MPI_FILE_WRITE_AT(filehandle,position_file,Ad_R_min,1,MPI_DOUBLE_PRECISION, &
+            status_write_mpi,ierror)
+            position_file=position_file+nb_bytes_double
+            call MPI_FILE_WRITE_AT(filehandle,position_file,Ad_R_max,1,MPI_DOUBLE_PRECISION, &
+            status_write_mpi,ierror)
+            position_file=position_file+nb_bytes_double
+
+            call MPI_FILE_WRITE_AT(filehandle,position_file,Ad_L_min,1,MPI_DOUBLE_PRECISION, &
+            status_write_mpi,ierror)
+            position_file=position_file+nb_bytes_double
+            call MPI_FILE_WRITE_AT(filehandle,position_file,Ad_L_max,1,MPI_DOUBLE_PRECISION, &
+            status_write_mpi,ierror)
+            position_file=position_file+nb_bytes_double
+
+            call MPI_FILE_WRITE_AT(filehandle,position_file,milay,1,MPI_INTEGER, &
+            status_write_mpi,ierror)
+            position_file=position_file+nb_bytes_integer
+            call MPI_FILE_WRITE_AT(filehandle,position_file,malay,1,MPI_INTEGER, &
+            status_write_mpi,ierror)
+            position_file=position_file+nb_bytes_integer
+
+            call MPI_FILE_WRITE_AT(filehandle,position_file,mk,1,MPI_INTEGER, &
+            status_write_mpi,ierror)
+            position_file=position_file+nb_bytes_integer
+            call MPI_FILE_WRITE_AT(filehandle,position_file,ndatadmax,1,MPI_INTEGER, &
+            status_write_mpi,ierror)
+            position_file=position_file+nb_bytes_integer
+        endif
+!
+        call MPI_BARRIER(MPI_COMM_WORLD, ierror)
+
+        nb_bytes_header=8*nb_bytes_integer+8*nb_bytes_real+4*nb_bytes_double ! number of bytes of the header
+        nb_bytes_model=7*nb_bytes_integer+(1+4*mk+2*ndatadmax)*nb_bytes_real+2*nb_bytes_double ! number of bytes in each model
 
         do while ((sample<nsample_widening).or.burnin_in_progress) ! main loop, sample: number of sample post burn-in
+            !write(*,*)ount
             ount=ount+1
             malayv=malay
             if (mod(ount,every)==0) then ! check regularly if acceptance rates are in an acceptable range, else change proposal width
@@ -1284,52 +1211,65 @@ program RJ_MCMC
                 if ((Acnd_R/(Prnd_R+1))<0.34) pAd_R=pAd_R*(1-perturb)
                 if ((Acnd_L/(Prnd_L+1))>0.54) pAd_L=pAd_L*(1+perturb) ! for love waves
                 if ((Acnd_L/(Prnd_L+1))<0.34) pAd_L=pAd_L*(1-perturb)
-
-                if ((Acv/(Prv+1))>0.54) pv=pv*(1+perturb) ! 2 layers for vsv
+                if ((Acv/(Prv+1))>0.54) pv=pv*(1+perturb) ! for vsv
                 if ((Acv/(Prv+1))<0.34) pv=pv*(1-perturb)
-
-                if ((Acp/(Prp+1))>0.54) pd=pd*(1+perturb) ! 2 layers for changing depth
+                if ((Acp/(Prp+1))>0.54) pd=pd*(1+perturb) ! for depth
                 if ((Acp/(Prp+1))<0.34) pd=pd*(1-perturb)
 
-                ! UPDATE SIGMAV
+                ! UPDATE SIGMAV AND SIGMAVP
                 if ((abs((AcB/PrB)-Ar_birth_old)>2*abs((AcB/PrB)-(AcD/PrD))).and.&
                     (AcB.ne.0)) then !special treatement for adding/removing layers
 
+                    sigma_count=sigma_count+1
                     if ((AcB/PrB)>Ar_birth_old) then! Going in the right direction
-                        if (sigmav>sigmav_old) then !Going up
-                            sigmav_new=sigmav*(1+perturb)
-                        else !Going down
-                            sigmav_new=sigmav*(1-perturb)
+                        if (mod(int(sigma_count/switch_sigma),2)==0) then
+                            if (sigmav>sigmav_old) then !Going up
+                                sigmav_new=sigmav*(1+perturb)
+                            else !Going down
+                                sigmav_new=sigmav*(1-perturb)
+                            endif
+                            sigmavp_new=sigmavp
+                        else
+                            ! sigmavp
+                            if (sigmavp>sigmavp_old) then !Going up
+                                sigmavp_new=sigmavp*(1+perturb)
+                            else !Going down
+                                sigmavp_new=sigmavp*(1-perturb)
+                            endif
+                            sigmav_new=sigmav
                         endif
                     else ! Going in the wrong direction
-                        if (sigmav>sigmav_old) then !Going up
-                            sigmav_new=sigmav*(1-perturb)
+                        if (mod(int(sigma_count/switch_sigma),2)==0) then
+                            if (sigmav>sigmav_old) then !Going up
+                                sigmav_new=sigmav*(1-perturb)
+                            else
+                                sigmav_new=sigmav*(1+perturb)
+                            endif
+                            sigmavp_new=sigmavp
+
                         else
-                            sigmav_new=sigmav*(1+perturb)
+                            ! sigmavp
+                            if (sigmavp>sigmavp_old) then !Going up
+                                sigmavp_new=sigmavp*(1-perturb)
+                            else
+                                sigmavp_new=sigmavp*(1+perturb)
+                            endif
+                            sigmav_new=sigmav
                         endif
                     endif
                     !write(*,*)sigmav_new
                     !write(*,*)
                     sigmav_old=sigmav
                     sigmav=sigmav_new
+
+                    sigmavp_old=sigmavp
+                    sigmavp=sigmavp_new
                     Ar_birth_old=AcB/PrB
                     PrB=0
                     PrD=0
                     AcB=0
                     AcD=0
                 endif
-
-!                 if ((Ac_vp/(Pr_vp+1))<0.001).and. then
-!                     write(filenamemax,"('/stuck_',I3.3,'.out')") rank
-!                     open(56,file=dirname//filenamemax,status='replace')
-!                     write(56,*) npt
-!                     do i=1,npt
-!                         write(56,*)voro(i,1),voro(i,2),voro(i,3),voro(i,4)
-!                     enddo
-!                     close(56)
-!                 endif
-
-                !-----------------------------------------------
 
                 PrP=0
                 PrV=0
@@ -1444,7 +1384,7 @@ program RJ_MCMC
                     voro_prop(ind,4)=voro(ind,4)+gasdev(ra)*p_vp
 
                     !Check if oustide bounds of prior
-                    if ((voro_prop(ind,4)<=vpvsv_min).or.(voro_prop(ind,4)>=vpvsv_max)) out=0
+                    if ((voro_prop(ind,4)<=vp_min).or.(voro_prop(ind,4)>=vp_max)) out=0
 
                 endif
             elseif (u<0.3) then !change position--------------------------------------------
@@ -1512,20 +1452,19 @@ program RJ_MCMC
                     call whichcell_d(voro_prop(npt_prop,1),voro,npt,ind)!
 
                     voro_prop(npt_prop,2) = voro(ind,2)+gasdev(ra)*sigmav ! sigmav: special width for new layers
-                    !voro_prop(npt_prop,2) = -width+2*width*ran3(ra) ! use completely random new value
                     voro_prop(npt_prop,3) = -1
                     !voro_prop(npt_prop,4) = voro(ind,4)+gasdev(ra)*p_vp
-                    voro_prop(npt_prop,4) = vpvsv_min+(vpvsv_max-vpvsv_min)*ran3(ra)
+                    voro_prop(npt_prop,4) = voro(ind,4)+gasdev(ra)*sigmavp ! sigmavpvs: special width for new layers
                     isoflag_prop(npt_prop) = .true.
 
                     logprob_vsv=log(1/(sigmav*sqrt(2*pi)))-((voro(ind,2)-voro_prop(npt_prop,2))**2)/(2*sigmav**2) ! correct acceptance rates because transdimensional
-                    !logprob_vp=log(1/(p_vp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(npt_prop,4))**2)/(2*p_vp**2)
+                    logprob_vp=log(1/(sigmavp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(npt_prop,4))**2)/(2*sigmavp**2)
 
                     !Check bounds
                     if ((voro_prop(npt_prop,2)<=-width).or.(voro_prop(npt_prop,2)>=width)) then
                         out=0
                     end if
-                    if ((voro_prop(npt_prop,4)<=vpvsv_min).or.(voro_prop(npt_prop,4)>=vpvsv_max)) then
+                    if ((voro_prop(npt_prop,4)<=vp_min).or.(voro_prop(npt_prop,4)>=vp_max)) then
                         out=0
                     end if
                 endif
@@ -1561,7 +1500,7 @@ program RJ_MCMC
 
                     call whichcell_d(voro(ind,1),voro_prop,npt_prop,ind2)
                     logprob_vsv=log(1/(sigmav*sqrt(2*pi)))-((voro(ind,2)-voro_prop(ind2,2))**2)/(2*sigmav**2) ! same as for birth
-                    !logprob_vp=log(1/(p_vp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(ind2,4))**2)/(2*p_vp**2)
+                    logprob_vp=log(1/(sigmavp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(ind2,4))**2)/(2*sigmavp**2)
 
                 endif
             elseif (u<0.9) then !Birth an anisotropic layer----------------------------------------
@@ -1622,8 +1561,8 @@ program RJ_MCMC
 
             !**************************************************************************
             if (out==1) then ! maybe we don't need a forward calculation for changes in noise parameters
-                call combine_linear(model_ref,nptref,nic_ref,noc_ref,voro_prop,npt_prop,d_max,&
-                    r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+                call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro_prop,npt_prop,d_max,&
+                    r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
 
                 if (ndatad_R>0) then
 
@@ -1641,13 +1580,13 @@ program RJ_MCMC
                             goto 11142
                         endif
 
-                        peri_R_tmp=peri_R(nlims_R(1,iharm):nlims_R(2,iharm))
-                        n_R_tmp=n_R(nlims_R(1,iharm):nlims_R(2,iharm))
+                        peri_R_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)=peri_R(nlims_R(1,iharm):nlims_R(2,iharm))
+                        n_R_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)=n_R(nlims_R(1,iharm):nlims_R(2,iharm))
                         ndatad_R_tmp=nlims_R(2,iharm)-nlims_R(1,iharm)+1 ! fortran slices take the first and the last element
                         call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
                             peri_R_tmp,n_R_tmp,d_cR_prop_tmp,rq_R,ndatad_R_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
                         !write(*,*)"dispersion_minos for RAYLEIGH"
-                        d_cR_prop(nlims_R(1,iharm):nlims_R(2,iharm))=d_cR_prop_tmp
+                        d_cR_prop(nlims_R(1,iharm):nlims_R(2,iharm))=d_cR_prop_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)
 
                         if (ier) then
                             out=0
@@ -1678,13 +1617,13 @@ program RJ_MCMC
                             goto 11142
                         endif
 
-                        peri_L_tmp=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
-                        n_L_tmp=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                        peri_L_tmp(:nlims_L(2,iharm)-nlims_L(1,iharm)+1)=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                        n_L_tmp(:nlims_L(2,iharm)-nlims_L(1,iharm)+1)=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
                         ndatad_L_tmp=nlims_L(2,iharm)-nlims_L(1,iharm)+1 ! fortran slices take the first and the last element
                         call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
                             peri_L_tmp,n_L_tmp,d_cL_prop_tmp,rq_L,ndatad_L_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
                         !write(*,*)"dispersion_minos for LOVE"
-                        d_cL_prop(nlims_L(1,iharm):nlims_L(2,iharm))=d_cL_prop_tmp
+                        d_cL_prop(nlims_L(1,iharm):nlims_L(2,iharm))=d_cL_prop_tmp(:nlims_L(2,iharm)-nlims_L(1,iharm)+1)
 
                         if (ier) then
                             out=0
@@ -1723,9 +1662,11 @@ program RJ_MCMC
             ! now check if we accept the new model - different treatement depending on the change
             if (birth) then!------------------------------------------------------------------
 
-                if (log(ran3(ra))<log(out) + log(real(npt)+1)-log(real(npt_prop)+1) -&
-                    log(2*width)-logprob_vsv&!-log(vpvsv_max-vpvsv_min)-logprob_vp&
+                if (log(ran3(ra))<log(out) + log(real(npt)+1)-log(real(npt_prop)+1)&
+                    -log(2*width)-logprob_vsv&
+                    -log(vp_max-vp_min)-logprob_vp&
                     -like_prop_w+like_w) then ! transdimensional case
+
                     accept=.true.
                     AcB=AcB+1
                 endif
@@ -1734,8 +1675,9 @@ program RJ_MCMC
 
                 if (log(ran3(ra))<log(out) + log(real(npt)+1)&
                     -log(real(npt_prop)+1) + &
-                    log(2*width)+logprob_vsv&!+log(vpvsv_max-vpvsv_min)+logprob_vp&
+                    log(2*width)+logprob_vsv+log(vp_max-vp_min)+logprob_vp&
                     -like_prop_w+like_w) then! transdimensional case
+
                     accept=.true.
                     AcD=AcD+1
                 endif
@@ -1847,7 +1789,8 @@ program RJ_MCMC
                     write(*,*)'AR_move',100*AcP/PrP
                     write(*,*)'AR_value',100*AcV/PrV
 
-                    write(*,*)'AR_Birth',100*AcB/PrB,'AR_Death',100*AcD/PrD,'sigmav',sigmav
+                    write(*,*)'AR_Birth',100*AcB/PrB,'AR_Death',100*AcD/PrD
+                    write(*,*)'sigmav',sigmav,'sigmavp',sigmavp
                     write(*,*)'AR_Birtha',100*AcBa/PrBa,'AR_Deatha',100*AcDa/PrDa
                     write(*,*)'AR_xi',100*Acxi/Prxi,'pxi',pxi
                     write(*,*)'AR__vp',100*Ac_vp/Pr_vp,'p_vp',p_vp
@@ -1925,47 +1868,172 @@ program RJ_MCMC
                     th = th + 1
                     th_all=th_all+1
 
-                    call combine_linear(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-                        r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
+                    call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+                        r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vp_data)
 
-                    write(100,*)nptfinal-noc,npt,npt_ani
-                    write(100,*)Ad_R,Ad_L
-                    do i=1,nptfinal-noc
-                        write(100,*)(rearth-r(nptfinal+1-i))/1000.,vsv(nptfinal+1-i)&
-                        ,xi(nptfinal+1-i),vpvsv_data(nptfinal+1-i)
-                    enddo
-                    write(100,*)like_w
-                    !write(100,*)logalpha(:numdis)
 
-                    write(100,*)ndatad_R
-                    write(100,*)d_cR(:ndatad_R)
-!                     do i=1,ndatad_R
-!                         write(100,*)n_R(i),d_cR(i)
-!                     enddo
-                    write(100,*)ndatad_L
-                    write(100,*)d_cL(:ndatad_L)
-!                     do i=1,ndatad_L
-!                         write(100,*)n_L(i),d_cL(i)
-!                     enddo
 
-                    if (mod(th_all,everyall)==0) then
-                    close(100)
-                    write(filenamemax,"('/All_models_prepare_',I3.3,'_',I3.3,'_',f5.2,'.out')")&
-                     rank, sample/everyall/thin,widening_prop
-                    open(100,file=dirname//filenamemax,status='replace')
-                    write(100,*)rank,sample/everyall,everyall
-                    write(100,*)burn_in,nsample_widening,widening_prop,thin
-                    write(100,*)d_min,d_max
-                    write(100,*)width
-                    write(100,*)xi_min,xi_max
-                    write(100,*)vpvs,vpvsv_min,vpvsv_max
-                    write(100,*)Ad_R_min,Ad_R_max
-                    write(100,*)Ad_L_min,Ad_L_max
-                    write(100,*)milay,malay
+                    if ((mod((th-1)*nbproc,everyall)==0).and.(th>1)) then ! if enough models in current files, create a new file
+                    call MPI_BARRIER(MPI_COMM_WORLD, ierror)
+                    call MPI_FILE_CLOSE(filehandle,ierror)
+
+                    write(filenamemax,"('/All_models_prepare_',I3.3,'_',f5.2,'.out')")sample*nbproc/everyall/thin,widening_prop
+                    write(*,*)filenamemax
+
+                    call MPI_FILE_OPEN(MPI_COMM_WORLD,dirname//filenamemax,MPI_MODE_WRONLY + MPI_MODE_CREATE, &
+                    MPI_INFO_NULL,filehandle,ierror) ! check MPI_INFO_NULL: might lead to conflicting filehandles
+
+                    if (rank==0) then ! create header
+
+                        position_file=0
+
+                        write(*,*)'writing header of file',filenamemax
+
+                        call MPI_FILE_WRITE_AT(filehandle,position_file,sample*nbproc/everyall/thin,1,MPI_INTEGER, &
+                        status_write_mpi,ierror)!sample/everyall/thin*nbproc
+                        position_file=position_file+nb_bytes_integer
+
+                        call MPI_FILE_WRITE_AT(filehandle,position_file,everyall,1,MPI_INTEGER, &
+                        status_write_mpi,ierror)
+                        position_file=position_file+nb_bytes_integer
+
+                        call MPI_FILE_WRITE_AT(filehandle,position_file,burn_in,1,MPI_INTEGER, &
+                        status_write_mpi,ierror)
+                        position_file=position_file+nb_bytes_integer
+                        call MPI_FILE_WRITE_AT(filehandle,position_file,widening_prop,1,MPI_REAL, &
+                        status_write_mpi,ierror)
+                        position_file=position_file+nb_bytes_real
+                        call MPI_FILE_WRITE_AT(filehandle,position_file,thin,1,MPI_INTEGER, &
+                        status_write_mpi,ierror)
+                        position_file=position_file+nb_bytes_integer
+
+                        call MPI_FILE_WRITE_AT(filehandle,position_file,d_min,1,MPI_REAL, &
+                        status_write_mpi,ierror)
+                        position_file=position_file+nb_bytes_real
+                        call MPI_FILE_WRITE_AT(filehandle,position_file,d_max,1,MPI_REAL, &
+                        status_write_mpi,ierror)
+                        position_file=position_file+nb_bytes_real
+
+                        call MPI_FILE_WRITE_AT(filehandle,position_file,width,1,MPI_REAL, &
+                        status_write_mpi,ierror)
+                        position_file=position_file+nb_bytes_real
+
+                        call MPI_FILE_WRITE_AT(filehandle,position_file,xi_min,1,MPI_REAL, &
+                        status_write_mpi,ierror)
+                        position_file=position_file+nb_bytes_real
+                        call MPI_FILE_WRITE_AT(filehandle,position_file,xi_max,1,MPI_REAL, &
+                        status_write_mpi,ierror)
+                        position_file=position_file+nb_bytes_real
+
+                        call MPI_FILE_WRITE_AT(filehandle,position_file,vp_min,1,MPI_REAL, &
+                        status_write_mpi,ierror)
+                        position_file=position_file+nb_bytes_real
+                        call MPI_FILE_WRITE_AT(filehandle,position_file,vp_max,1,MPI_REAL, &
+                        status_write_mpi,ierror)
+                        position_file=position_file+nb_bytes_real
+
+                        call MPI_FILE_WRITE_AT(filehandle,position_file,Ad_R_min,1,MPI_DOUBLE_PRECISION, &
+                        status_write_mpi,ierror)
+                        position_file=position_file+nb_bytes_double
+                        call MPI_FILE_WRITE_AT(filehandle,position_file,Ad_R_max,1,MPI_DOUBLE_PRECISION, &
+                        status_write_mpi,ierror)
+                        position_file=position_file+nb_bytes_double
+
+                        call MPI_FILE_WRITE_AT(filehandle,position_file,Ad_L_min,1,MPI_DOUBLE_PRECISION, &
+                        status_write_mpi,ierror)
+                        position_file=position_file+nb_bytes_double
+                        call MPI_FILE_WRITE_AT(filehandle,position_file,Ad_L_max,1,MPI_DOUBLE_PRECISION, &
+                        status_write_mpi,ierror)
+                        position_file=position_file+nb_bytes_double
+
+                        call MPI_FILE_WRITE_AT(filehandle,position_file,milay,1,MPI_INTEGER, &
+                        status_write_mpi,ierror)
+                        position_file=position_file+nb_bytes_integer
+                        call MPI_FILE_WRITE_AT(filehandle,position_file,malay,1,MPI_INTEGER, &
+                        status_write_mpi,ierror)
+                        position_file=position_file+nb_bytes_integer
+
+                        call MPI_FILE_WRITE_AT(filehandle,position_file,mk,1,MPI_INTEGER, &
+                        status_write_mpi,ierror)
+                        position_file=position_file+nb_bytes_integer
+                        call MPI_FILE_WRITE_AT(filehandle,position_file,ndatadmax,1,MPI_INTEGER, &
+                        status_write_mpi,ierror)
+                        position_file=position_file+nb_bytes_integer
+                    endif
+            !
+                    call MPI_BARRIER(MPI_COMM_WORLD, ierror)
+
                     endif
 
-                    !mean_prop=mean_prop+logalpha
+                    position_file=nb_bytes_header+mod(((th-1)*nbproc+rank),everyall)*nb_bytes_model ! position in the file where the model is written
 
+                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    ! Write the current model
+                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+                    call MPI_FILE_WRITE_AT(filehandle,position_file,nptfinal,1,MPI_INTEGER, &
+                    status_write_mpi,ierror)
+                    position_file=position_file+nb_bytes_integer
+
+                    call MPI_FILE_WRITE_AT(filehandle,position_file,nic,1,MPI_INTEGER, &
+                    status_write_mpi,ierror)
+                    position_file=position_file+nb_bytes_integer
+
+                    call MPI_FILE_WRITE_AT(filehandle,position_file,noc,1,MPI_INTEGER, &
+                    status_write_mpi,ierror)
+                    position_file=position_file+nb_bytes_integer
+
+                    call MPI_FILE_WRITE_AT(filehandle,position_file,npt,1,MPI_INTEGER, &
+                    status_write_mpi,ierror)
+                    position_file=position_file+nb_bytes_integer
+
+                    call MPI_FILE_WRITE_AT(filehandle,position_file,npt_ani,1,MPI_INTEGER, &
+                    status_write_mpi,ierror)
+                    position_file=position_file+nb_bytes_integer
+
+                    call MPI_FILE_WRITE_AT(filehandle,position_file,Ad_R,1,MPI_DOUBLE_PRECISION, &
+                    status_write_mpi,ierror)
+                    position_file=position_file+nb_bytes_double
+
+                    call MPI_FILE_WRITE_AT(filehandle,position_file,Ad_L,1,MPI_DOUBLE_PRECISION, &
+                    status_write_mpi,ierror)
+                    position_file=position_file+nb_bytes_double
+
+                    call MPI_FILE_WRITE_AT(filehandle,position_file,r,mk,MPI_REAL, &
+                    status_write_mpi,ierror)
+                    position_file=position_file+mk*nb_bytes_real
+
+                    call MPI_FILE_WRITE_AT(filehandle,position_file,vsv,mk,MPI_REAL, &
+                    status_write_mpi,ierror)
+                    position_file=position_file+mk*nb_bytes_real
+
+                    call MPI_FILE_WRITE_AT(filehandle,position_file,xi,mk,MPI_REAL, &
+                    status_write_mpi,ierror)
+                    position_file=position_file+mk*nb_bytes_real
+
+                    call MPI_FILE_WRITE_AT(filehandle,position_file,vp_data,mk,MPI_REAL, &
+                    status_write_mpi,ierror)
+                    position_file=position_file+mk*nb_bytes_real
+
+                    call MPI_FILE_WRITE_AT(filehandle,position_file,like_w,1,MPI_REAL, &
+                    status_write_mpi,ierror)
+                    position_file=position_file+nb_bytes_real
+
+                    call MPI_FILE_WRITE_AT(filehandle,position_file,ndatad_R,1,MPI_INTEGER, &
+                    status_write_mpi,ierror)
+                    position_file=position_file+nb_bytes_integer
+
+                    call MPI_FILE_WRITE_AT(filehandle,position_file,d_cR,ndatadmax,MPI_REAL, &
+                    status_write_mpi,ierror)
+                    position_file=position_file+ndatadmax*nb_bytes_real
+
+                    call MPI_FILE_WRITE_AT(filehandle,position_file,ndatad_L,1,MPI_INTEGER, &
+                    status_write_mpi,ierror)
+                    position_file=position_file+nb_bytes_integer
+
+                    call MPI_FILE_WRITE_AT(filehandle,position_file,d_cL,ndatadmax,MPI_REAL, &
+                    status_write_mpi,ierror)
+                    position_file=position_file+ndatadmax*nb_bytes_real
 
                     alpha=exp(logalpha)
                     alphasum=alphasum+exp(logalpha)
@@ -1989,37 +2057,10 @@ program RJ_MCMC
                     ncell(burn_in+ount+(nsample_widening+burn_in_widening)*(i_w-1)/thin)=npt
                     convAd_R(burn_in+ount+(nsample_widening+burn_in_widening)*(i_w-1)/thin)=Ad_R
                     convAd_L(burn_in+ount+(nsample_widening+burn_in_widening)*(i_w-1)/thin)=Ad_L
-!                     do idis=1,numdis
-!                         i_al=ceiling((logalpha(idis)-logalpha_min)/(logalpha_max-logalpha_min)*num_logalpha)
-!                         if (i_al<logalpha_min) i_al=1
-!                         if (i_al>logalpha_max) i_al=num_logalpha
-!                         !alphahist(i_al,idis,i_w)=alphahist(i_al,idis,i_w)+1
-!                     enddo
 
                 endif
 
             endif
-
-
-!             if (burnin_in_progress) then
-!                 convBa(ount)=100*AcBa/PrBa ! acceptance rates in percent
-!                 convB(ount)=100*AcB/PrB
-!                 convDa(ount)=100*AcDa/PrDa
-!                 convD(ount)=100*AcD/PrD
-!                 convvp(ount)=100*Ac_vp/Pr_vp
-!                 convvs1(ount)=100*Acv(1)/Prv(1)
-!                 convvs2(ount)=100*Acv(2)/Prv(2)
-!                 convdp1(ount)=100*Acp(1)/Prp(1)
-!                 convdp2(ount)=100*Acp(2)/Prp(2)
-!                 convxi(ount)=100*Acxi/Prxi
-!                 convd_R(ount)=lsd_R
-!                 convd_L(ount)=lsd_L
-!                 ncell(ount)=npt
-!                 convAd_R(ount)=Ad_R
-!                 convAd_L(ount)=Ad_L
-!             else
-
-!             endif
 
             IF ((mod(ount,display).EQ.0).and.(mod(ran,50).EQ.0)) THEN
 
@@ -2032,7 +2073,8 @@ program RJ_MCMC
                 write(*,*)'AR_move',100*AcP/PrP
                 write(*,*)'AR_value',100*AcV/PrV
 
-                write(*,*)'AR_Birth',100*AcB/PrB,'AR_Death',100*AcD/PrD,'sigmav',sigmav
+                write(*,*)'AR_Birth',100*AcB/PrB,'AR_Death',100*AcD/PrD
+                write(*,*)'sigmav',sigmav,'sigmavp',sigmavp
                 write(*,*)'AR_Birtha',100*AcBa/PrBa,'AR_Deatha',100*AcDa/PrDa
                 write(*,*)'AR_xi',100*Acxi/Prxi,'pxi',pxi
                 write(*,*)'AR__vp',100*Ac_vp/Pr_vp,'p_vp',p_vp
@@ -2048,18 +2090,10 @@ program RJ_MCMC
 
             END IF
         end do !End Markov chain
-        close(100)
-
-        !write(*,*)'alphamax1',alphamax_prop(:numdis)
-
-        !alphamax_prop=maxval(alphaall,1)
-
-        !write(*,*)'alphamax2',alphamax_prop(:numdis)
+        call MPI_FILE_CLOSE(filehandle,ierror)
 
         k=0
         if (th.ne.0) then !normalize averages
-
-            !mean_prop=mean_prop/th
 
             inorout(ran+1)=1
             k=k+1
@@ -2072,9 +2106,6 @@ program RJ_MCMC
             call MPI_REDUCE(inorout,inorouts,21000,MPI_Integer,MPI_Sum,i-1,MPI_COMM_WORLD,ierror)
         enddo
 
-
-        !write(*,*)'rank=',ran,'th=',th
-
         j=0
         k=0
         do i=1,nbproc
@@ -2085,9 +2116,6 @@ program RJ_MCMC
             endif
         enddo
 
-        !write(*,*)members
-
-        !IF (ran==0) write(*,*) 'k',k,'nbproc',nbproc
         !***************************************************************************
 
         ! Collect information from all the chains and average everything
@@ -2096,7 +2124,6 @@ program RJ_MCMC
         flag=0
         do i=1,j
             if (ran==members(i)) flag=1
-            write(*,*)'found the core!'
         enddo
 
         call MPI_Group_incl(group_world, j, members, good_group, ierror)
@@ -2219,6 +2246,7 @@ program RJ_MCMC
                 best_current_pv=pv
                 best_current_pd=pd
                 best_current_sigmav=sigmav
+                best_current_sigmavp=sigmavp
                 best_current_npt=npt
                 best_current_voro=voro
 
@@ -2326,24 +2354,6 @@ program RJ_MCMC
 
     write(*,*)'writing outputs of widening tests'
 
-
-    write(filenamemax,"('/last_model_',I3.3,'.inout')") rank
-    open(65,file=dirname//filenamemax,status='replace')
-    write(65,*)best_current_Ad_R
-    write(65,*)best_current_Ad_L
-    write(65,*)best_current_pxi
-    write(65,*)best_current_p_vp
-    write(65,*)best_current_pAd_R
-    write(65,*)best_current_pAd_L
-    write(65,*)best_current_pv
-    write(65,*)best_current_pd
-    write(65,*)best_current_sigmav
-    write(65,*)best_current_npt
-    do i=1,best_current_npt
-        write(65,*)best_current_voro(i,:)
-    enddo
-    close(65)
-
     IF (ran==members(1)) THEN
 
         open(65,file=dirname//'/mean_prop.out',status='replace')
@@ -2376,8 +2386,6 @@ program RJ_MCMC
         enddo
         write(65,*)mean_best(:numdis)
         close(65)
-
-        !write(*,*)'final alphamax',alpharefmax,alphamax(:numdis)
 
         open(54,file=dirname//'/Convergence_Birth_prep.out',status='replace')
         write(54,*)burn_in,n_w,burn_in_widening,nsample_widening
@@ -2457,7 +2465,6 @@ program RJ_MCMC
     close(outputfile)
 
     call MPI_FINALIZE(ierror)! Terminate the parralelization
-
 
 end! end the main program
 

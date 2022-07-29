@@ -116,8 +116,8 @@ program RJ_MCMC
     
     ! to save the current state
     real best_current_Ad_R,best_current_Ad_L,best_current_pxi,best_current_p_vp
-    real best_current_pAd_R,best_current_pAd_L,best_current_pv1,best_current_pv2
-    real best_current_pd1,best_current_pd2,best_current_sigmav
+    real best_current_pAd_R,best_current_pAd_L,best_current_pv
+    real best_current_pd,best_current_sigmav
     integer best_current_npt
     real best_current_voro(malay,4)
     logical burnin_in_progress
@@ -152,7 +152,7 @@ program RJ_MCMC
     real convAd_Ls(n_w*(burn_in_widening+nsample_widening)+burn_in) !variations of uncertainty parameters
     
     integer i_opt,num_prop(numdis_max),num_props(numdis_max)
-
+    
     ! todo: implement a test with raylquo
 1000 format(I4)
 
@@ -205,7 +205,6 @@ program RJ_MCMC
     
     
     if (testing) then !!!!!!!testing: create synthetic model
-        write(*,*)'testing'
         ndatad_R=0
         j=1
         numharm_count=1
@@ -416,7 +415,7 @@ program RJ_MCMC
 !         voro(19,4)=-0.3
         
         ! take voro, combine it with prem into a format suitable for minos
-        call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+        call combine_linear(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
             r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
         
         !calculate synthetic dispersion curves
@@ -541,7 +540,7 @@ program RJ_MCMC
         
         
         ! take voro, combine it with prem into a format suitable for minos
-        call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+        call combine_linear(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
             r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
         
         !calculate synthetic dispersion curves
@@ -662,7 +661,7 @@ program RJ_MCMC
         
         
         ! take voro, combine it with prem into a format suitable for minos
-        call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+        call combine_linear(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
             r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
         
         !calculate synthetic dispersion curves
@@ -929,7 +928,7 @@ program RJ_MCMC
             voro(i,4)= vpvsv_min+(vpvsv_max-vpvsv_min)*ran3(ra)
         enddo
         
-        call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+        call combine_linear(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
             r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
         
         if (ndatad_R>0) then
@@ -945,15 +944,12 @@ program RJ_MCMC
                 if (error_flag) then 
                     tes=.false.
                     write(*,*)"Minos_bran FAILED for RAYLEIGH 004"
-                else
-                    write(*,*)"Minos_bran SUCCESS for RAYLEIGH"
                 end if
                 peri_R_tmp=peri_R(nlims_R(1,iharm):nlims_R(2,iharm))
                 n_R_tmp=n_R(nlims_R(1,iharm):nlims_R(2,iharm))
                 ndatad_R_tmp=nlims_R(2,iharm)-nlims_R(1,iharm)+1 ! fortran slices take the first and the last element
                 call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
                     peri_R_tmp,n_R_tmp,d_cR_tmp,rq_R,ndatad_R_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
-                write(*,*)"dispersion_minos for RAYLEIGH"
                 d_cR(nlims_R(1,iharm):nlims_R(2,iharm))=d_cR_tmp
                 if (ier) tes=.false.
                 if (maxval(abs(rq_R(:ndatad_R_tmp)))>maxrq*eps) tes=.false.
@@ -972,15 +968,12 @@ program RJ_MCMC
                 if (error_flag) then 
                     tes=.false.
                     write(*,*)"Minos_bran FAILED for LOVE 004"
-                else
-                    write(*,*)"Minos_bran SUCCESS for LOVE"
                 end if
                 peri_L_tmp=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
                 n_L_tmp=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
                 ndatad_L_tmp=nlims_L(2,iharm)-nlims_L(1,iharm)+1 ! fortran slices take the first and the last element
                 call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
                 peri_L_tmp,n_L_tmp,d_cL_tmp,rq_L,ndatad_L_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
-                write(*,*)"dispersion_minos for LOVE"
                 d_cL(nlims_L(1,iharm):nlims_L(2,iharm))=d_cL_tmp
                 if (ier) tes=.false.
                 if (maxval(abs(rq_L(:ndatad_L_tmp)))>maxrq*eps) tes=.false.
@@ -1113,7 +1106,7 @@ program RJ_MCMC
         
         ier=.false.
         
-        call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+        call combine_linear(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
             r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
         
         if (ndatad_R>0) then
@@ -1129,15 +1122,12 @@ program RJ_MCMC
                 if (error_flag) then 
                     tes=.false.
                     write(*,*)"Minos_bran FAILED for RAYLEIGH 004"
-                else
-                    write(*,*)"Minos_bran SUCCESS for RAYLEIGH"
                 end if
                 peri_R_tmp=peri_R(nlims_R(1,iharm):nlims_R(2,iharm))
                 n_R_tmp=n_R(nlims_R(1,iharm):nlims_R(2,iharm))
                 ndatad_R_tmp=nlims_R(2,iharm)-nlims_R(1,iharm)+1 ! fortran slices take the first and the last element
                 call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
                     peri_R_tmp,n_R_tmp,d_cR_tmp,rq_R,ndatad_R_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
-                write(*,*)"dispersion_minos for RAYLEIGH"
                 d_cR(nlims_R(1,iharm):nlims_R(2,iharm))=d_cR_tmp
                 if (ier) then 
                     tes=.false.
@@ -1162,15 +1152,12 @@ program RJ_MCMC
                 if (error_flag) then 
                     tes=.false.
                     write(*,*)"Minos_bran FAILED for LOVE 004"
-                else
-                    write(*,*)"Minos_bran SUCCESS for LOVE"
                 end if
                 peri_L_tmp=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
                 n_L_tmp=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
                 ndatad_L_tmp=nlims_L(2,iharm)-nlims_L(1,iharm)+1 ! fortran slices take the first and the last element
                 call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
                 peri_L_tmp,n_L_tmp,d_cL_tmp,rq_L,ndatad_L_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
-                write(*,*)"dispersion_minos for LOVE"
                 d_cL(nlims_L(1,iharm):nlims_L(2,iharm))=d_cL_tmp
                 if (ier) then 
                     tes=.false.
@@ -1610,7 +1597,7 @@ program RJ_MCMC
     
             !**************************************************************************
             if (out==1) then ! maybe we don't need a forward calculation for changes in noise parameters
-                call combine(model_ref,nptref,nic_ref,noc_ref,voro_prop,npt_prop,d_max,&
+                call combine_linear(model_ref,nptref,nic_ref,noc_ref,voro_prop,npt_prop,d_max,&
                     r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,xi,vpvsv_data)
     
                 if (ndatad_R>0) then
@@ -1970,8 +1957,8 @@ program RJ_MCMC
                 write(*,*)'number of cells:',npt
                 write(*,*)'Ad_R',Ad_R,'Ad_L',Ad_L
                 write(*,*)'Acceptance rates'
-                write(*,*)'AR_move',100*AcP(1)/PrP(1),100*AcP(2)/PrP(2)
-                write(*,*)'AR_value',100*AcV(1)/PrV(1),100*AcV(2)/PrV(2)
+                write(*,*)'AR_move',100*AcP/PrP
+                write(*,*)'AR_value',100*AcV/PrV
 
                 write(*,*)'AR_Birth',100*AcB/PrB,'AR_Death',100*AcD/PrD,'sigmav',sigmav
                 write(*,*)'AR_Birtha',100*AcBa/PrBa,'AR_Deatha',100*AcDa/PrDa
@@ -2085,36 +2072,38 @@ program RJ_MCMC
                 sum_tmp=0
                 isum=num_logalpha+1
                 
-                i_opt=isum-int((15)/(logalpha_max-logalpha_min)*num_logalpha)
+                !i_opt=isum-int((15)/(logalpha_max-logalpha_min)*num_logalpha)
+                i_opt=1
                 totsum=sum(alphahists(i_opt:,idis,i_w))
-                do while ((sum_tmp<0.05*totsum).or.(totsum==0))
+                do while ((sum_tmp<0.01*totsum).or.(totsum==0))
                     isum=isum-1
                     sum_tmp=sum_tmp+alphahists(isum,idis,i_w)
-                    i_opt=i_opt-1
-                    totsum=sum(alphahists(i_opt:,idis,i_w))
+                    !i_opt=i_opt-1
+                    !totsum=sum(alphahists(i_opt:,idis,i_w))
                 enddo
                 alphamax_props(idis)=alphamax_props(idis)+(logalpha_min+isum*((logalpha_max-logalpha_min)/num_logalpha))
             enddo
             
             sum_tmp=0
             isum=num_logalpha+1
-            i_opt=isum-int((15)/(logalpha_max-logalpha_min)*num_logalpha)
+            !i_opt=isum-int((15)/(logalpha_max-logalpha_min)*num_logalpha)
+            i_opt=1
             totsum=sum(alpharefhists(i_opt:,i_w))
-            do while ((sum_tmp<0.05*totsum).or.(totsum==0))
+            do while ((sum_tmp<0.01*totsum).or.(totsum==0))
                 isum=isum-1
                 sum_tmp=sum_tmp+alpharefhists(isum,i_w)
-                i_opt=i_opt-1
-                totsum=sum(alpharefhists(i_opt:,i_w))
+                !i_opt=i_opt-1
+                !totsum=sum(alpharefhists(i_opt:,i_w))
             enddo
             alpharefmax_props=alpharefmax_props+(logalpha_min+isum*((logalpha_max-logalpha_min)/num_logalpha))
             
             do idis=1,numdis
                 
                 do i=1,th
-                    if ((alphaall(i,idis)-alphamax_props(idis))>-15) then
+                    !if ((alphaall(i,idis)-alphamax_props(idis))>-15) then
                         mean_prop(idis)=mean_prop(idis)+min(0.,alphaall(i,idis)-alphamax_props(idis))
                         num_prop(idis)=num_prop(idis)+1
-                    endif
+                    !endif
                 enddo
             enddo
             
@@ -2124,8 +2113,6 @@ program RJ_MCMC
             call MPI_Group_free(good_group, ierror)
             call MPI_Comm_free(MPI_COMM_small, ierror)
             call MPI_BARRIER(MPI_COMM_WORLD, ierror)
-            
-            write(*,*)ierror
             
             mean_props=mean_props/num_props!-alphamax_props
             meandiff_hist(i_w,:)=mean_props
@@ -2237,10 +2224,8 @@ program RJ_MCMC
         convDs=convDs/j
         convDas=convDas/j
         convvps=convvps/j
-        convvs1s=convvs1s/j
-        convvs2s=convvs2s/j
-        convdp1s=convdp1s/j
-        convdp2s=convdp2s/j
+        convvss=convvss/j
+        convdps=convdps/j
         convxis=convxis/j
         convd_Rs=convd_Rs/j
         convd_Ls=convd_Ls/j
@@ -2257,7 +2242,6 @@ program RJ_MCMC
     
     
     write(filenamemax,"('/last_model_',I3.3,'.inout')") rank    
-    write(*,*)filenamemax
     open(65,file=dirname//filenamemax,status='replace')
     write(65,*)best_current_Ad_R
     write(65,*)best_current_Ad_L

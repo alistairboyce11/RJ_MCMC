@@ -262,15 +262,19 @@ def get_alpha_max(comm,directory,params_inversion, params_dispersion,dispersion_
 
     '''
 
+    files_all=[]
     if prepare:
-        files_all=glob.glob(directory+'/All_models_prepare*%4.2f.out'%widening)
+        files_all.extend(glob.glob(directory+'/All_models_prepare_*%4.2f.out'%widening))
     else:
-        files_all=glob.glob(directory+'/All_models_invert*.out')
 
-    files_all.sort()
-    files_all=files_all
+        files_all.extend(glob.glob(directory+'/All_models_invert*.out'))
+
+    #files_all.sort()
+    #files_all=files_all[:10]#+files_all[-10:]
 
     rank = comm.Get_rank()
+
+    numdis=dispersion_all['numdis']
 
     size = comm.Get_size()
     files=[]
@@ -278,93 +282,148 @@ def get_alpha_max(comm,directory,params_inversion, params_dispersion,dispersion_
         if i%size==rank:
             files.append(files_all[i])
 
-    numdis=dispersion_all['numdis']
-
+    num_to_store=0
     if maxpercent==0.:
-        alpha_ref_max=float('-inf')
-        alpha_max=np.ones((numdis))*float('-inf')
+
+        num_to_store=1
     else:
-        alpha_ref_max=0
-        alpha_max=np.zeros((numdis))
+        num_to_store=int(len(files_all)*maxpercent/100.*params_inversion['everyall'])
+    #alphas_best=np.ones((num_to_store,numdis))*float('-inf')
+
+    # if maxpercent==0.:
+    #     alpha_ref_max=float('-inf')
+    #     alpha_max=np.ones((numdis))*float('-inf')
+    # else:
+
+    #num_to_store=20
+
+    alpha_ref_max=np.ones((num_to_store))*float('-inf')
+    alpha_max=np.ones((num_to_store,numdis))*float('-inf')
 
     print(rank,files)
+    print(num_to_store)
+    i=0
+    num_models=0
+    for i in range(len(files)):#file in files:
 
-    for file in files:
+        file=files[i]
+        alphas_max_prop,alpha_ref_max_prop,num_models_prop=process_file_alphamax(file,params_dispersion,dispersion_ref,dispersion_all,maxpercent,prepare,num_to_store)
 
-        # input_dict={}
-        # input_dict['file']=file
-        # input_dict['params_inversion']=params_inversion
-        # input_dict['params_dispersion']=params_dispersion
-        # input_dict['dispersion_ref']=dispersion_ref
-        # input_dict['dispersion_all']=dispersion_all
-        # input_dict['maxpercent']=maxpercent
-        # input_dict['prepare']=prepare
+        # print(alpha_ref_max,alpha_ref_max_prop)
+        # #print(np.append(alpha_ref_max,alpha_ref_max_prop))
+        # tmp=np.append(alpha_ref_max,alpha_ref_max_prop)
+        # print(np.shape(alpha_ref_max),np.shape(alpha_ref_max_prop))
+        # print(tmp)
+        # tmp.sort()
+        # print(tmp)
+        # print(num_to_store)
+        # print(tmp[-num_to_store:])
+        alpha_ref_max=np.append(alpha_ref_max,alpha_ref_max_prop)
+        alpha_ref_max.sort()
+        alpha_ref_max=alpha_ref_max[-num_to_store:]
 
-        alpha_ref_max_prop,alpha_max_prop=process_file_alphamax(file,params_inversion,params_dispersion,dispersion_ref,dispersion_all,maxpercent,prepare)
+        #print(np.shape(np.append(alpha_max,alphas_max_prop,axis=0)))
+        alpha_max=np.append(alpha_max,alphas_max_prop,axis=0)
+        alpha_max.sort(axis=0)
+        alpha_max=alpha_max[-num_to_store:,:]
 
-        if maxpercent==0.:
-            alpha_ref_max=max(alpha_ref_max_prop,alpha_ref_max)
-            alpha_max=np.maximum.reduce([alpha_max,alpha_max_prop])
-        else:
-            alpha_ref_max+=alpha_ref_max_prop/len(files_all)
-            alpha_max+=alpha_max_prop/len(files_all)
+        num_models+=num_models_prop
 
+        # if np.any(np.amin(alpha_ref_max,axis=0)<alpha_ref_max_prop):
+        #     min_indices=np.argmin(alpha_ref_max)
+        #     print(min_indices)
+        #     #print(np.shape(alpha),np.shape(np.amin(alphas_best,axis=0)))
+        #     alpha_ref_max[min_indices]=np.maximum(alpha_ref_max_prop,np.amin(alpha_ref_max,axis=0))
 
-    #print(rank,alpha_ref_max)
+        # if np.any(np.amin(alpha_max,axis=0)<alphas_max_prop):
+        #     min_indices=np.argmin(alpha_max,axis=0)
+        #     #print(np.shape(alpha),np.shape(np.amin(alphas_best,axis=0)))
+        #     alpha_max[min_indices,np.arange(numdis)]=np.maximum(alphas_max_prop,np.amin(alpha_max,axis=0))
 
-    # for i in range(size)[1:]:
-    #     if rank==i:
-    #         comm.send(obj=(alpha_ref_max,alpha_max),dest=0,tag=rank)
-    #     elif rank==0:
-    #         print(i)
-    #         alpha_ref_max_prop,alpha_max_prop=comm.recv(source=i,tag=rank)
-    #         #alpha_max_prop=comm.recv(i,1)
-    #         if maxpercent==0.:
-    #             alpha_ref_max=max(alpha_ref_max_prop,alpha_ref_max)
-    #             alpha_max=np.maximum.reduce([alpha_max,alpha_max_prop])
-    #         else:
-    #             alpha_ref_max+=alpha_ref_max_prop/len(files_all)
-    #             alpha_max+=alpha_max_prop/len(files_all)
-    #         print(alpha_ref_max)
-
-    #alpha_ref_max=rank**2
 
     if rank!=0:
-        #print('sending',rank)
-        comm.send(obj=(alpha_ref_max,alpha_max),dest=0,tag=1)
 
-        #print('sent',rank)
-    elif rank==0:
-
+        #print('sending alpha')
+        comm.Send([alpha_max,MPI.FLOAT],dest=0,tag=1)
+        #print('sent alpha')
+        #print('sending alpha_ref')
+        comm.Send([alpha_ref_max,MPI.FLOAT],dest=0,tag=2)
+        #print('sent alpha_ref')
+        #print('sending num_models')
+        comm.Send([np.array([num_models]),MPI.FLOAT],dest=0,tag=3)
+        #print('sent num_models')
+                # alpha_max=np.zeros((numdis))
+                # comm.Recv([alpha_max,MPI.FLOAT],0,100)
+    if rank==0:
+        #print('ready to recieve')
         for i in range(size)[1:]:
-            #print('recieving',i)
-            (alpha_ref_max_prop,alpha_max_prop)=comm.recv(source=i,tag=1)
-            #print('recieved',i)
-            #alpha_max_prop=comm.recv(i,1)
-            if maxpercent==0.:
-                alpha_ref_max=max(alpha_ref_max_prop,alpha_ref_max)
-                alpha_max=np.maximum.reduce([alpha_max,alpha_max_prop])
-            else:
-                alpha_ref_max+=alpha_ref_max_prop
-                alpha_max+=alpha_max_prop
+            #print('ready to recieve '+str(i))
+            alpha_max_prop=np.zeros_like(alpha_max)
+            comm.Recv([alpha_max_prop,MPI.FLOAT],i,1)
+            for j in range(num_to_store):
+                if np.any(np.amin(alpha_max,axis=0)<alpha_max_prop[j,:]):
+                    min_indices=np.argmin(alpha_max,axis=0)
+                    #print(np.shape(alpha),np.shape(np.amin(alphas_best,axis=0)))
+                    alpha_max[min_indices,np.arange(numdis)]=np.maximum(alpha_max_prop[j,:],np.amin(alpha_max,axis=0))
+            # alpha_max=np.append(alpha_max,alphas_max_prop,axis=0)
+            # alpha_max.sort(axis=0)
+            # alpha_max=alpha_max[-num_to_store:,:]
+            #print('merged alpha')
+
+            alpha_max_ref_prop=np.zeros_like(alpha_ref_max)
+            comm.Recv([alpha_max_ref_prop,MPI.FLOAT],i,2)
+            for j in range(num_to_store):
+                if np.amin(alpha_ref_max)<alpha_max_ref_prop[j]:
+                    min_indices=np.argmin(alpha_ref_max)
+                    alpha_ref_max[min_indices]=alpha_max_ref_prop[j]
+            # alpha_ref_max=np.append(alpha_ref_max,alpha_ref_max_prop)
+            # alpha_ref_max.sort()
+            # alpha_ref_max=alpha_ref_max[-num_to_store:]
+            #print('merged alpha_ref')
+
+            num_models_prop=np.zeros_like(num_models)
+            comm.Recv([num_models_prop,MPI.FLOAT],i,3)
+            #print(num_models_prop)
+            num_models+=num_models_prop
+            #print(num_models)
+            #print('merged num_models')
 
 
-    #if rank==0:
-    #time.sleep(10)
+
+            # elif rank==0:
+            #     print(i)
+            #     for i in range(size)[1:]:
+            #         num_models_prop=comm.recv(source=i,tag=1)
+            #         num_models+=num_models_prop
+    #num_models=num_models[0]
+    real_num_to_store=int(num_models*maxpercent/100.)
+
+    alpha_max.sort(axis=0)
+    alpha_max=alpha_max[-real_num_to_store,:]
+
+    alpha_ref_max.sort()
+    alpha_ref_max=alpha_ref_max[-real_num_to_store]
+
+    #print(np.shape(alpha_max))
+
+    #print(np.shape(alpha_max))
+    # if rank==0:
+    #     print('100 first alphas: ',alpha_max[:100])
+    #     print(rank,alpha_ref_max)
 
     alpha_max = comm.bcast(alpha_max, root=0)
     alpha_ref_max = comm.bcast(alpha_ref_max, root=0)
 
-    #print(rank,alpha_ref_max)
     dispersion_all['alpha_max']=alpha_max
     dispersion_ref['alpha_max']=alpha_ref_max
 
-def process_file_alphamax(file,params_inversion,params_dispersion,dispersion_ref,dispersion_all,maxpercent,prepare):
+    return
+
+def process_file_alphamax(file,params_dispersion,dispersion_ref,dispersion_all,maxpercent,prepare,num_to_store):
     '''processes one file to get alphamax
     input: input_dict
     input_dict contains:
         file: filename of the file to process
-        params_inversion
 
 
     Parameters
@@ -381,32 +440,19 @@ def process_file_alphamax(file,params_inversion,params_dispersion,dispersion_ref
 
     '''
 
-    # file=input_dict['file']
-    # params_inversion=input_dict['params_inversion']
-    # params_dispersion=input_dict['params_dispersion']
-    # dispersion_ref=input_dict['dispersion_ref']
-    # dispersion_all=input_dict['dispersion_all']
-    # maxpercent=input_dict['maxpercent']
-    # prepare=input_dict['prepare']
-
     # reading the file
     f=open(file,'r')
     print(file)
 
+    num_model=0
+
     numdis=dispersion_all['numdis']
-    alpha_ref_max=float('-inf')
-    alpha_max=np.ones((numdis))*float('-inf')
-
-    if prepare:
-        num_file=int(float(file.split('/')[-1].split('_')[4]))
-
-    else:
-        num_file=int(float(file.split('/')[-1].split('_')[-1].split('.')[0]))
-
-    num_models=int(min(params_inversion['everyall'],params_inversion['nsample']//params_inversion['thin']-num_file*params_inversion['everyall']))
-
-    alpha_ref_all=np.ones((int(num_models*maxpercent/100)))*float('-inf')
-    alpha_all=np.ones((numdis,int(num_models*maxpercent/100)))*float('-inf')
+    # if maxpercent==0.:
+    #     alpha_ref_max=float('-inf')
+    #     alpha_max=np.ones((numdis))*float('-inf')
+    # else:
+    alpha_ref_max=np.ones((num_to_store))*float('-inf')
+    alpha_max=np.ones((num_to_store,numdis))*float('-inf')
 
     fline=f.readline()
     if not fline:
@@ -420,7 +466,7 @@ def process_file_alphamax(file,params_inversion,params_dispersion,dispersion_ref
     f.readline()
     f.readline()
 
-    num_model=0
+
 
     line=f.readline()
     while line:
@@ -434,6 +480,13 @@ def process_file_alphamax(file,params_inversion,params_dispersion,dispersion_ref
         dispersion_one['R']['Ad']=float(data[0])
         dispersion_one['L']['Ad']=float(data[1])
 
+        # # new writing
+        # f.readline()
+        # f.readline()
+        # f.readline()
+        # f.readline()
+
+        # old writing
         for i in range(npt_true):
             f.readline()
 
@@ -450,13 +503,31 @@ def process_file_alphamax(file,params_inversion,params_dispersion,dispersion_ref
 
         if maxpercent==0.:
             alpha_ref_max=max(alpha_ref,alpha_ref_max)
-            alpha_max=np.maximum.reduce([alpha_max,alpha])
+            #print(np.shape(alpha_max),np.shape(np.atleast_2d(alpha)))
+            alpha_max=np.maximum.reduce([alpha_max,np.atleast_2d(alpha)])
 
         else:
-            min_indices=np.argmin(alpha_all,axis=1)
-            alpha_all[np.arange(numdis),min_indices]=np.maximum(alpha,np.amin(alpha_all,axis=1))
-            if alpha_ref>np.amin(alpha_ref_all):
-                alpha_ref_all[np.argmin(alpha_ref_all)]=alpha_ref
+
+            if np.any(np.amin(alpha_ref_max,axis=0)<alpha_ref):
+                min_indices=np.argmin(alpha_ref_max)
+                # print(alpha_ref_max)
+                # print(alpha_ref)
+                #print(min_indices)
+                #print(np.shape(alpha),np.shape(np.amin(alphas_best,axis=0)))
+                alpha_ref_max[min_indices]=np.maximum(alpha_ref,np.amin(alpha_ref_max,axis=0))
+
+            # if np.any(np.amin(alpha_max[:20,:10],axis=0)<alpha[:10]):
+            #     print(alpha_max[:20,:10])
+            #     print(alpha[:10])
+
+            if np.any(np.amin(alpha_max,axis=0)<alpha):
+                min_indices=np.argmin(alpha_max,axis=0)
+                #print(np.shape(alpha),np.shape(np.amin(alphas_best,axis=0)))
+                alpha_max[min_indices,np.arange(numdis)]=np.maximum(alpha,np.amin(alpha_max,axis=0))
+                #print('comm ',rank)
+                #comm.Bcast([alphas_best,MPI.FLOAT], root=rank)
+            # if alpha_ref>np.amin(alpha_ref_all):
+            #     alpha_ref_all[np.argmin(alpha_ref_all)]=alpha_ref
 
         num_model+=1
         line=f.readline()
@@ -465,11 +536,17 @@ def process_file_alphamax(file,params_inversion,params_dispersion,dispersion_ref
         #    break
     f.close()
 
-    if maxpercent>0.:
-        alpha_max=np.amin(alpha_all,axis=1)
-        alpha_ref_max=np.amin(alpha_ref_all)
+    # if maxpercent>0.:
+    #     if int(num_model*maxpercent/100)<int(num_models*maxpercent/100):
+    #         alpha_ref_max=alpha_ref_max.sort()[-int(num_model*maxpercent/100):]
+    #         alpha_max=alpha_max.sort(axis=1)[:,-int(num_model*maxpercent/100):]
 
-    return alpha_ref_max,alpha_max
+    #     if len(alpha_ref_all)==0:
+    #         return 0., np.zeros((numdis))
+    #     alpha_max=np.amin(alpha_all,axis=1)
+    #     alpha_ref_max=np.amin(alpha_ref_all)
+    #print(alpha_ref_max)
+    return alpha_max,alpha_ref_max,num_model
 
 def get_alpha(dispersion_one,params_dispersion,dispersion_ref,dispersion_all):
     '''
@@ -921,11 +998,17 @@ def process_one_file(file,functions,params_inversion,params_dispersion,dispersio
         model['Ad_R']=dispersion_one['R']['Ad']
         model['Ad_L']=dispersion_one['L']['Ad']
 
+        # # new writing
+        # d=np.array(f.readline().split()).astype('float')
+        # vsv=np.array(f.readline().split()).astype('float')
+        # xi=np.array(f.readline().split()).astype('float')
+        # vp=np.array(f.readline().split()).astype('float')
+
+        # old writing
         d=np.zeros(npt_true)
         vsv=np.zeros_like(d)
         xi=np.zeros_like(d)
         vp=np.zeros_like(d)
-
         for i in range(npt_true):
             data=f.readline().split()
             d[i]=float(data[0])
@@ -953,6 +1036,11 @@ def process_one_file(file,functions,params_inversion,params_dispersion,dispersio
         t2=time.time()
         time_read+=t2-t1
 
+        if len(dispersion_L_one)==0:
+            print('read: ',time_read)
+            print('get alpha: ',time_alpha)
+            print('apply: ',time_apply)
+            return
         t1=time.time()
 
 
@@ -1632,7 +1720,7 @@ def get_dispersion_mean(file,model,model_ref,dispersion_one,params_dispersion,pa
 
     alpha_alt=np.tile(alpha,(len(dispersion_L_true_ref),1))
     #dis_alt,alpha_alt=np.meshgrid(dispersion_L_model,alpha)
-    outputs['stack']['dispersion_L']+=np.multiply(dispersion_R_true_all,alpha_alt)
+    outputs['stack']['dispersion_L']+=np.multiply(dispersion_L_true_all,alpha_alt)
     dis_alt=np.transpose(np.tile(dispersion_L_model,(numdis,1)))-dispersion_L_true_all
     #dis_alt,alpha_alt=np.meshgrid(dispersion_L_model-dispersion_L_true,alpha)
     outputs['stack']['dispersion_L_shift']+=np.multiply(dis_alt,alpha_alt)
@@ -1728,86 +1816,174 @@ def get_tradeoff(file,model,model_ref,dispersion_one,params_dispersion,params_in
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 
+# directory='OUT_CLUSTER0_ALL/OUT'
+# maxpercent=0.05
+# prepare=True
+# params_dispersion, dispersion_ref, dispersion_all=get_dispersion(directory)
+# model_ref=get_model_ref()
+# output={}
+# params_inversion={}
+# widening=1.
+# params_inversion=get_metadata(directory,prepare=prepare,widening=widening)
+# get_alpha_max(comm,directory, params_inversion, params_dispersion, dispersion_ref, dispersion_all, prepare=prepare, widening=widening, maxpercent=maxpercent)
 
-directory='OUT_CLUSTER0_ALL/OUT'
+# if rank==0:
+#     print(dispersion_all['alpha_max'][:100])
 
-functions=[create_posterior,get_average,get_histograms,get_dispersion_mean,get_tradeoff] #create_posterior,get_average,get_histograms,,get_tradeoff
+#sys.exit()
+#directory='OUT_CLUSTER0_ALL/OUT'
 
-prepare=True
-maxpercent=1.
-print('start')
-params_dispersion, dispersion_ref, dispersion_all=get_dispersion(directory)
-print('get dispersion')
-model_ref=get_model_ref()
-print('get model ref')
+for directory in ['OUT_CLUSTER1_ALL/OUT']: #'OUT_CLUSTER0_ALL/OUT',
 
-if rank==0:
-    filename='dispersion.h5'
-    f = h5py.File(directory+'/Processing/'+filename,'w')
-    grp=f.create_group('cluster_params')
-    grp.create_dataset('numdis',data=dispersion_all['numdis'])
-    grp.create_dataset('lat',data=dispersion_all['lat'])
-    grp.create_dataset('lon',data=dispersion_all['lon'])
-    grp.create_dataset('cluster',data=dispersion_all['cluster'])
-    grp=f.create_group('dispersion_params')
-    grp2=grp.create_group('L')
-    grp2.create_dataset('periods',data=params_dispersion['L']['periods'])
-    grp2.create_dataset('modes',data=params_dispersion['L']['modes'])
-    grp2=grp.create_group('R')
-    grp2.create_dataset('periods',data=params_dispersion['R']['periods'])
-    grp2.create_dataset('modes',data=params_dispersion['R']['modes'])
-    grp=f.create_group('reference')
-    grp2=grp.create_group('L')
-    grp2.create_dataset('dispersion',data=dispersion_ref['L']['dispersion'])
-    grp2.create_dataset('error',data=dispersion_ref['L']['error'])
-    grp2=grp.create_group('R')
-    grp2.create_dataset('dispersion',data=dispersion_ref['R']['dispersion'])
-    grp2.create_dataset('error',data=dispersion_ref['R']['error'])
-    grp=f.create_group('cluster')
-    grp2=grp.create_group('L')
-    grp2.create_dataset('dispersion',data=dispersion_all['L']['dispersion'])
-    grp2.create_dataset('error',data=dispersion_all['L']['error'])
-    grp2=grp.create_group('R')
-    grp2.create_dataset('dispersion',data=dispersion_all['R']['dispersion'])
-    grp2.create_dataset('error',data=dispersion_all['R']['error'])
-    f.close()
+    functions=[create_posterior,get_average,get_histograms,get_dispersion_mean,get_tradeoff] #create_posterior,get_average,get_histograms,,get_tradeoff
 
-# #print(np.amax(dispersion_all['R']['dispersion']))
+    prepare=True
+    maxpercent=1.
+    print('start')
+    params_dispersion, dispersion_ref, dispersion_all=get_dispersion(directory)
+    print('get dispersion')
+    model_ref=get_model_ref()
+    print('get model ref')
 
-# #sys.exit()
-for widening in [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.]:
-#widening=1.0
-    for maxpercent in [0.,0.1,1.,0.5]:
+    if rank==0:
+        filename='dispersion.h5'
+        f = h5py.File(directory+'/Processing/'+filename,'w')
+        grp=f.create_group('cluster_params')
+        grp.create_dataset('numdis',data=dispersion_all['numdis'])
+        grp.create_dataset('lat',data=dispersion_all['lat'])
+        grp.create_dataset('lon',data=dispersion_all['lon'])
+        grp.create_dataset('cluster',data=dispersion_all['cluster'])
+        grp=f.create_group('dispersion_params')
+        grp2=grp.create_group('L')
+        grp2.create_dataset('periods',data=params_dispersion['L']['periods'])
+        grp2.create_dataset('modes',data=params_dispersion['L']['modes'])
+        grp2=grp.create_group('R')
+        grp2.create_dataset('periods',data=params_dispersion['R']['periods'])
+        grp2.create_dataset('modes',data=params_dispersion['R']['modes'])
+        grp=f.create_group('reference')
+        grp2=grp.create_group('L')
+        grp2.create_dataset('dispersion',data=dispersion_ref['L']['dispersion'])
+        grp2.create_dataset('error',data=dispersion_ref['L']['error'])
+        grp2=grp.create_group('R')
+        grp2.create_dataset('dispersion',data=dispersion_ref['R']['dispersion'])
+        grp2.create_dataset('error',data=dispersion_ref['R']['error'])
+        grp=f.create_group('cluster')
+        grp2=grp.create_group('L')
+        grp2.create_dataset('dispersion',data=dispersion_all['L']['dispersion'])
+        grp2.create_dataset('error',data=dispersion_all['L']['error'])
+        grp2=grp.create_group('R')
+        grp2.create_dataset('dispersion',data=dispersion_all['R']['dispersion'])
+        grp2.create_dataset('error',data=dispersion_all['R']['error'])
+        f.close()
 
+    # #print(np.amax(dispersion_all['R']['dispersion']))
+
+    # widening=1.
+    # maxpercent=0.05
+
+    # output={}
+    # params_inversion={}
+    # params_inversion=get_metadata(directory,prepare=prepare,widening=widening)
+    # print('get metadata')
+    # alphafile=directory+'/Processing/alphamax_'+str(prepare)+'_'+str(widening)+'_'+str(maxpercent)+'.txt'
+    # # if os.path.isfile(alphafile):
+    # #     file=open(alphafile,'r')
+    # #     dispersion_ref['alpha_max']=float(file.readline())
+    # #     dispersion_all['alpha_max']=np.array(file.readline().split()).astype('float')
+    # #     file.close()
+    # # else:
+    # get_alpha_max(comm,directory, params_inversion, params_dispersion, dispersion_ref, dispersion_all, prepare=prepare, widening=widening, maxpercent=maxpercent)
+        # file=open(alphafile,'w')
+        # file.write(str(dispersion_ref['alpha_max'])+'\n')
+        # file.write(' '.join(map(str,dispersion_all['alpha_max']))+'\n')
+        # file.close()
+
+    # #sys.exit()
+    for widening in [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.]:
+    #widening=1.0
+        for maxpercent in [0.,0.1,0.5,0.05,1.]:
+
+            output={}
+            params_inversion={}
+            params_inversion=get_metadata(directory,prepare=prepare,widening=widening)
+            print('get metadata')
+            alphafile=directory+'/Processing/alphamax_'+str(prepare)+'_'+str(widening)+'_'+str(maxpercent)+'.txt'
+            if os.path.isfile(alphafile):
+                file=open(alphafile,'r')
+                dispersion_ref['alpha_max']=float(file.readline())
+                dispersion_all['alpha_max']=np.array(file.readline().split()).astype('float')
+                file.close()
+            else:
+                get_alpha_max(comm,directory, params_inversion, params_dispersion, dispersion_ref, dispersion_all, prepare=prepare, widening=widening, maxpercent=maxpercent)
+                file=open(alphafile,'w')
+                file.write(str(dispersion_ref['alpha_max'])+'\n')
+                file.write(' '.join(map(str,dispersion_all['alpha_max']))+'\n')
+                file.close()
+
+            print('get alphamax')
+            output=apply_stuff(comm,directory,functions,params_inversion,params_dispersion,dispersion_ref,dispersion_all,model_ref,prepare=prepare,widening=widening) #
+            print('apply functions')
+
+            if rank==0:
+
+                ############################################################
+                # print to files
+                ############################################################
+                for function in output:
+                    filename='processing_'+str(widening)+'_'+str(prepare)+'_'+str(maxpercent)+'_'+function+'_outputs.h5'
+                    print(filename)
+                    f = h5py.File(directory+'/Processing/'+filename,'w')
+                    f.create_dataset('widening',data=params_inversion['widening'])
+                    f.create_dataset('prepare',data=prepare)
+                    f.create_dataset('burn-in',data=params_inversion['burn-in'])
+                    f.create_dataset('nsample',data=params_inversion['nsample'])
+
+
+                    grp=f.create_group(function)
+                    grp_stack=grp.create_group('stack')
+                    grp_nostack=grp.create_group('nostack')
+                    for key in output[function]['stack']:
+                        grp_stack.create_dataset(key,data=output[function]['stack'][key])
+                        output[function]['stack'][key]=[]
+                    for key in output[function]['nostack']:
+                        grp_nostack.create_dataset(key,data=output[function]['nostack'][key])
+                        output[function]['nostack'][key]=[]
+                    f.close()
+                    output[function]={}
+
+            #del params_inversion,output,data,weights
+
+    for maxpercent in [0.,0.1,1.,0.5,0.05]:
         output={}
-        params_inversion={}
-        params_inversion=get_metadata(directory,prepare=prepare,widening=widening)
+        prepare=False
+        params_inversion=get_metadata(directory,prepare=prepare)
         print('get metadata')
-        alphafile=directory+'/Processing/alphamax_'+str(prepare)+'_'+str(widening)+'_'+str(maxpercent)+'.txt'
+        alphafile=directory+'/Processing/alphamax_'+str(prepare)+'_'+str(maxpercent)+'.txt'
         if os.path.isfile(alphafile):
             file=open(alphafile,'r')
             dispersion_ref['alpha_max']=float(file.readline())
             dispersion_all['alpha_max']=np.array(file.readline().split()).astype('float')
             file.close()
         else:
-            get_alpha_max(comm,directory, params_inversion, params_dispersion, dispersion_ref, dispersion_all, prepare=prepare, widening=widening, maxpercent=maxpercent)
-            file=open(alphafile,'w')
-            file.write(str(dispersion_ref['alpha_max'])+'\n')
-            file.write(' '.join(map(str,dispersion_all['alpha_max']))+'\n')
-            file.close()
+            get_alpha_max(comm,directory,params_inversion,params_dispersion,dispersion_ref,dispersion_all,prepare=prepare,maxpercent=maxpercent)
+            if rank==0:
+                file=open(alphafile,'w')
+                file.write(str(dispersion_ref['alpha_max'])+'\n')
+                file.write(' '.join(map(str,dispersion_all['alpha_max']))+'\n')
+                file.close()
 
+        continue
+        widening=params_inversion['widening']
         print('get alphamax')
-        output=apply_stuff(comm,directory,functions,params_inversion,params_dispersion,dispersion_ref,dispersion_all,model_ref,prepare=prepare,widening=widening) #
+        output=apply_stuff(comm,directory,functions,params_inversion,params_dispersion,dispersion_ref,dispersion_all,model_ref,prepare=prepare,widening=widening)
         print('apply functions')
 
+        ##########################################################
+        # Print to file
+        ##########################################################
         if rank==0:
-
-            ############################################################
-            # print to files
-            ############################################################
             for function in output:
-                filename='processing_'+str(widening)+'_'+str(prepare)+'_'+str(maxpercent)+'_'+function+'_outputs.h5'
-                print(filename)
+                filename='processing_'+'_'+str(maxpercent)+'_'+function+'_outputs.h5'
                 f = h5py.File(directory+'/Processing/'+filename,'w')
                 f.create_dataset('widening',data=params_inversion['widening'])
                 f.create_dataset('prepare',data=prepare)
@@ -1820,61 +1996,9 @@ for widening in [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.]:
                 grp_nostack=grp.create_group('nostack')
                 for key in output[function]['stack']:
                     grp_stack.create_dataset(key,data=output[function]['stack'][key])
-                    output[function]['stack'][key]=[]
                 for key in output[function]['nostack']:
                     grp_nostack.create_dataset(key,data=output[function]['nostack'][key])
-                    output[function]['nostack'][key]=[]
                 f.close()
-                output[function]={}
 
-        #del params_inversion,output,data,weights
-
-for maxpercent in [0.,0.1,1.,0.5]:
-    output={}
-    prepare=False
-    params_inversion=get_metadata(directory,prepare=prepare)
-    print('get metadata')
-    alphafile=directory+'/Processing/alphamax_'+str(prepare)+'_'+str(maxpercent)+'.txt'
-    if os.path.isfile(alphafile):
-        file=open(alphafile,'r')
-        dispersion_ref['alpha_max']=float(file.readline())
-        dispersion_all['alpha_max']=np.array(file.readline().split()).astype('float')
-        file.close()
-    else:
-        get_alpha_max(comm,directory,params_inversion,params_dispersion,dispersion_ref,dispersion_all,prepare=prepare,maxpercent=maxpercent)
-        if rank==0:
-            file=open(alphafile,'w')
-            file.write(str(dispersion_ref['alpha_max'])+'\n')
-            file.write(' '.join(map(str,dispersion_all['alpha_max']))+'\n')
-            file.close()
-
-    continue
-    widening=params_inversion['widening']
-    print('get alphamax')
-    output=apply_stuff(comm,directory,functions,params_inversion,params_dispersion,dispersion_ref,dispersion_all,model_ref,prepare=prepare,widening=widening)
-    print('apply functions')
-
-    ##########################################################
-    # Print to file
-    ##########################################################
-    if rank==0:
-        for function in output:
-            filename='processing_'+'_'+str(maxpercent)+'_'+function+'_outputs.h5'
-            f = h5py.File(directory+'/Processing/'+filename,'w')
-            f.create_dataset('widening',data=params_inversion['widening'])
-            f.create_dataset('prepare',data=prepare)
-            f.create_dataset('burn-in',data=params_inversion['burn-in'])
-            f.create_dataset('nsample',data=params_inversion['nsample'])
-
-
-            grp=f.create_group(function)
-            grp_stack=grp.create_group('stack')
-            grp_nostack=grp.create_group('nostack')
-            for key in output[function]['stack']:
-                grp_stack.create_dataset(key,data=output[function]['stack'][key])
-            for key in output[function]['nostack']:
-                grp_nostack.create_dataset(key,data=output[function]['nostack'][key])
-            f.close()
-
-    #del params_inversion,output
+        #del params_inversion,output
 
