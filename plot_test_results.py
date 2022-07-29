@@ -184,56 +184,59 @@ def get_inversion_model(filename='RM_ak135.txt'):
 
 ########## histogram of number of layers
 if Layer_Hist:
-    f=open(directory+'/'+'NB_layers.out','r')
-    lines=f.readlines()
-    f.close()
+    if os.path.isfile(directory+'/'+'NB_layers.out'):
+            
+        f=open(directory+'/'+'NB_layers.out','r')
+        lines=f.readlines()
+        f.close()
 
-    n=[]
-    for line in lines:
-        n.append(float(line))
-    
-    plt.figure('nlayers_histogram')
-    plt.title('nlayers histogram')
-    plt.plot(n)
-    plt.xlim([0, maxnlay])
-    plt.xlabel('Number of layers')
-    plt.ylabel('Frequency')
-    
-    # plt.show()
-    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Layer_hist.png',dpi=200)
-    plt.close()
+        n=[]
+        for line in lines:
+            n.append(float(line))
+        
+        plt.figure('nlayers_histogram')
+        plt.title('nlayers histogram')
+        plt.plot(n)
+        plt.xlim([0, maxnlay])
+        plt.xlabel('Number of layers')
+        plt.ylabel('Frequency')
+        
+        # plt.show()
+        plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Layer_hist.png',dpi=200)
+        plt.close()
 
 ########## matrix containing number of layers and number of anisotropic layers
 if Layers_Aniso_Tr:
-    f=open(directory+'/'+'Tradeoff.out','r')
-    lines=f.readlines()
-    f.close()
+    if os.path.isfile(directory+'/'+'Tradeoff.out'):
+        f=open(directory+'/'+'Tradeoff.out','r')
+        lines=f.readlines()
+        f.close()
 
-    nlay=int(lines[0])
-    l=np.zeros((nlay+1,nlay))
+        nlay=int(lines[0])
+        l=np.zeros((nlay+1,nlay))
 
-    i=0
-    j=0
-    for line in lines[1:]:
-        l[j,i]=float(line.split()[0])#/(i+1)
-        j+=1
-        if j==nlay+1:
-            i+=1
-            j=0
+        i=0
+        j=0
+        for line in lines[1:]:
+            l[j,i]=float(line.split()[0])#/(i+1)
+            j+=1
+            if j==nlay+1:
+                i+=1
+                j=0
 
-    plt.figure('Layers_Aniso_Tr')
-    plt.title('Number of Layers versus Anisotropic Layers')
-    plt.xlim([0, nlay])
-    plt.ylim([0, nlay])
-    plt.xlabel('Number of Layers')
-    plt.ylabel('Number of Anisotropic Layers')
-    plt.viridis()
-    plt.pcolor(l)
-    plt.colorbar()
-    plt.plot([0, nlay], [0, nlay], '--r', linewidth=1)
-    # plt.show()
-    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Layers_Aniso_Tr.png',dpi=200)
-    plt.close()
+        plt.figure('Layers_Aniso_Tr')
+        plt.title('Number of Layers versus Anisotropic Layers')
+        plt.xlim([0, nlay])
+        plt.ylim([0, nlay])
+        plt.xlabel('Number of Layers')
+        plt.ylabel('Number of Anisotropic Layers')
+        plt.viridis()
+        plt.pcolor(l)
+        plt.colorbar()
+        plt.plot([0, nlay], [0, nlay], '--r', linewidth=1)
+        # plt.show()
+        plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Layers_Aniso_Tr.png',dpi=200)
+        plt.close()
 
 ############ Posterior #######################
 if Posterior:
@@ -700,77 +703,84 @@ if Posterior:
     ax0.pcolormesh(vsvs,depths,vsvd,cmap='viridis')
 
     # true model overlaid on the posterior (only for synthetic tests)
-    file=open(directory+'/'+'true_model.out','r')
-    lines=file.readlines()
-    file.close()
+    if os.path.isfile(directory+'/'+'true_model.out'):
+        file=open(directory+'/'+'true_model.out','r')
+        lines=file.readlines()
+        file.close()
 
-    true_depth=[]
-    true_vsv=[]
-    true_xi=[]
-    true_vp=[]
-    for line in lines[1:]:
-        data=line.split()
-        true_depth.append(float(data[0]))
-        true_vsv.append(float(data[1]))
+        true_depth=[]
+        true_vsv=[]
+        true_xi=[]
+        true_vp=[]
+        for line in lines[1:]:
+            data=line.split()
+            true_depth.append(float(data[0]))
+            true_vsv.append(float(data[1]))
+            try:
+                true_xi.append(float(data[2]))
+                true_vp.append(float(data[3]))
+                # pass
+            except:
+                pass
+
+        # True models in cyan.
+        true,=ax0.plot(true_vsv,true_depth,c='white',linewidth=1)
         try:
-            true_xi.append(float(data[2]))
-            true_vp.append(float(data[3]))
-            # pass
+            ax1.plot(true_xi,true_depth,c='white',linewidth=1,alpha=1,marker='o',markersize=2,mfc='k')
+            ax2.plot(true_vp,true_depth,c='white',linewidth=1)
+
         except:
             pass
-
-    # True models in cyan.
-    true,=ax0.plot(true_vsv,true_depth,c='white',linewidth=1)
-    try:
-        ax1.plot(true_xi,true_depth,c='white',linewidth=1,alpha=1,marker='o',markersize=2,mfc='k')
-        ax2.plot(true_vp,true_depth,c='white',linewidth=1)
-
-    except:
-        pass
 
     ax2.pcolormesh(vps,depths,vpd,cmap='viridis')
     plt.setp(ax2.get_yticklabels(), visible=False)
 
-    # histogram of depths for layer boundaries
-    file=open(directory+'/'+'Change_points.out','r')
-    lines=file.readlines()
-    file.close()
+    if os.path.isfile(directory+'/'+'Change_points.out'):
+        # histogram of depths for layer boundaries
+        file=open(directory+'/'+'Change_points.out','r')
+        lines=file.readlines()
+        file.close()
 
-    change_depths=[]
-    change_hist=[]
-    for line in lines:
-        data=line.split()
-        change_depths.append(float(data[0]))
-        change_hist.append(float(data[1]))
+        change_depths=[]
+        change_hist=[]
+        for line in lines:
+            data=line.split()
+            change_depths.append(float(data[0]))
+            change_hist.append(float(data[1]))
 
-    ax5.plot(change_hist,change_depths)
+        ax5.plot(change_hist,change_depths)
     ax5.set_title('Change Points')
     ax5.set_xlabel('Frequency',fontsize=10)
 
     # average model overlaid on the posterior (only for synthetic tests)
     # and anisotropy probability
-    file=open(directory+'/'+'Average.out','r')
-    lines=file.readlines()
-    file.close()
 
     depths=[]
     average_vs=[]
     average_xi=[]
     average_vp=[]
     average_probani=[]
-    for line in lines:
-        data=line.split()
-        depths.append(float(data[0]))
-        average_vs.append(float(data[1]))
-        average_xi.append(float(data[2]))
-        average_vp.append(float(data[3]))
-        average_probani.append(float(data[4]))
-    
+
+    if os.path.isfile(directory+'/'+'Average.out'):
+
+        file=open(directory+'/'+'Average.out','r')
+        lines=file.readlines()
+        file.close()
+
+        for line in lines:
+            data=line.split()
+            depths.append(float(data[0]))
+            average_vs.append(float(data[1]))
+            average_xi.append(float(data[2]))
+            average_vp.append(float(data[3]))
+            average_probani.append(float(data[4]))
+        
     # Average models in red.
     ave,=ax0.plot(average_vs,depths,c='r',linewidth=1)
     ax1.plot(average_xi,depths,c='r',linewidth=1)
     ax2.plot(average_vp,depths,c='r',linewidth=1)
     ax4.plot(average_probani,depths,c='k',linewidth=1)
+
     ax4.set_xlabel('Probability',fontsize=10)
     ax4.set_title('Anisotropy')
     ax4.set_xlim([0,100])
@@ -793,9 +803,10 @@ if Posterior:
 
 
 
-
-    plt.legend([true, ave], ['true', 'ave'])
-
+    if os.path.isfile(directory+'/'+'true_model.out'):
+        plt.legend([true, ave], ['true', 'ave'])
+    else:
+        plt.legend([ave], ['ave'])
     fig.suptitle('Posterior and Averages')
 
     # plt.show()
@@ -954,47 +965,51 @@ if Posterior2:
     ax2.plot(vpd_medians,depths,c='b',linewidth=2)
 
     # true model overlaid on the posterior (only for synthetic tests)
-    file=open(directory+'/'+'true_model.out','r')
-    lines=file.readlines()
-    file.close()
+    if os.path.isfile(directory+'/'+'true_model.out'):
+        file=open(directory+'/'+'true_model.out','r')
+        lines=file.readlines()
+        file.close()
 
-    true_depth=[]
-    true_vsv=[]
-    true_xi=[]
-    true_vp=[]
-    for line in lines[1:]:
-        data=line.split()
-        true_depth.append(float(data[0]))
-        true_vsv.append(float(data[1]))
+        true_depth=[]
+        true_vsv=[]
+        true_xi=[]
+        true_vp=[]
+        for line in lines[1:]:
+            data=line.split()
+            true_depth.append(float(data[0]))
+            true_vsv.append(float(data[1]))
+            try:
+                true_xi.append(float(data[2]))
+                true_vp.append(float(data[3]))
+                # pass
+            except:
+                pass
+
+        # True models in cyan.
+        true,=ax0.plot(true_vsv,true_depth,c='k',linewidth=1)
         try:
-            true_xi.append(float(data[2]))
-            true_vp.append(float(data[3]))
-            # pass
+            ax1.plot(true_xi,true_depth,c='k',linewidth=1) # ,alpha=1,marker='o',markersize=2,mfc='k'
+            ax2.plot(true_vp,true_depth,c='k',linewidth=1)
         except:
             pass
-
-    # True models in cyan.
-    true,=ax0.plot(true_vsv,true_depth,c='k',linewidth=1)
-    try:
-        ax1.plot(true_xi,true_depth,c='k',linewidth=1) # ,alpha=1,marker='o',markersize=2,mfc='k'
-        ax2.plot(true_vp,true_depth,c='k',linewidth=1)
-    except:
-        pass
 
     # ax2.pcolormesh(vps,depths,vpd,cmap='viridis')
     plt.setp(ax2.get_yticklabels(), visible=False)
 
-    # histogram of depths for layer boundaries
-    file=open(directory+'/'+'Change_points.out','r')
-    lines=file.readlines()
-    file.close()
-
     change_depths=[]
     change_hist=[]
-    for line in lines:
-        data=line.split()
-        change_depths.append(float(data[0]))
-        change_hist.append(float(data[1]))
+    if os.path.isfile(directory+'/'+'Change_points.out'):
+
+        # histogram of depths for layer boundaries
+        file=open(directory+'/'+'Change_points.out','r')
+        lines=file.readlines()
+        file.close()
+
+
+        for line in lines:
+            data=line.split()
+            change_depths.append(float(data[0]))
+            change_hist.append(float(data[1]))
 
     ax5.plot(change_hist,change_depths)
     ax5.set_title('Change Points')
@@ -1002,22 +1017,24 @@ if Posterior2:
 
     # average model overlaid on the posterior (only for synthetic tests)
     # and anisotropy probability
-    file=open(directory+'/'+'Average.out','r')
-    lines=file.readlines()
-    file.close()
-
     depths=[]
     average_vs=[]
     average_xi=[]
     average_vp=[]
     average_probani=[]
-    for line in lines:
-        data=line.split()
-        depths.append(float(data[0]))
-        average_vs.append(float(data[1]))
-        average_xi.append(float(data[2]))
-        average_vp.append(float(data[3]))
-        average_probani.append(float(data[4]))
+
+    if os.path.isfile(directory+'/'+'Average.out'):
+        file=open(directory+'/'+'Average.out','r')
+        lines=file.readlines()
+        file.close()
+
+        for line in lines:
+            data=line.split()
+            depths.append(float(data[0]))
+            average_vs.append(float(data[1]))
+            average_xi.append(float(data[2]))
+            average_vp.append(float(data[3]))
+            average_probani.append(float(data[4]))
     
     # Average models in red.
     mean,=ax0.plot(average_vs,depths,c='r',linewidth=2)
@@ -1031,8 +1048,10 @@ if Posterior2:
     # Make proxy artists to make the legend work
     q95,=ax0.fill(np.NaN, np.NaN, 'r', alpha=0.15)
     q65,=ax0.fill(np.NaN, np.NaN, 'r', alpha=0.25)
-
-    plt.legend([true, mean, median2, q95, (q95, q65)], ['true', 'mean', 'median', '95% mods.', '65% mods.'],loc='lower right')
+    if os.path.isfile(directory+'/'+'true_model.out'):
+        plt.legend([true, mean, median2, q95, (q95, q65)], ['true', 'mean', 'median', '95% mods.', '65% mods.'],loc='lower right')
+    else:
+        plt.legend([mean, median2, q95, (q95, q65)], ['mean', 'median', '95% mods.', '65% mods.'],loc='lower right')
 
     ax0.annotate('(a)',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=10,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
     ax1.annotate('(b)',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=10,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
@@ -1050,59 +1069,60 @@ if Posterior2:
 #################### histogram of rayleigh uncertainty parameter
 
 if Sigmad:
-    
-    file=open(directory+'/'+'Sigmad_R.out','r')
-    lines=file.readlines()
-    file.close()
+    if os.path.isfile(directory+'/'+'Sigmad_R.out'):
+        file=open(directory+'/'+'Sigmad_R.out','r')
+        lines=file.readlines()
+        file.close()
 
-    data_init=lines[0].split()
-    ad_r_min=float(data_init[0])
-    ad_r_max=float(data_init[1])
-    disa=int(float(data_init[2]))
+        data_init=lines[0].split()
+        ad_r_min=float(data_init[0])
+        ad_r_max=float(data_init[1])
+        disa=int(float(data_init[2]))
 
-    d=[]
-    sigmad_R=[]
-    for line in lines[1:]:
-        data=line.split()
-        d.append(float(data[0]))
-        sigmad_R.append(float(data[1]))
+        d=[]
+        sigmad_R=[]
+        for line in lines[1:]:
+            data=line.split()
+            d.append(float(data[0]))
+            sigmad_R.append(float(data[1]))
 
-    plt.figure('sigmad_R')
-    plt.title('sigmad_R')
-    plt.xlim([ad_r_min, ad_r_max])
-    plt.xlabel('Rayleigh uncertainty parameter')
-    plt.ylabel('Frequency')
-    plt.plot(d,sigmad_R)
-    # plt.show()
-    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Sigmad_R.png',dpi=200)
-    # histogram of love uncertainty parameter
-    file=open(directory+'/'+'Sigmad_L.out','r')
-    lines=file.readlines()
-    file.close()
+        plt.figure('sigmad_R')
+        plt.title('sigmad_R')
+        plt.xlim([ad_r_min, ad_r_max])
+        plt.xlabel('Rayleigh uncertainty parameter')
+        plt.ylabel('Frequency')
+        plt.plot(d,sigmad_R)
+        # plt.show()
+        plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Sigmad_R.png',dpi=200)
+        # histogram of love uncertainty parameter
+        file=open(directory+'/'+'Sigmad_L.out','r')
+        lines=file.readlines()
+        file.close()
 
-    data_init=lines[0].split()
-    ad_l_min=float(data_init[0])
-    ad_l_max=float(data_init[1])
-    disa=int(float(data_init[2]))
+        data_init=lines[0].split()
+        ad_l_min=float(data_init[0])
+        ad_l_max=float(data_init[1])
+        disa=int(float(data_init[2]))
 
-    d=[]
-    sigmad_L=[]
-    for line in lines[1:]:
-        data=line.split()
-        d.append(float(data[0]))
-        sigmad_L.append(float(data[1]))
+        d=[]
+        sigmad_L=[]
+        for line in lines[1:]:
+            data=line.split()
+            d.append(float(data[0]))
+            sigmad_L.append(float(data[1]))
 
-    plt.figure('sigmad_L')
-    plt.title('sigmad_L')
-    plt.xlim([ad_l_min, ad_l_max])
-    plt.xlabel('Love uncertainty parameter')
-    plt.ylabel('Frequency')
-    plt.plot(d,sigmad_L)
-    # plt.show()
-    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Sigmad_L.png',dpi=200)
-    plt.close()
+        plt.figure('sigmad_L')
+        plt.title('sigmad_L')
+        plt.xlim([ad_l_min, ad_l_max])
+        plt.xlabel('Love uncertainty parameter')
+        plt.ylabel('Frequency')
+        plt.plot(d,sigmad_L)
+        # plt.show()
+        plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Sigmad_L.png',dpi=200)
+        plt.close()
 
     if os.path.isfile(directory+'/'+'Sigmad_PsPp.out'):
+        
         # histogram of PsPp uncertainty parameter
         file=open(directory+'/'+'Sigmad_PsPp.out','r')
         lines=file.readlines()
@@ -1134,228 +1154,233 @@ if Sigmad:
 #################################### CONVERGENCE #################################
 
 if Convergence:
-    ############### misfit change over time, for one core and average over all cores #################
-    file=open(directory+'/'+'Convergence_misfit.out','r')
-    lines=file.readlines()
-    file.close()
+    if os.path.isfile(directory+'/'+'Convergence_misfit.out'):
 
-    burn_in=int(lines[0].split()[0])
-    nsample=int(lines[0].split()[1])
+        ############### misfit change over time, for one core and average over all cores #################
+        file=open(directory+'/'+'Convergence_misfit.out','r')
+        lines=file.readlines()
+        file.close()
 
-    conv_R_one=[]
-    conv_R=[]
-    conv_L_one=[]
-    conv_L=[]
-    conv_PsPp_one=[]
-    conv_PsPp=[]
-    for line in lines[1:]:
-        data=line.split()
-        conv_R_one.append(float(data[0]))
-        conv_R.append(float(data[1]))
-        conv_L_one.append(float(data[2]))
-        conv_L.append(float(data[3]))
+        burn_in=int(lines[0].split()[0])
+        nsample=int(lines[0].split()[1])
+
+        conv_R_one=[]
+        conv_R=[]
+        conv_L_one=[]
+        conv_L=[]
+        conv_PsPp_one=[]
+        conv_PsPp=[]
+        for line in lines[1:]:
+            data=line.split()
+            conv_R_one.append(float(data[0]))
+            conv_R.append(float(data[1]))
+            conv_L_one.append(float(data[2]))
+            conv_L.append(float(data[3]))
+            try:
+                conv_PsPp_one.append(float(data[4]))
+                conv_PsPp.append(float(data[5]))
+            except:
+                pass        
+                
+
+
+        plt.figure('convergence_misfit')
+        plt.title('Misfit Convergence')
+
+        plt.plot(conv_R_one[burn_in:],label='Rayleigh, one core')
+        plt.plot(conv_R[burn_in:],label='Rayleigh, all cores')
+        plt.plot(conv_L_one[burn_in:],label='Love, one core')
+        plt.plot(conv_L[burn_in:],label='Love, all cores')
         try:
-            conv_PsPp_one.append(float(data[4]))
-            conv_PsPp.append(float(data[5]))
+            plt.plot(conv_PsPp_one[burn_in:],label='PsPp, one core')
+            plt.plot(conv_PsPp[burn_in:],label='PsPp, all cores')
         except:
-            pass        
-            
+            pass
+        plt.xlim([0,nsample])
+        plt.xlabel('Iteration number')
+        plt.ylabel('Misfit')
+        plt.legend()
+        # plt.show()
+        plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_misfit.png',dpi=200)
+        plt.close()
+        
+        ############### number of layers over time, for one core and average over all cores ###############
+        file=open(directory+'/'+'Convergence_nb_layers.out','r')
+        lines=file.readlines()
+        file.close()
+
+        burn_in=int(lines[0].split()[0])
+        nsample=int(lines[0].split()[1])
+
+        conv_n_one=[]
+        conv_n=[]
+        for line in lines[1:]:
+            data=line.split()
+            conv_n_one.append(float(data[0]))
+            conv_n.append(float(data[1]))
+
+        plt.figure('convergence_nlayers')
+        plt.title('Number of Layers Convergence')
+        plt.plot(conv_n_one[burn_in:],label='nblayers, one core')
+        plt.plot(conv_n[burn_in:],label='nblayers, all cores')
+        plt.xlabel('Iteration number')
+        plt.ylabel('Number of Layers')
+        plt.xlim([0,nsample])
+        plt.legend()
+        # plt.show()
+        plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_layers.png',dpi=200)
+        plt.close()
 
 
-    plt.figure('convergence_misfit')
-    plt.title('Misfit Convergence')
+        ################ rayleigh uncertainty parameter over time, for one core and average over all cores ###############
+        file=open(directory+'/'+'Convergence_sigma_R.out','r')
+        lines=file.readlines()
+        file.close()
 
-    plt.plot(conv_R_one[burn_in:],label='Rayleigh, one core')
-    plt.plot(conv_R[burn_in:],label='Rayleigh, all cores')
-    plt.plot(conv_L_one[burn_in:],label='Love, one core')
-    plt.plot(conv_L[burn_in:],label='Love, all cores')
-    try:
-        plt.plot(conv_PsPp_one[burn_in:],label='PsPp, one core')
-        plt.plot(conv_PsPp[burn_in:],label='PsPp, all cores')
-    except:
-        pass
-    plt.xlim([0,nsample])
-    plt.xlabel('Iteration number')
-    plt.ylabel('Misfit')
-    plt.legend()
-    # plt.show()
-    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_misfit.png',dpi=200)
-    plt.close()
-    
-    ############### number of layers over time, for one core and average over all cores ###############
-    file=open(directory+'/'+'Convergence_nb_layers.out','r')
-    lines=file.readlines()
-    file.close()
+        burn_in=int(lines[0].split()[0])
+        nsample=int(lines[0].split()[1])
 
-    burn_in=int(lines[0].split()[0])
-    nsample=int(lines[0].split()[1])
+        conv_sigmaR_one=[]
+        conv_sigmaR=[]
+        for line in lines[1:]:
+            data=line.split()
+            conv_sigmaR_one.append(float(data[0]))
+            conv_sigmaR.append(float(data[1]))
 
-    conv_n_one=[]
-    conv_n=[]
-    for line in lines[1:]:
-        data=line.split()
-        conv_n_one.append(float(data[0]))
-        conv_n.append(float(data[1]))
+        plt.figure('convergence_sigmaR')
+        plt.title('sigmaR convergence')
+        plt.plot(conv_sigmaR_one[burn_in:],label='sigmaR, one core')
+        plt.plot(conv_sigmaR[burn_in:],label='sigmaR, all cores')
+        plt.xlabel('Iteration number')
+        plt.ylabel('sigmaR')
+        plt.xlim([0,nsample])
+        plt.legend()
+        # plt.show()
+        plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_sigma_R.png',dpi=200)
+        plt.close()
 
-    plt.figure('convergence_nlayers')
-    plt.title('Number of Layers Convergence')
-    plt.plot(conv_n_one[burn_in:],label='nblayers, one core')
-    plt.plot(conv_n[burn_in:],label='nblayers, all cores')
-    plt.xlabel('Iteration number')
-    plt.ylabel('Number of Layers')
-    plt.xlim([0,nsample])
-    plt.legend()
-    # plt.show()
-    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_layers.png',dpi=200)
-    plt.close()
+        ################ love uncertainty parameter over time, for one core and average over all cores ###############
+        file=open(directory+'/'+'Convergence_sigma_L.out','r')
+        lines=file.readlines()
+        file.close()
 
+        burn_in=int(lines[0].split()[0])
+        nsample=int(lines[0].split()[1])
 
-    ################ rayleigh uncertainty parameter over time, for one core and average over all cores ###############
-    file=open(directory+'/'+'Convergence_sigma_R.out','r')
-    lines=file.readlines()
-    file.close()
+        conv_sigmaL_one=[]
+        conv_sigmaL=[]
+        for line in lines[1:]:
+            data=line.split()
+            conv_sigmaL_one.append(float(data[0]))
+            conv_sigmaL.append(float(data[1]))
 
-    burn_in=int(lines[0].split()[0])
-    nsample=int(lines[0].split()[1])
-
-    conv_sigmaR_one=[]
-    conv_sigmaR=[]
-    for line in lines[1:]:
-        data=line.split()
-        conv_sigmaR_one.append(float(data[0]))
-        conv_sigmaR.append(float(data[1]))
-
-    plt.figure('convergence_sigmaR')
-    plt.title('sigmaR convergence')
-    plt.plot(conv_sigmaR_one[burn_in:],label='sigmaR, one core')
-    plt.plot(conv_sigmaR[burn_in:],label='sigmaR, all cores')
-    plt.xlabel('Iteration number')
-    plt.ylabel('sigmaR')
-    plt.xlim([0,nsample])
-    plt.legend()
-    # plt.show()
-    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_sigma_R.png',dpi=200)
-    plt.close()
-
-    ################ love uncertainty parameter over time, for one core and average over all cores ###############
-    file=open(directory+'/'+'Convergence_sigma_L.out','r')
-    lines=file.readlines()
-    file.close()
-
-    burn_in=int(lines[0].split()[0])
-    nsample=int(lines[0].split()[1])
-
-    conv_sigmaL_one=[]
-    conv_sigmaL=[]
-    for line in lines[1:]:
-        data=line.split()
-        conv_sigmaL_one.append(float(data[0]))
-        conv_sigmaL.append(float(data[1]))
-
-    plt.figure('convergence_sigmaL')
-    plt.title('sigmaL convergence')
-    plt.plot(conv_sigmaL_one[burn_in:],label='sigmaL, one core')
-    plt.plot(conv_sigmaL[burn_in:],label='sigmaL, all cores')
-    plt.xlabel('Iteration number')
-    plt.ylabel('sigmaL')
-    plt.xlim([0,nsample])
-    plt.legend()
-    # plt.show()
-    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_sigma_L.png',dpi=200)
-    plt.close()
+        plt.figure('convergence_sigmaL')
+        plt.title('sigmaL convergence')
+        plt.plot(conv_sigmaL_one[burn_in:],label='sigmaL, one core')
+        plt.plot(conv_sigmaL[burn_in:],label='sigmaL, all cores')
+        plt.xlabel('Iteration number')
+        plt.ylabel('sigmaL')
+        plt.xlim([0,nsample])
+        plt.legend()
+        # plt.show()
+        plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_sigma_L.png',dpi=200)
+        plt.close()
 
     ################ acceptance rates for birth of isotropic and anisotropic layers over time, for one core and average over all cores ###############
-    file=open(directory+'/'+'Convergence_Birth.out','r')
-    lines=file.readlines()
-    file.close()
+    if os.path.isfile(directory+'/'+'Convergence_Birth.out'):
+        file=open(directory+'/'+'Convergence_Birth.out','r')
+        lines=file.readlines()
+        file.close()
 
-    burn_in=int(lines[0].split()[0])
-    nsample=int(lines[0].split()[1])
+        burn_in=int(lines[0].split()[0])
+        nsample=int(lines[0].split()[1])
 
-    convB_one=[]
-    convB=[]
-    convBa_one=[]
-    convBa=[]
-    for line in lines[1:]:
-        data=line.split()
-        convB_one.append(float(data[0]))
-        convB.append(float(data[1]))
-        convBa_one.append(float(data[2]))
-        convBa.append(float(data[3]))
+        convB_one=[]
+        convB=[]
+        convBa_one=[]
+        convBa=[]
+        for line in lines[1:]:
+            data=line.split()
+            convB_one.append(float(data[0]))
+            convB.append(float(data[1]))
+            convBa_one.append(float(data[2]))
+            convBa.append(float(data[3]))
 
-    plt.figure('convergence_birth')
-    plt.title('Birth Rate Convergence')
-    plt.plot(convB_one[burn_in:],label='birth, one core')
-    plt.plot(convB[burn_in:],label='birth, all cores')
-    plt.plot(convBa_one[burn_in:],label='birth anisotropic, one core')
-    plt.plot(convBa[burn_in:],label='birth anisotropic, all cores')
-    plt.xlabel('Iteration number')
-    plt.ylabel('XXX')
-    plt.xlim([0,nsample])
-    plt.legend()
-    # plt.show()
-    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_Birth.png',dpi=200)
-    plt.close()
+        plt.figure('convergence_birth')
+        plt.title('Birth Rate Convergence')
+        plt.plot(convB_one[burn_in:],label='birth, one core')
+        plt.plot(convB[burn_in:],label='birth, all cores')
+        plt.plot(convBa_one[burn_in:],label='birth anisotropic, one core')
+        plt.plot(convBa[burn_in:],label='birth anisotropic, all cores')
+        plt.xlabel('Iteration number')
+        plt.ylabel('XXX')
+        plt.xlim([0,nsample])
+        plt.legend()
+        # plt.show()
+        plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_Birth.png',dpi=200)
+        plt.close()
 
     ################ acceptance rates for death of isotropic and anisotropic layers over time, for one core and average over all cores ###############
-    file=open(directory+'/'+'Convergence_Death.out','r')
-    lines=file.readlines()
-    file.close()
+    if os.path.isfile(directory+'/'+'Convergence_Death.out'):
+        file=open(directory+'/'+'Convergence_Death.out','r')
+        lines=file.readlines()
+        file.close()
 
-    burn_in=int(lines[0].split()[0])
-    nsample=int(lines[0].split()[1])
+        burn_in=int(lines[0].split()[0])
+        nsample=int(lines[0].split()[1])
 
-    convD_one=[]
-    convD=[]
-    convDa_one=[]
-    convDa=[]
-    for line in lines[1:]:
-        data=line.split()
-        convD_one.append(float(data[0]))
-        convD.append(float(data[1]))
-        convDa_one.append(float(data[2]))
-        convDa.append(float(data[3]))
+        convD_one=[]
+        convD=[]
+        convDa_one=[]
+        convDa=[]
+        for line in lines[1:]:
+            data=line.split()
+            convD_one.append(float(data[0]))
+            convD.append(float(data[1]))
+            convDa_one.append(float(data[2]))
+            convDa.append(float(data[3]))
 
-    plt.figure('convergence_death')
-    plt.title('Death Rate Convergence')
-    plt.plot(convD_one[burn_in:],label='death, one core')
-    plt.plot(convD[burn_in:],label='death, all cores')
-    plt.plot(convDa_one[burn_in:],label='death anisotropic, one core')
-    plt.plot(convDa[burn_in:],label='death anisotropic, all cores')
-    plt.xlabel('Iteration number')
-    plt.ylabel('XXX')
-    plt.xlim([0,nsample])
-    plt.legend()
-    # plt.show()
-    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_Death.png',dpi=200)
-    plt.close()
+        plt.figure('convergence_death')
+        plt.title('Death Rate Convergence')
+        plt.plot(convD_one[burn_in:],label='death, one core')
+        plt.plot(convD[burn_in:],label='death, all cores')
+        plt.plot(convDa_one[burn_in:],label='death anisotropic, one core')
+        plt.plot(convDa[burn_in:],label='death anisotropic, all cores')
+        plt.xlabel('Iteration number')
+        plt.ylabel('XXX')
+        plt.xlim([0,nsample])
+        plt.legend()
+        # plt.show()
+        plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_Death.png',dpi=200)
+        plt.close()
 
     ################ ####################################################### ###############
-    file=open(directory+'/'+'Convergence_xi.out','r')
-    lines=file.readlines()
-    file.close()
+    if os.path.isfile(directory+'/'+'Convergence_xi.out'):
+        file=open(directory+'/'+'Convergence_xi.out','r')
+        lines=file.readlines()
+        file.close()
 
-    burn_in=int(lines[0].split()[0])
-    nsample=int(lines[0].split()[1])
+        burn_in=int(lines[0].split()[0])
+        nsample=int(lines[0].split()[1])
 
-    convP_one=[]
-    convP=[]
-    for line in lines[1:]:
-        data=line.split()
-        convP_one.append(float(data[0]))
-        convP.append(float(data[1]))
+        convP_one=[]
+        convP=[]
+        for line in lines[1:]:
+            data=line.split()
+            convP_one.append(float(data[0]))
+            convP.append(float(data[1]))
 
-    plt.figure('convergence_xi')
-    plt.title('Anisotropy Change Rate Convergence')
-    plt.plot(convP_one[burn_in:],label='xi change, one core')
-    plt.plot(convP[burn_in:],label='xi change, all cores')
-    plt.xlabel('Iteration number')
-    plt.ylabel('XXX')
-    plt.xlim([0,nsample])
-    plt.legend()
-    # plt.show()
-    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_xi.png',dpi=200)
-    plt.close()
+        plt.figure('convergence_xi')
+        plt.title('Anisotropy Change Rate Convergence')
+        plt.plot(convP_one[burn_in:],label='xi change, one core')
+        plt.plot(convP[burn_in:],label='xi change, all cores')
+        plt.xlabel('Iteration number')
+        plt.ylabel('XXX')
+        plt.xlim([0,nsample])
+        plt.legend()
+        # plt.show()
+        plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_xi.png',dpi=200)
+        plt.close()
 
     ################ #######################################################s ###############
     if os.path.isfile(directory+'/'+'Convergence_vp.out'):
@@ -1389,58 +1414,61 @@ if Convergence:
 
     
     ################ ####################################################### ###############
-    file=open(directory+'/'+'Convergence_vs.out','r')
-    lines=file.readlines()
-    file.close()
+    if os.path.isfile(directory+'/'+'Convergence_vs.out'):
+        file=open(directory+'/'+'Convergence_vs.out','r')
+        lines=file.readlines()
+        file.close()
 
-    burn_in=int(lines[0].split()[0])
-    nsample=int(lines[0].split()[1])
+        burn_in=int(lines[0].split()[0])
+        nsample=int(lines[0].split()[1])
 
-    convsv1_one=[]
-    convsv1=[]
-    for line in lines[1:]:
-        data=line.split()
-        convsv1_one.append(float(data[0]))
-        convsv1.append(float(data[1]))
+        convsv1_one=[]
+        convsv1=[]
+        for line in lines[1:]:
+            data=line.split()
+            convsv1_one.append(float(data[0]))
+            convsv1.append(float(data[1]))
 
-    plt.figure('convergence_vs')
-    plt.title('Vsv Change Rate Convergence, upper half')
-    plt.plot(convsv1_one[burn_in:],label='vsv change upper half, one core')
-    plt.plot(convsv1[burn_in:],label='vsv change upper half, all cores')
-    plt.xlabel('Iteration number')
-    plt.ylabel('XXX')
-    plt.xlim([0,nsample])
-    plt.legend()
-    # plt.show()
-    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_vs.png',dpi=200)
-    plt.close()
+        plt.figure('convergence_vs')
+        plt.title('Vsv Change Rate Convergence, upper half')
+        plt.plot(convsv1_one[burn_in:],label='vsv change upper half, one core')
+        plt.plot(convsv1[burn_in:],label='vsv change upper half, all cores')
+        plt.xlabel('Iteration number')
+        plt.ylabel('XXX')
+        plt.xlim([0,nsample])
+        plt.legend()
+        # plt.show()
+        plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_vs.png',dpi=200)
+        plt.close()
 
     ############################################################################
-    file=open(directory+'/'+'Convergence_dp.out','r')
-    lines=file.readlines()
-    file.close()
+    if os.path.isfile(directory+'/'+'Convergence_dp.out'):
 
-    burn_in=int(lines[0].split()[0])
-    nsample=int(lines[0].split()[1])
+        file=open(directory+'/'+'Convergence_dp.out','r')
+        lines=file.readlines()
+        file.close()
 
-    condp1_one=[]
-    condp1=[]
-    for line in lines[1:]:
-        data=line.split()
-        condp1_one.append(float(data[0]))
-        condp1.append(float(data[1]))
+        burn_in=int(lines[0].split()[0])
+        nsample=int(lines[0].split()[1])
 
-    plt.figure('convergence_dp')
-    plt.title('Depth Change Rate Convergence, upper half')
-    plt.plot(condp1_one[burn_in:],label='depth change upper half, one core')
-    plt.plot(condp1[burn_in:],label='depth change upper half, all cores')
-    plt.xlabel('Iteration number')
-    plt.ylabel('XXX')
-    plt.xlim([0,nsample])
-    plt.legend()
-    # plt.show()
-    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_dp.png',dpi=200)
-    plt.close()
+        condp1_one=[]
+        condp1=[]
+        for line in lines[1:]:
+            data=line.split()
+            condp1_one.append(float(data[0]))
+            condp1.append(float(data[1]))
+
+        plt.figure('convergence_dp')
+        plt.title('Depth Change Rate Convergence, upper half')
+        plt.plot(condp1_one[burn_in:],label='depth change upper half, one core')
+        plt.plot(condp1[burn_in:],label='depth change upper half, all cores')
+        plt.xlabel('Iteration number')
+        plt.ylabel('XXX')
+        plt.xlim([0,nsample])
+        plt.legend()
+        # plt.show()
+        plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Convergence_dp.png',dpi=200)
+        plt.close()
 
 
 
@@ -1477,114 +1505,115 @@ if Convergence:
 
 ################################# Average dispersion curves ################################################
 if Dispersion:
-    file=open(directory+'/'+'Dispersion_mean.out','r')
-    lines=file.readlines()
-    file.close()
+    if os.path.isfile(directory+'/'+'Dispersion_mean.out'):
+        file=open(directory+'/'+'Dispersion_mean.out','r')
+        lines=file.readlines()
+        file.close()
 
-    ndatad_R=int(lines[0].split()[0])
-    ndatad_L=int(lines[0].split()[1])
+        ndatad_R=int(lines[0].split()[0])
+        ndatad_L=int(lines[0].split()[1])
 
-    period_R=[]
-    n_R=[]
-    c_R=[]
-    dc_R=[]
-    for line in lines[1:ndatad_R+1]:
-        data=line.split()
-        period_R.append(float(data[0]))
-        n_R.append(int(float(data[1])))
-        c_R.append(float(data[2]))
-        dc_R.append(float(data[3]))
+        period_R=[]
+        n_R=[]
+        c_R=[]
+        dc_R=[]
+        for line in lines[1:ndatad_R+1]:
+            data=line.split()
+            period_R.append(float(data[0]))
+            n_R.append(int(float(data[1])))
+            c_R.append(float(data[2]))
+            dc_R.append(float(data[3]))
 
-    period_L=[]
-    n_L=[]
-    c_L=[]
-    dc_L=[]
-    for line in lines[ndatad_R+1:]:
-        data=line.split()
-        period_L.append(float(data[0]))
-        n_L.append(int(float(data[1])))
-        c_L.append(float(data[2]))
-        dc_L.append(float(data[3]))
+        period_L=[]
+        n_L=[]
+        c_L=[]
+        dc_L=[]
+        for line in lines[ndatad_R+1:]:
+            data=line.split()
+            period_L.append(float(data[0]))
+            n_L.append(int(float(data[1])))
+            c_L.append(float(data[2]))
+            dc_L.append(float(data[3]))
 
-    # true dispersion curves (data)
-    file=open(directory+'/'+'Dispersion_obs.out','r')
-    lines=file.readlines()
-    file.close()
+        # true dispersion curves (data)
+        file=open(directory+'/'+'Dispersion_obs.out','r')
+        lines=file.readlines()
+        file.close()
 
-    ndatad_R=int(lines[0].split()[0])
-    ndatad_L=int(lines[0].split()[1])
+        ndatad_R=int(lines[0].split()[0])
+        ndatad_L=int(lines[0].split()[1])
 
-    period_R_obs=[]
-    n_R_obs=[]
-    c_R_obs=[]
-    dc_R_obs=[]
-    for line in lines[1:ndatad_R+1]:
-        data=line.split()
-        period_R_obs.append(float(data[0]))
-        n_R_obs.append(int(float(data[1])))
-        c_R_obs.append(float(data[2]))
-        dc_R_obs.append(float(data[3]))
+        period_R_obs=[]
+        n_R_obs=[]
+        c_R_obs=[]
+        dc_R_obs=[]
+        for line in lines[1:ndatad_R+1]:
+            data=line.split()
+            period_R_obs.append(float(data[0]))
+            n_R_obs.append(int(float(data[1])))
+            c_R_obs.append(float(data[2]))
+            dc_R_obs.append(float(data[3]))
 
-    period_L_obs=[]
-    n_L_obs=[]
-    c_L_obs=[]
-    dc_L_obs=[]
-    for line in lines[ndatad_R+1:]:
-        data=line.split()
-        period_L_obs.append(float(data[0]))
-        n_L_obs.append(int(float(data[1])))
-        c_L_obs.append(float(data[2]))
-        dc_L_obs.append(float(data[3]))
+        period_L_obs=[]
+        n_L_obs=[]
+        c_L_obs=[]
+        dc_L_obs=[]
+        for line in lines[ndatad_R+1:]:
+            data=line.split()
+            period_L_obs.append(float(data[0]))
+            n_L_obs.append(int(float(data[1])))
+            c_L_obs.append(float(data[2]))
+            dc_L_obs.append(float(data[3]))
 
-    Modes_R=np.unique(n_R)
-    Modes_L=np.unique(n_L)
+        Modes_R=np.unique(n_R)
+        Modes_L=np.unique(n_L)
 
-    plt.figure('dispersion')
+        plt.figure('dispersion')
 
-    if len(Modes_R)>0:
-        for R_mode in Modes_R:
-            ave_R='ave_R_'+str(R_mode)
-            obs_R='obs_R_'+str(R_mode)
-            # print(ave_R)
-            ind=np.where(n_R==R_mode)
-            ave_R=plt.errorbar(np.array(period_R)[ind[0]],np.array(c_R)[ind[0]],yerr=np.array(dc_R)[ind[0]],marker='o',zorder=0,label='Rayleigh average',mfc='blue',mec='blue', c='blue')
-            obs_R=plt.errorbar(np.array(period_R_obs)[ind[0]]-0.1,np.array(c_R_obs)[ind[0]],yerr=np.array(dc_R_obs)[ind[0]],marker='o',zorder=0,label='Rayleigh observed',mfc='limegreen',mec='limegreen', c='limegreen')
+        if len(Modes_R)>0:
+            for R_mode in Modes_R:
+                ave_R='ave_R_'+str(R_mode)
+                obs_R='obs_R_'+str(R_mode)
+                # print(ave_R)
+                ind=np.where(n_R==R_mode)
+                ave_R=plt.errorbar(np.array(period_R)[ind[0]],np.array(c_R)[ind[0]],yerr=np.array(dc_R)[ind[0]],marker='o',zorder=0,label='Rayleigh average',mfc='blue',mec='blue', c='blue')
+                obs_R=plt.errorbar(np.array(period_R_obs)[ind[0]]-0.1,np.array(c_R_obs)[ind[0]],yerr=np.array(dc_R_obs)[ind[0]],marker='o',zorder=0,label='Rayleigh observed',mfc='limegreen',mec='limegreen', c='limegreen')
 
-    if len(Modes_L)>0:
-        for L_mode in Modes_L:
-            ave_L='ave_L_'+str(L_mode)
-            obs_L='obs_L_'+str(L_mode)
-            # print(ave_L)
-            ind=np.where(n_L==L_mode)
-            ave_L=plt.errorbar(np.array(period_L)[ind[0]]+0.1,np.array(c_L)[ind[0]],yerr=np.array(dc_L)[ind[0]],marker='o',zorder=0,label='Love average',mfc='orange',mec='orange', c='orange')
-            obs_L=plt.errorbar(np.array(period_L_obs)[ind[0]]+0.2,np.array(c_L_obs)[ind[0]],yerr=np.array(dc_L_obs)[ind[0]],marker='o',zorder=0,label='Love observed',mfc='red',mec='red', c='red')
+        if len(Modes_L)>0:
+            for L_mode in Modes_L:
+                ave_L='ave_L_'+str(L_mode)
+                obs_L='obs_L_'+str(L_mode)
+                # print(ave_L)
+                ind=np.where(n_L==L_mode)
+                ave_L=plt.errorbar(np.array(period_L)[ind[0]]+0.1,np.array(c_L)[ind[0]],yerr=np.array(dc_L)[ind[0]],marker='o',zorder=0,label='Love average',mfc='orange',mec='orange', c='orange')
+                obs_L=plt.errorbar(np.array(period_L_obs)[ind[0]]+0.2,np.array(c_L_obs)[ind[0]],yerr=np.array(dc_L_obs)[ind[0]],marker='o',zorder=0,label='Love observed',mfc='red',mec='red', c='red')
 
 
-    # plt.errorbar(np.array(period_R),c_R,yerr=dc_R,marker='o',zorder=0,label='Rayleigh average')
-    # plt.errorbar(np.array(period_L)+0.1,c_L,yerr=dc_L,marker='o',zorder=0,label='Love average')
-    # plt.errorbar(np.array(period_R_obs)-0.1,c_R_obs,yerr=dc_R_obs,marker='o',zorder=0,label='Rayleigh observed')
-    # plt.errorbar(np.array(period_L_obs)+0.2,c_L_obs,yerr=dc_L_obs,marker='o',zorder=0,label='Love observed')
-    # plt.legend()
-    
-    if len(Modes_R)>0 and len(Modes_L)>0:
-        plt.legend([ave_R, obs_R, ave_L, obs_L], ['Rayleigh average', 'Rayleigh observed', 'Love average', 'Love observed'])
-    elif len(Modes_R)>0 and len(Modes_L)==0:
-        plt.legend([ave_R, obs_R], ['Rayleigh average', 'Rayleigh observed'])
-    elif len(Modes_R)==0 and len(Modes_L)>0:
-        plt.legend([ave_L, obs_L], ['Love average', 'Love observed'])
+        # plt.errorbar(np.array(period_R),c_R,yerr=dc_R,marker='o',zorder=0,label='Rayleigh average')
+        # plt.errorbar(np.array(period_L)+0.1,c_L,yerr=dc_L,marker='o',zorder=0,label='Love average')
+        # plt.errorbar(np.array(period_R_obs)-0.1,c_R_obs,yerr=dc_R_obs,marker='o',zorder=0,label='Rayleigh observed')
+        # plt.errorbar(np.array(period_L_obs)+0.2,c_L_obs,yerr=dc_L_obs,marker='o',zorder=0,label='Love observed')
+        # plt.legend()
+        
+        if len(Modes_R)>0 and len(Modes_L)>0:
+            plt.legend([ave_R, obs_R, ave_L, obs_L], ['Rayleigh average', 'Rayleigh observed', 'Love average', 'Love observed'])
+        elif len(Modes_R)>0 and len(Modes_L)==0:
+            plt.legend([ave_R, obs_R], ['Rayleigh average', 'Rayleigh observed'])
+        elif len(Modes_R)==0 and len(Modes_L)>0:
+            plt.legend([ave_L, obs_L], ['Love average', 'Love observed'])
 
-    
-    # plt.xlim([40,360])
-    plt.ylim([2.5,9.5])
-    plt.xlabel('Period (s)')
-    plt.ylabel('Phase Velocity (m/s)')
-    plt.title('Compare Dispersion Curves')
+        
+        # plt.xlim([40,360])
+        plt.ylim([2.5,9.5])
+        plt.xlabel('Period (s)')
+        plt.ylabel('Phase Velocity (m/s)')
+        plt.title('Compare Dispersion Curves')
 
-    plt.xlim([np.min(period_R+period_L),np.max(period_R+period_L)])
+        plt.xlim([np.min(period_R+period_L),np.max(period_R+period_L)])
 
-    # plt.show()
-    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Dispersion.png',dpi=200)
-    plt.close()
+        # plt.show()
+        plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Dispersion.png',dpi=200)
+        plt.close()
 
 
 ################################# Average PsPp Fit ################################################
@@ -1660,10 +1689,10 @@ if PsPp_Fit:
 
 
 if Corr_Hist:
-    if os.path.isfile(directory+'/'+'Posterior_corr_100_200.json'):
+    if os.path.isfile(directory+'/'+'Posterior_corr.json'):
         print('Posterior Correlation file present')
         
-        with open(directory+'/'+'Posterior_corr_100_200.json') as data_file:
+        with open(directory+'/'+'Posterior_corr.json') as data_file:
             corrs = json.load(data_file)
 
         nsample  = int(corrs['params_inversion']['nsample'])
@@ -2033,72 +2062,72 @@ if Corr_Hist:
         Modes='fund'
         # Modes='over'
 
-        ########################### Add PREM to plot #########################################
-        if os.path.isfile('/Users/alistair/Google_Drive/Lyon_Pdoc/PREM_4_MINEOS/PREM_corr.json'):
-            print('Adding PREM as Green circle') # o, g
-            with open('/Users/alistair/Google_Drive/Lyon_Pdoc/PREM_4_MINEOS/PREM_corr.json') as data_file:
-                PREM_corr = json.load(data_file)
-            corr_name='corr_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)
-            PREM_p1_p2 = np.array(PREM_corr['stack'][str(av_int)][str(corr_name)])
-            print(PREM_p1_p2[0])
-            axCorr.plot(PREM_p1_p2[0][1],PREM_p1_p2[0][0],c='g',marker='o',markersize=5,linewidth=1, alpha=1)
-        ########################### Add AK135 to plot #########################################
-        if os.path.isfile('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/AK135sph_corr.json'):
-            print('Adding AK135 as Grey triangle') # t, g
-            with open('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/AK135sph_corr.json') as data_file:
-                AK135_corr = json.load(data_file)
-            corr_name='corr_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)
-            AK135_p1_p2 = np.array(AK135_corr['stack'][str(av_int)][str(corr_name)])
-            print(AK135_p1_p2[0])
-            axCorr.plot(AK135_p1_p2[0][1],AK135_p1_p2[0][0],c='gray',marker='^',markersize=5,linewidth=1, alpha=1)
+        # ########################### Add PREM to plot #########################################
+        # if os.path.isfile('/Users/alistair/Google_Drive/Lyon_Pdoc/PREM_4_MINEOS/PREM_corr.json'):
+        #     print('Adding PREM as Green circle') # o, g
+        #     with open('/Users/alistair/Google_Drive/Lyon_Pdoc/PREM_4_MINEOS/PREM_corr.json') as data_file:
+        #         PREM_corr = json.load(data_file)
+        #     corr_name='corr_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)
+        #     PREM_p1_p2 = np.array(PREM_corr['stack'][str(av_int)][str(corr_name)])
+        #     print(PREM_p1_p2[0])
+        #     axCorr.plot(PREM_p1_p2[0][1],PREM_p1_p2[0][0],c='g',marker='o',markersize=5,linewidth=1, alpha=1)
+        # ########################### Add AK135 to plot #########################################
+        # if os.path.isfile('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/AK135sph_corr.json'):
+        #     print('Adding AK135 as Grey triangle') # t, g
+        #     with open('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/AK135sph_corr.json') as data_file:
+        #         AK135_corr = json.load(data_file)
+        #     corr_name='corr_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)
+        #     AK135_p1_p2 = np.array(AK135_corr['stack'][str(av_int)][str(corr_name)])
+        #     print(AK135_p1_p2[0])
+        #     axCorr.plot(AK135_p1_p2[0][1],AK135_p1_p2[0][0],c='gray',marker='^',markersize=5,linewidth=1, alpha=1)
 
-        if os.path.isfile('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/RM_ak135_corr.json'):
-            print('Adding AK135 inversion as Grey inverted triangle') # t, g
-            with open('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/RM_ak135_corr.json') as data_file:
-                AK135_corr = json.load(data_file)
-            corr_name='corr_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)
-            AK135_p1_p2 = np.array(AK135_corr['stack'][str(av_int)][str(corr_name)])
-            print(AK135_p1_p2[0])
-            axCorr.plot(AK135_p1_p2[0][1],AK135_p1_p2[0][0],c='gray',marker='v',markersize=5,linewidth=1, alpha=1)
+        # if os.path.isfile('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/RM_ak135_corr.json'):
+        #     print('Adding AK135 inversion as Grey inverted triangle') # t, g
+        #     with open('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/RM_ak135_corr.json') as data_file:
+        #         AK135_corr = json.load(data_file)
+        #     corr_name='corr_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)
+        #     AK135_p1_p2 = np.array(AK135_corr['stack'][str(av_int)][str(corr_name)])
+        #     print(AK135_p1_p2[0])
+        #     axCorr.plot(AK135_p1_p2[0][1],AK135_p1_p2[0][0],c='gray',marker='v',markersize=5,linewidth=1, alpha=1)
 
 
-        ########################### Add Craton to plot #########################################
-        if os.path.isfile('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/AK135_craton_corr.json'):
-            print('Adding AK135_craton input as blue triangle') # t, b
-            with open('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/AK135_craton_corr.json') as data_file:
-                AK135_corr = json.load(data_file)
-            corr_name='corr_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)
-            AK135_p1_p2 = np.array(AK135_corr['stack'][str(av_int)][str(corr_name)])
-            print(AK135_p1_p2[0])
-            axCorr.plot(AK135_p1_p2[0][1],AK135_p1_p2[0][0],c='b',marker='^',markersize=5,linewidth=1, alpha=1)
+        # ########################### Add Craton to plot #########################################
+        # if os.path.isfile('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/AK135_craton_corr.json'):
+        #     print('Adding AK135_craton input as blue triangle') # t, b
+        #     with open('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/AK135_craton_corr.json') as data_file:
+        #         AK135_corr = json.load(data_file)
+        #     corr_name='corr_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)
+        #     AK135_p1_p2 = np.array(AK135_corr['stack'][str(av_int)][str(corr_name)])
+        #     print(AK135_p1_p2[0])
+        #     axCorr.plot(AK135_p1_p2[0][1],AK135_p1_p2[0][0],c='b',marker='^',markersize=5,linewidth=1, alpha=1)
 
-        if os.path.isfile('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/RM_craton_corr.json'):
-            print('Adding RM_craton inversion as blue inverted triangle') # v, b
-            with open('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/RM_craton_corr.json') as data_file:
-                AK135_corr = json.load(data_file)
-            corr_name='corr_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)
-            AK135_p1_p2 = np.array(AK135_corr['stack'][str(av_int)][str(corr_name)])
-            print(AK135_p1_p2[0])
-            axCorr.plot(AK135_p1_p2[0][1],AK135_p1_p2[0][0],c='b',marker='v',markersize=5,linewidth=1, alpha=1)
+        # if os.path.isfile('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/RM_craton_corr.json'):
+        #     print('Adding RM_craton inversion as blue inverted triangle') # v, b
+        #     with open('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/RM_craton_corr.json') as data_file:
+        #         AK135_corr = json.load(data_file)
+        #     corr_name='corr_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)
+        #     AK135_p1_p2 = np.array(AK135_corr['stack'][str(av_int)][str(corr_name)])
+        #     print(AK135_p1_p2[0])
+        #     axCorr.plot(AK135_p1_p2[0][1],AK135_p1_p2[0][0],c='b',marker='v',markersize=5,linewidth=1, alpha=1)
 
-        ########################### Add Craton to plot #########################################
-        if os.path.isfile('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/AK135_craton_meta_corr.json'):
-            print('Adding AK135_craton_meta input as red triangle') # t, br
-            with open('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/AK135_craton_meta_corr.json') as data_file:
-                AK135_corr = json.load(data_file)
-            corr_name='corr_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)
-            AK135_p1_p2 = np.array(AK135_corr['stack'][str(av_int)][str(corr_name)])
-            print(AK135_p1_p2[0])
-            axCorr.plot(AK135_p1_p2[0][1],AK135_p1_p2[0][0],c='r',marker='^',markersize=5,linewidth=1, alpha=1)
+        # ########################### Add Craton to plot #########################################
+        # if os.path.isfile('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/AK135_craton_meta_corr.json'):
+        #     print('Adding AK135_craton_meta input as red triangle') # t, br
+        #     with open('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/AK135_craton_meta_corr.json') as data_file:
+        #         AK135_corr = json.load(data_file)
+        #     corr_name='corr_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)
+        #     AK135_p1_p2 = np.array(AK135_corr['stack'][str(av_int)][str(corr_name)])
+        #     print(AK135_p1_p2[0])
+        #     axCorr.plot(AK135_p1_p2[0][1],AK135_p1_p2[0][0],c='r',marker='^',markersize=5,linewidth=1, alpha=1)
 
-        if os.path.isfile('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/RM_craton_meta_corr.json'):
-            print('Adding RM_craton_meta inversion as red inverted triangle') # v, r
-            with open('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/RM_craton_meta_corr.json') as data_file:
-                AK135_corr = json.load(data_file)
-            corr_name='corr_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)
-            AK135_p1_p2 = np.array(AK135_corr['stack'][str(av_int)][str(corr_name)])
-            print(AK135_p1_p2[0])
-            axCorr.plot(AK135_p1_p2[0][1],AK135_p1_p2[0][0],c='r',marker='v',markersize=5,linewidth=1, alpha=1)
+        # if os.path.isfile('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/RM_craton_meta_corr.json'):
+        #     print('Adding RM_craton_meta inversion as red inverted triangle') # v, r
+        #     with open('/Users/alistair/Google_Drive/Lyon_Pdoc/Surf_rad_ani/AL_surf_inv_'+str(Modes)+'/RM_craton_meta_corr.json') as data_file:
+        #         AK135_corr = json.load(data_file)
+        #     corr_name='corr_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)
+        #     AK135_p1_p2 = np.array(AK135_corr['stack'][str(av_int)][str(corr_name)])
+        #     print(AK135_p1_p2[0])
+        #     axCorr.plot(AK135_p1_p2[0][1],AK135_p1_p2[0][0],c='r',marker='v',markersize=5,linewidth=1, alpha=1)
 
 
 
