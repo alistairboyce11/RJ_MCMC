@@ -157,7 +157,10 @@ c      real,intent(in):    r(Nmax),rho(Nmax),vpv(Nmax),vph(Nmax),vsv(Nmax),vsh(N
       common/rindx/nic,noc,nsl,nicp1,nocp1,nslp1,n
 c     ------ Al Edits ------ 
       logical :: error_flag
+      real*8    :: start_time, cur_time, run_time
+      parameter (run_lim=5.0)
       error_flag = .false.
+      call cpu_time(start_time)
 
       ifanis=ifanis2
       N=N2
@@ -186,13 +189,16 @@ c     ------ Al Edits ------
       eps=eps2
       wgrav=wgrav2
       call model(ifdeck)
+
+
+
       ifreq=1
 c     print *,'model done'
 c     call wtable(ifreq,nmodes_max,i_mode,n_mode,l_mode,c_ph,period,
 c    +raylquo,wmin,wmax,lmin,lmax,nmin,nmax)
 c     ------ Al Edits ------ 
       call wtable(ifreq,nmodes_max,i_mode,n_mode,l_mode,c_ph,period,
-     +raylquo,wmin,wmax,lmin,lmax,nmin,nmax,error_flag)
+     +raylquo,wmin,wmax,lmin,lmax,nmin,nmax,error_flag,start_time)
 c***  if (error_flag) then
 c***    print *,'minos_bran: POS: 001: error_flag:', error_flag
 c***  end if
@@ -203,7 +209,8 @@ c     subroutine wtable(ifreq,nmodes_max,i_mode,n_mode,l_mode,c_ph,
 c    +period,raylquo,wmin,wmax,lmin,lmax,normin,normax)
 c     ------ Al Edits ------ 
       subroutine wtable(ifreq,nmodes_max,i_mode,n_mode,l_mode,c_ph,
-     +period,raylquo,wmin,wmax,lmin,lmax,normin,normax,error_flag)
+     +period,raylquo,wmin,wmax,lmin,lmax,normin,normax,error_flag,
+     +start_time)
 c*** makes up table of frequencies ***
       implicit real*8(a-h,o-z)
       integer,intent(in) :: nmodes_max
@@ -215,6 +222,8 @@ c*** makes up table of frequencies ***
       real,dimension(nmodes_max),intent(out) :: c_ph,period,raylquo
 c     ------ Al Edits ------ 
       logical :: error_flag
+      real*8    :: start_time, cur_time, run_time
+      parameter (run_lim=5.0)
       common/bits/pi,rn,vn,wn,w,wsq,wray,qinv,cg,wgrav,tref,fct,eps,fl,
      +  fl1,fl2,fl3,sfl3,jcom,nord,l,kg,kount,knsw,ifanis,iback
       common/shanks/b(46),c(10),dx,step(8),stepf,maxo,in
@@ -222,7 +231,7 @@ c     ------ Al Edits ------
       dimension wt(2)
       data inss/5/
 c     ------ Al Edits ------ 
-      error_flag = .false.
+      ! error_flag = .false.
 
       cmhz=pi/500.d0
       stepf=1.d0    
@@ -262,7 +271,7 @@ c      print *,lmin,lmax,wmin,wmax,normin,normax
       end if
       normin=max(normin,0)
       normax=max(normax,normin)
-	  ncall = 0
+      ncall = 0
       do 50 nor=normin,normax
 c***  print *,'wtable: POS: 009' !!! Confusing stuff
 c***  print *, normin,normax,nor !!! Confusing stuff
@@ -292,7 +301,7 @@ c***  print *, lmin, lmax, l !!! This is printing mode numbers set in RJ_MCMC.f
 c***  print *,'wtable: POS: 001'
 c***  if(wtry.ne.0.d0) print *,'wtable: POS: 008', wtry
       if(wtry.ne.0.d0) we(2)=wtry
-      call detqn(we(1),ke(1),de(1),0)
+      call detqn(we(1),ke(1),de(1),0,start_time,error_flag)
 c***  if(ke(1).gt.ndn) print *,'wtable: POS: 002'
       if(ke(1).gt.ndn) goto 10
 c***  Al Check statement -- start --  
@@ -301,20 +310,20 @@ c***    print *,'wtable: CALL detqn: we(2).lt.0'
 c***    print *, 'we(2),ke(2),de(2),0'
 c***    print *, we(2),ke(2),de(2),0
 c       Comment next line        
-c       call detqn(we(2),ke(2),de(2),0)
+c       call detqn(we(2),ke(2),de(2),0,start_time,error_flag)
 c       Uncomment next two lines.
         error_flag = .true.
         return
       else
-        error_flag = .false.
-        call detqn(we(2),ke(2),de(2),0)
+        ! error_flag = .false.
+        call detqn(we(2),ke(2),de(2),0,start_time,error_flag)
       end if
 c     Al Check statement -- end --  
 c     Original line
-c     call detqn(we(2),ke(2),de(2),0)
+c     call detqn(we(2),ke(2),de(2),0,start_time,error_flag)
       if(ke(2).lt.nup) then
          we(2)=wt(2)
-         call detqn(we(2),ke(2),de(2),0)
+         call detqn(we(2),ke(2),de(2),0,start_time,error_flag)
 c***    if(ke(2).lt.nup) print *,'wtable: POS: 003'
          if(ke(2).lt.nup) goto 50
       end if
@@ -327,7 +336,7 @@ c***  if(ke(1).eq.ndn.and.ke(2).eq.nup) print *,'wtable: POS: 005'
       ktry=ktry+1
 c***  if(ktry.gt.50) print *,'wtable: POS: 006'
       if(ktry.gt.50) goto 10
-      call detqn(wx,kx,dx,0)
+      call detqn(wx,kx,dx,0,start_time,error_flag)
 c***  print *, 'kx = ',kx
       if(kx.le.ndn) then
         we(1)=wx
@@ -339,6 +348,14 @@ c***  print *, 'kx = ',kx
         de(2)=dx
       end if
       wx=0.5d0*(we(1)+we(2))
+
+      call cpu_time(cur_time)
+      run_time=cur_time-start_time
+      if (run_time.gt.run_lim) then
+            error_flag = .true.
+            return
+      end if
+
       goto 15
 c*** print *,'wtable: POS: 007'
 
@@ -346,9 +363,9 @@ c*** find roots ***
    40 knsw=0
       maxo=8
 c		added argument for number of times called (mhr)
-	  ncall = ncall + 1
+      ncall = ncall + 1
       call rotspl(eps1,wt,ifreq,ncall,nmodes_max,i_mode,n_mode,l_mode,
-     &c_ph,period,raylquo,error_flag)
+     &c_ph,period,raylquo,error_flag,start_time)
       if (error_flag) then
 c***    print *,'wtable: POS: 008: error_flag:', error_flag
         return
@@ -359,7 +376,7 @@ c***    print *,'wtable: POS: 008: error_flag:', error_flag
       end subroutine wtable
 
       subroutine rotspl(eps1,wt,ifreq,ncall,nmodes_max,i_mode,n_mode,
-     &l_mode,c_ph,period,raylquo,error_flag)
+     &l_mode,c_ph,period,raylquo,error_flag,start_time)
 c*** find roots by spline interpolation ***
       implicit real*8(a-h,o-z)
       integer,intent(in) :: nmodes_max
@@ -377,9 +394,18 @@ c     ------ Al Edits ------
       logical :: error_flag
       parameter (count_max=250000)
       data tol/1.d-9/,itmax/15/,kchar/' s',' t',' s',' c'/
+      real*8    :: start_time, cur_time, run_time   
+      parameter (run_lim=5.0)
 c     ------ Al Edits ------ 
       count = 1
-      error_flag = .false.
+      ! error_flag = .false.
+
+      call cpu_time(cur_time)
+      run_time=cur_time-start_time
+      if (run_time.gt.run_lim) then
+            error_flag = .true.
+            return
+      end if
 
 c***  print *, "rotspl: POS: 001"
       if(de(1)*de(2).gt.0.d0) return
@@ -396,8 +422,8 @@ c***  print *, "rotspl: POS: 001"
       b=x(1)-det(1)*grad
    15 t=dabs(b*eps1)
       if(dabs(b-c).lt.t) goto 65
-c***  print *, "rotspl: POS: 002: call detqn",b,knt,fb,0
-      call detqn(b,knt,fb,0)
+c***  print *, "rotspl: POS: 002: call detqn",b,knt,fb,0,start_time
+      call detqn(b,knt,fb,0,start_time,error_flag)
 c***  print *, "rotspl: POS: 003"
       ind=1
       do 20 m=2,ntry
@@ -439,6 +465,16 @@ c***  print *, "rotspl: POS: 011: tol, del*delx", tol, del*delx
       del=delx
 c***  print *, "rotspl: POS: 012: goto 50: count = ", count
 c***  print *, "- - - - - - - - - - - - - - - - - - - - - - - - -"
+      
+      call cpu_time(cur_time)
+      run_time=cur_time-start_time
+      if (run_time.gt.run_lim) then
+c***          print *, run_time
+            error_flag = .true.
+            return
+      end if
+
+
       count = count + 1
       if (count.gt.count_max) then
 c***    print *, count
@@ -459,7 +495,7 @@ c***  print *, "rotspl: POS: 015"
 
 c*** write out frequencies ***
 c***  print *, "rotspl: POS: 016"
-   65 call detqn(b,knt,fb,ifreq)
+   65 call detqn(b,knt,fb,ifreq,start_time,error_flag)
 c***  print *, "rotspl: POS: 017"
       tcom=2.d0*pi/b
       wmhz=1000.d0/tcom
@@ -704,7 +740,7 @@ c*** normalise and spline ***
       return
       end subroutine model
 
-      subroutine detqn(wdim,knt,det,ifeif)
+      subroutine detqn(wdim,knt,det,ifeif,start_time,error_flag)
 c**** supevises the integration of the equations,it returns the value
 c**** of the secular determinant as det and the count of zero crossings.
       implicit real*8(a-h,o-z)
@@ -720,6 +756,22 @@ c**** of the secular determinant as det and the count of zero crossings.
       common/eifx/a(14,mk),dum(mk)
       common/rindx/nic,noc,nsl,nicp1,nocp1,nslp1,n
       dimension ass(14),vf(mk),zi(4)
+c     ------ Al Edits ------ 
+      logical :: error_flag
+      real*8    :: start_time, cur_time, run_time
+      parameter (run_lim=5.0)
+      parameter (cg_lim=1000000)
+c     ------ Al Edits ------ 
+      ! error_flag = .false.
+
+      call cpu_time(cur_time)
+      run_time=cur_time-start_time
+      if (run_time.gt.run_lim) then
+            error_flag = .true.
+            return
+      end if
+
+
       iback=0
       w=wdim/wn
       wsq=w*w
@@ -727,17 +779,35 @@ c**** of the secular determinant as det and the count of zero crossings.
       kount=0
       kg=0
       fct=0.d0
+
+
+      ! print *, "cg, cg_norm, cg_norm_ref, vn",cg*vn,cg,5000./vn,vn
+
 c***  Al Check statement    
-c***  print *,'detqn:  POS: 001'
-c***  if(wdim.lt.0) then
-c***    print *, 'wdim -ve'
-c***    print *, 'wdim, knt, det, ifeif, wn, w'
-c***    print *, wdim,knt,det,ifeif,wn,w
-c***  else
-c***    print *, 'wdim +ve'
-c***    print *, 'wdim, knt, det, ifeif, wn, w'
-c***    print *, wdim,knt,det,ifeif,wn,w
-c***  end if
+      if(wdim.lt.0) then
+c       print *, 'wdim -ve'
+c       print *, 'wdim, knt, det, ifeif, wn, w'
+c       print *, wdim,knt,det,ifeif,wn,w
+c       print *, "Exiting..."
+        error_flag=.true.
+        return
+      else if (cg*vn.gt.cg_lim) then
+c       print *, 'cg*vn > cg_lim'
+c       print *, "cg*vn, cg_lim, cg, cg_ref, vn"
+c       print *, cg*vn,cg_lim,cg,5000./vn,vn
+c       print *, 'wdim, knt, det, ifeif, wn, w'
+c       print *, wdim,knt,det,ifeif,wn,w
+c       print *, "Exiting..."
+        error_flag=.true.
+        return
+      ! else
+      !   print *, 'wdim SMALL +ve'
+      !   print *, 'wdim, knt, det, ifeif, wn, w'
+      !   print *, wdim,knt,det,ifeif,wn,w
+      end if
+
+
+
       if(tref.gt.0.d0) fct=2.d0*dlog(tref*wdim)/pi
 c***  print *, "jcom=",jcom
       goto (2,3,1,3),jcom
@@ -776,7 +846,7 @@ c***    print *,'detqn:  POS: 006'
       is=max(ls,nocp1)
       if(is.eq.ls) call spsm(ls,nvesm,ass)
 c*** propagate through mantle ***
-c***  print *,'detqn:  POS: 007'-01
+c***  print *,'detqn:  POS: 007'
       call sprpmn(is,nsl,ass,vf,nvesm,iexp)
       if(nsl.eq.n) then
 c***    print *,'detqn:  POS: 008'
