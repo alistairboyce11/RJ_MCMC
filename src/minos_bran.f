@@ -21,13 +21,13 @@ c  eigenvalue-eigenfunction problem.
 c
 c****************************************************************************
 c  this program uses one input and two output files
-c  the input file contains the model 
+c  the input file contains the model
 c  the output files are 1) a model listing + a summary of mode properties
-c  and 2) a file for the eigenfunctions 
+c  and 2) a file for the eigenfunctions
 c  the program then asks for some control info described below
 c
 c structure of model file
-c  card 1  :   title (up to 256 chars long) 
+c  card 1  :   title (up to 256 chars long)
 c  card 2  :   ifanis,tref,ifdeck              (unformatted)
 c           ifanis=1 for anisotropic model, 0 for isotropic
 c           tref=ref period(secs) of model for dispersion correction.
@@ -61,33 +61,33 @@ c           cards 4-9(iso) or 4-12(ani) are repeated for each region of the
 c           model
 c
 c control parameters  (from screen)
-c   eps,wgrav          
+c   eps,wgrav
 c           eps controls the accuracy of the runge-kutta integration scheme.
 c           the relative accuracy of an eigen frequency will be 2-3 x eps.
 c           it also controls the precision with which a root is found and
-c           the minimum relative separation of two roots with the same angular 
+c           the minimum relative separation of two roots with the same angular
 c           order.it is safe to set eps=1.d-7.
 c           wgrav is the frequency in millihertz above which gravitational terms
 c           are neglected-this gives about a factor of 3 increase in speed.
-c   jcom       
+c   jcom
 c           jcom=1 radial modes, 2 toroidal modes, 3 spheroidal modes,
-c           4 inner core toroidal modes. 
-c   lmin,lmax,wmin,wmax,nmin,nmax            
+c           4 inner core toroidal modes.
+c   lmin,lmax,wmin,wmax,nmin,nmax
 c           lmin - lmax defines the range of angular orders to be computed.
 c           if jcom=1 this is ignored. wmin - wmax defines the frequency range
 c           to be computed (in millihertz)
 c           nmin-nmax specifies the branch numbers to be computed -- nmin=0
 c           is the fundamental mode
-c                          
+c
 c  model listing
 c    this is an ascii file which lists the model and mode properties
 c    i.e. phase velocity in km/s,frequency,period,group velocity in km/s,
 c    q and a parameter which is the ratio of kinetic to potential energy
-c    minus 1 which should be small ( of order eps )if the eigenfunction is 
-c    accurate and if there are enough radial knots in the model to allow 
+c    minus 1 which should be small ( of order eps )if the eigenfunction is
+c    accurate and if there are enough radial knots in the model to allow
 c    quodratures to be done accurately. (you will probably see some degradation
-c    in this parameter for strongly exponential modes such as stoneley modes ). 
-c  
+c    in this parameter for strongly exponential modes such as stoneley modes ).
+c
 c  eigenfunction file
 c****** file name "none" will suppress calculation of eigenfunctions
 c    this is a fixed record length binary file with an entry for each mode
@@ -97,15 +97,15 @@ c    where nvec is 5+6*npts for spheroidal modes and 5+2*npts for toroidal
 c    and radial modes. the first five words of abuf are n,l,frequecy,q and
 c    group velocity. the rest of abuf contains w(1..npts) and wp(1..npts)
 c    for toroidal modes and u(1..npts),up(1..npts),v(1..npts),vp(1..npts),
-c    p(1..npts) and pp(1..npts) for spheroidal modes. these are as in 
+c    p(1..npts) and pp(1..npts) for spheroidal modes. these are as in
 c    woodhouse and dahlen 1978 except that w,wp,v and vp must be divided
-c    by sqrt(l*(l+1)). the normalisation is such that 
+c    by sqrt(l*(l+1)). the normalisation is such that
 c       frequency**2 times integral(rho*w*w*r*r) is 1 for toroidal modes
-c       frequency**2 times integral(rho*(u*u+l*(l+1)*v*v)*r*r) is 1 for 
+c       frequency**2 times integral(rho*(u*u+l*(l+1)*v*v)*r*r) is 1 for
 c    spheroidal modes
 c    the model has been normalised such that a density of 5515 mg/m**3 = 1 ;
 c    pi*g=1 where g is the grav constant (6.6723e-11) and the radius of the
-c    earth (rn=6371000 m) is 1. these normalizations result in 
+c    earth (rn=6371000 m) is 1. these normalizations result in
 c      acceleration normalisation = pi*g*rhobar*rn
 c      velocity normalisation     = rn*sqrt(pi*g*rhobar)= vn
 c      frequency normalization    = vn/rn
@@ -116,7 +116,7 @@ c     subroutine minos_bran(ifanis2,tref2,N2,nic2,noc2,r2,rho2,vpv2,
 c    &vph2,vsv2,vsh2,qkappa2,qshear2,eta2,eps2,wgrav2,jcom2,lmin2,
 c    &lmax2,wmin2,wmax2,nmin2,nmax2,nmodes_max,i_mode,n_mode,l_mode,
 c    &c_ph,period,raylquo)
-c     ------ Al Edits ------ 
+c     ------ Al Edits ------
       subroutine minos_bran(ifanis2,tref2,N2,nic2,noc2,r2,rho2,vpv2,
      &vph2,vsv2,vsh2,qkappa2,qshear2,eta2,eps2,wgrav2,jcom2,lmin2,
      &lmax2,wmin2,wmax2,nmin2,nmax2,nmodes_max,i_mode,n_mode,l_mode,
@@ -155,23 +155,26 @@ c      real,intent(in):    r(Nmax),rho(Nmax),vpv(Nmax),vph(Nmax),vsv(Nmax),vsh(N
      +  fl1,fl2,fl3,sfl3,jcom,nord,l,kg,kount,knsw,ifanis,iback
       common/eifx/vpv(mk),vph(mk),vsv(mk),vsh(mk),eta(mk),wrk(mk*10)
       common/rindx/nic,noc,nsl,nicp1,nocp1,nslp1,n
-c     ------ Al Edits ------ 
+c     ------ Al Edits ------
       logical :: error_flag
+      real*8    :: start_time, cur_time, run_time
+      parameter (run_lim=5.0)
       error_flag = .false.
+      call cpu_time(start_time)
 
       ifanis=ifanis2
       N=N2
       nic=nic2
       noc=noc2
       jcom=jcom2
-      
+
       lmin=lmin2
       lmax=lmax2
       nmin=nmin2
       nmax=nmax2
       wmin=wmin2
       wmax=wmax2
-      
+
       r(1:mk)=r2(1:mk)
       rho(1:mk)=rho2(1:mk)
       vpv(1:mk)=vpv2(1:mk)
@@ -181,18 +184,21 @@ c     ------ Al Edits ------
       qkappa(1:mk)=qkappa2(1:mk)
       qshear(1:mk)=qshear2(1:mk)
       eta(1:mk)=eta2(1:mk)
-      
+
       tref=tref2
       eps=eps2
       wgrav=wgrav2
       call model(ifdeck)
+
+
+
       ifreq=1
 c     print *,'model done'
 c     call wtable(ifreq,nmodes_max,i_mode,n_mode,l_mode,c_ph,period,
 c    +raylquo,wmin,wmax,lmin,lmax,nmin,nmax)
-c     ------ Al Edits ------ 
+c     ------ Al Edits ------
       call wtable(ifreq,nmodes_max,i_mode,n_mode,l_mode,c_ph,period,
-     +raylquo,wmin,wmax,lmin,lmax,nmin,nmax,error_flag)
+     +raylquo,wmin,wmax,lmin,lmax,nmin,nmax,error_flag,start_time)
 c***  if (error_flag) then
 c***    print *,'minos_bran: POS: 001: error_flag:', error_flag
 c***  end if
@@ -201,9 +207,10 @@ c***  end if
 
 c     subroutine wtable(ifreq,nmodes_max,i_mode,n_mode,l_mode,c_ph,
 c    +period,raylquo,wmin,wmax,lmin,lmax,normin,normax)
-c     ------ Al Edits ------ 
+c     ------ Al Edits ------
       subroutine wtable(ifreq,nmodes_max,i_mode,n_mode,l_mode,c_ph,
-     +period,raylquo,wmin,wmax,lmin,lmax,normin,normax,error_flag)
+     +period,raylquo,wmin,wmax,lmin,lmax,normin,normax,error_flag,
+     +start_time)
 c*** makes up table of frequencies ***
       implicit real*8(a-h,o-z)
       integer,intent(in) :: nmodes_max
@@ -213,21 +220,23 @@ c*** makes up table of frequencies ***
       integer,intent(in) :: ifreq
       integer,dimension(nmodes_max),intent(out) :: n_mode,l_mode
       real,dimension(nmodes_max),intent(out) :: c_ph,period,raylquo
-c     ------ Al Edits ------ 
+c     ------ Al Edits ------
       logical :: error_flag
+      real*8    :: start_time, cur_time, run_time
+      parameter (run_lim=5.0)
       common/bits/pi,rn,vn,wn,w,wsq,wray,qinv,cg,wgrav,tref,fct,eps,fl,
      +  fl1,fl2,fl3,sfl3,jcom,nord,l,kg,kount,knsw,ifanis,iback
       common/shanks/b(46),c(10),dx,step(8),stepf,maxo,in
       common/mtab/we(2),de(2),ke(2),wtry,bm
       dimension wt(2)
       data inss/5/
-c     ------ Al Edits ------ 
-      error_flag = .false.
+c     ------ Al Edits ------
+      ! error_flag = .false.
 
       cmhz=pi/500.d0
-      stepf=1.d0    
+      stepf=1.d0
 c      print *,'enter eps and wgrav'
-c      read(*,*) eps,wgrav    
+c      read(*,*) eps,wgrav
       eps=max(eps,1.d-12)
       eps1=eps
       eps2=eps
@@ -240,7 +249,7 @@ c     +   8x,'phs vel',7x,'w(mhz)',10x,'t(secs)',6x,'grp vel(km/s)',
 c     +   8x,'q',13x,'raylquo',/)
       call steps(eps)
 c     print *,eps
-      
+
 c      print *,'enter jcom (1=rad;2=tor;3=sph;4=ictor)'
 c      read(*,*) jcom
 cc MB added one line below
@@ -262,7 +271,7 @@ c      print *,lmin,lmax,wmin,wmax,normin,normax
       end if
       normin=max(normin,0)
       normax=max(normax,normin)
-	  ncall = 0
+      ncall = 0
       do 50 nor=normin,normax
 c***  print *,'wtable: POS: 009' !!! Confusing stuff
 c***  print *, normin,normax,nor !!! Confusing stuff
@@ -292,29 +301,29 @@ c***  print *, lmin, lmax, l !!! This is printing mode numbers set in RJ_MCMC.f
 c***  print *,'wtable: POS: 001'
 c***  if(wtry.ne.0.d0) print *,'wtable: POS: 008', wtry
       if(wtry.ne.0.d0) we(2)=wtry
-      call detqn(we(1),ke(1),de(1),0)
+      call detqn(we(1),ke(1),de(1),0,start_time,error_flag)
 c***  if(ke(1).gt.ndn) print *,'wtable: POS: 002'
       if(ke(1).gt.ndn) goto 10
-c***  Al Check statement -- start --  
+c***  Al Check statement -- start --
       if(we(2).lt.0) then
 c***    print *,'wtable: CALL detqn: we(2).lt.0'
 c***    print *, 'we(2),ke(2),de(2),0'
 c***    print *, we(2),ke(2),de(2),0
-c       Comment next line        
-c       call detqn(we(2),ke(2),de(2),0)
+c       Comment next line
+c       call detqn(we(2),ke(2),de(2),0,start_time,error_flag)
 c       Uncomment next two lines.
         error_flag = .true.
         return
       else
-        error_flag = .false.
-        call detqn(we(2),ke(2),de(2),0)
+        ! error_flag = .false.
+        call detqn(we(2),ke(2),de(2),0,start_time,error_flag)
       end if
-c     Al Check statement -- end --  
+c     Al Check statement -- end --
 c     Original line
-c     call detqn(we(2),ke(2),de(2),0)
+c     call detqn(we(2),ke(2),de(2),0,start_time,error_flag)
       if(ke(2).lt.nup) then
          we(2)=wt(2)
-         call detqn(we(2),ke(2),de(2),0)
+         call detqn(we(2),ke(2),de(2),0,start_time,error_flag)
 c***    if(ke(2).lt.nup) print *,'wtable: POS: 003'
          if(ke(2).lt.nup) goto 50
       end if
@@ -327,7 +336,7 @@ c***  if(ke(1).eq.ndn.and.ke(2).eq.nup) print *,'wtable: POS: 005'
       ktry=ktry+1
 c***  if(ktry.gt.50) print *,'wtable: POS: 006'
       if(ktry.gt.50) goto 10
-      call detqn(wx,kx,dx,0)
+      call detqn(wx,kx,dx,0,start_time,error_flag)
 c***  print *, 'kx = ',kx
       if(kx.le.ndn) then
         we(1)=wx
@@ -339,6 +348,14 @@ c***  print *, 'kx = ',kx
         de(2)=dx
       end if
       wx=0.5d0*(we(1)+we(2))
+
+      call cpu_time(cur_time)
+      run_time=cur_time-start_time
+      if (run_time.gt.run_lim) then
+            error_flag = .true.
+            return
+      end if
+
       goto 15
 c*** print *,'wtable: POS: 007'
 
@@ -346,9 +363,9 @@ c*** find roots ***
    40 knsw=0
       maxo=8
 c		added argument for number of times called (mhr)
-	  ncall = ncall + 1
+      ncall = ncall + 1
       call rotspl(eps1,wt,ifreq,ncall,nmodes_max,i_mode,n_mode,l_mode,
-     &c_ph,period,raylquo,error_flag)
+     &c_ph,period,raylquo,error_flag,start_time)
       if (error_flag) then
 c***    print *,'wtable: POS: 008: error_flag:', error_flag
         return
@@ -359,7 +376,7 @@ c***    print *,'wtable: POS: 008: error_flag:', error_flag
       end subroutine wtable
 
       subroutine rotspl(eps1,wt,ifreq,ncall,nmodes_max,i_mode,n_mode,
-     &l_mode,c_ph,period,raylquo,error_flag)
+     &l_mode,c_ph,period,raylquo,error_flag,start_time)
 c*** find roots by spline interpolation ***
       implicit real*8(a-h,o-z)
       integer,intent(in) :: nmodes_max
@@ -371,15 +388,24 @@ c*** find roots by spline interpolation ***
       common/mtab/we(2),de(2),ke(2),wtry,bm
       dimension x(20),det(20),qx(3,20),wrk(60),wt(*),kchar(4)
       character*2 kchar
-      
-c     ------ Al Edits ------ 
+
+c     ------ Al Edits ------
       integer :: count, count_max
       logical :: error_flag
       parameter (count_max=250000)
       data tol/1.d-9/,itmax/15/,kchar/' s',' t',' s',' c'/
-c     ------ Al Edits ------ 
+      real*8    :: start_time, cur_time, run_time
+      parameter (run_lim=5.0)
+c     ------ Al Edits ------
       count = 1
-      error_flag = .false.
+      ! error_flag = .false.
+
+      call cpu_time(cur_time)
+      run_time=cur_time-start_time
+      if (run_time.gt.run_lim) then
+            error_flag = .true.
+            return
+      end if
 
 c***  print *, "rotspl: POS: 001"
       if(de(1)*de(2).gt.0.d0) return
@@ -396,8 +422,8 @@ c***  print *, "rotspl: POS: 001"
       b=x(1)-det(1)*grad
    15 t=dabs(b*eps1)
       if(dabs(b-c).lt.t) goto 65
-c***  print *, "rotspl: POS: 002: call detqn",b,knt,fb,0
-      call detqn(b,knt,fb,0)
+c***  print *, "rotspl: POS: 002: call detqn",b,knt,fb,0,start_time
+      call detqn(b,knt,fb,0,start_time,error_flag)
 c***  print *, "rotspl: POS: 003"
       ind=1
       do 20 m=2,ntry
@@ -439,6 +465,16 @@ c***  print *, "rotspl: POS: 011: tol, del*delx", tol, del*delx
       del=delx
 c***  print *, "rotspl: POS: 012: goto 50: count = ", count
 c***  print *, "- - - - - - - - - - - - - - - - - - - - - - - - -"
+
+      call cpu_time(cur_time)
+      run_time=cur_time-start_time
+      if (run_time.gt.run_lim) then
+c***          print *, run_time
+            error_flag = .true.
+            return
+      end if
+
+
       count = count + 1
       if (count.gt.count_max) then
 c***    print *, count
@@ -459,7 +495,7 @@ c***  print *, "rotspl: POS: 015"
 
 c*** write out frequencies ***
 c***  print *, "rotspl: POS: 016"
-   65 call detqn(b,knt,fb,ifreq)
+   65 call detqn(b,knt,fb,ifreq,start_time,error_flag)
 c***  print *, "rotspl: POS: 017"
       tcom=2.d0*pi/b
       wmhz=1000.d0/tcom
@@ -558,7 +594,7 @@ c		include writing egfcns (mhr)
 c      write(ioeig) (abuf(i),i=1,nvec)
       return
       end subroutine modout
-      
+
       subroutine model(ifdeck)
       ! iin: input file
       ! iout: output text file
@@ -704,7 +740,7 @@ c*** normalise and spline ***
       return
       end subroutine model
 
-      subroutine detqn(wdim,knt,det,ifeif)
+      subroutine detqn(wdim,knt,det,ifeif,start_time,error_flag)
 c**** supevises the integration of the equations,it returns the value
 c**** of the secular determinant as det and the count of zero crossings.
       implicit real*8(a-h,o-z)
@@ -720,6 +756,22 @@ c**** of the secular determinant as det and the count of zero crossings.
       common/eifx/a(14,mk),dum(mk)
       common/rindx/nic,noc,nsl,nicp1,nocp1,nslp1,n
       dimension ass(14),vf(mk),zi(4)
+c     ------ Al Edits ------
+      logical :: error_flag
+      real*8    :: start_time, cur_time, run_time
+      parameter (run_lim=5.0)
+      parameter (cg_lim=1000000)
+c     ------ Al Edits ------
+      ! error_flag = .false.
+
+      call cpu_time(cur_time)
+      run_time=cur_time-start_time
+      if (run_time.gt.run_lim) then
+            error_flag = .true.
+            return
+      end if
+
+
       iback=0
       w=wdim/wn
       wsq=w*w
@@ -727,17 +779,35 @@ c**** of the secular determinant as det and the count of zero crossings.
       kount=0
       kg=0
       fct=0.d0
-c***  Al Check statement    
-c***  print *,'detqn:  POS: 001'
-c***  if(wdim.lt.0) then
-c***    print *, 'wdim -ve'
-c***    print *, 'wdim, knt, det, ifeif, wn, w'
-c***    print *, wdim,knt,det,ifeif,wn,w
-c***  else
-c***    print *, 'wdim +ve'
-c***    print *, 'wdim, knt, det, ifeif, wn, w'
-c***    print *, wdim,knt,det,ifeif,wn,w
-c***  end if
+
+
+      ! print *, "cg, cg_norm, cg_norm_ref, vn",cg*vn,cg,5000./vn,vn
+
+c***  Al Check statement
+      if(wdim.lt.0) then
+c         print *, 'wdim -ve'
+c         print *, 'wdim, knt, det, ifeif, wn, w'
+c         print *, wdim,knt,det,ifeif,wn,w
+c         print *, "Exiting..."
+        error_flag=.true.
+        return
+      else if (cg*vn.gt.cg_lim) then
+c         print *, 'cg*vn > cg_lim'
+c         print *, "cg*vn, cg_lim, cg, cg_ref, vn"
+c         print *, cg*vn,cg_lim,cg,5000./vn,vn
+c         print *, 'wdim, knt, det, ifeif, wn, w'
+c         print *, wdim,knt,det,ifeif,wn,w
+c         print *, "Exiting..."
+        error_flag=.true.
+        return
+      ! else
+      !   print *, 'wdim SMALL +ve'
+      !   print *, 'wdim, knt, det, ifeif, wn, w'
+      !   print *, wdim,knt,det,ifeif,wn,w
+      end if
+
+
+
       if(tref.gt.0.d0) fct=2.d0*dlog(tref*wdim)/pi
 c***  print *, "jcom=",jcom
       goto (2,3,1,3),jcom
@@ -776,7 +846,7 @@ c***    print *,'detqn:  POS: 006'
       is=max(ls,nocp1)
       if(is.eq.ls) call spsm(ls,nvesm,ass)
 c*** propagate through mantle ***
-c***  print *,'detqn:  POS: 007'-01
+c***  print *,'detqn:  POS: 007'
       call sprpmn(is,nsl,ass,vf,nvesm,iexp)
       if(nsl.eq.n) then
 c***    print *,'detqn:  POS: 008'
