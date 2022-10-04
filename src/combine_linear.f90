@@ -49,8 +49,6 @@ subroutine combine_linear(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
         vpvsv(i)=vpvs*(1+voro2(i,4))
     end do
 
-
-
     i=nptref
     j=1
     k=nptref+2*npt
