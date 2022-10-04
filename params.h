@@ -12,7 +12,7 @@
       parameter (namelen=40, milay = 5, malay=80)
       parameter (maxlay=300, maxtr=13, maxseg=45)
       parameter (maxph=40000,buffsize=120)
-      parameter (ndatadmax=50)
+      parameter (ndatadmax=100)
       parameter (mk=350)
 
       integer invertype

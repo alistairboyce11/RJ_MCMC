@@ -61,6 +61,10 @@ joint_store_prepare: params.h
 	$(F77) -o run RJ_MCMC_joint_prepare_store.f90 \
 	-L./ -lroutines -lm
 
+joint_store_prepare_delayed: params.h
+	$(F77) -o run RJ_MCMC_joint_prepare_store_delayed.f90 \
+	-L./ -lroutines -lm
+
 joint_store_invert: params.h
 	$(F77) -o run2 RJ_MCMC_joint_invert_store.f90 \
 	-L./ -lroutines -lm
@@ -91,6 +95,10 @@ synth: params.h data_params.h
 
 postprocess_binary: params.h
 	$(F77) -o run_binary postprocess_binary_outputs.f90 \
+	-L./ -lroutines -lm
+	
+toy: params.h
+	$(F77) -o run_toy create_toy.f90 \
 	-L./ -lroutines -lm
 
 obj: params.h

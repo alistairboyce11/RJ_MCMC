@@ -15,7 +15,7 @@ program postprocess_binary_outputs
     integer milay_2,malay_2,mk_2,ndatadmax_2
     integer nptfinal,npt,npt_ani,nic,noc
     DOUBLE PRECISION Ad_R,Ad_L
-    real, DIMENSION(mk) :: r,vsv,xi,vp_data
+    real, DIMENSION(mk) :: r,vsv,xi,vpv
     real like_w
     integer ndatad_R,ndatad_L
     real, DIMENSION(ndatadmax) :: d_cR,d_cL
@@ -27,9 +27,9 @@ program postprocess_binary_outputs
     widening_prop2=widening_start
     do i_w=1,n_w
         write(*,*)widening_prop2
-        do i=0,10
+        do i=0,50
             write(filenamemax,"('/All_models_prepare_',I3.3,'_',f5.2,'.out')")i,widening_prop2
-            write(*,*)filenamemax
+            write(*,*)dirname//filenamemax
             open(100,file=dirname//filenamemax,status='old',form='unformatted',access='stream',iostat=io_file)
 
             if (io_file/=0) goto 500
@@ -92,7 +92,9 @@ program postprocess_binary_outputs
             do while (io==0)
 
                 read(100,IOSTAT=io)nptfinal
+                !write(*,*)nptfinal
                 if (io/=0) goto 500
+                if (nptfinal>mk) CONTINUE
 
                 read(100,IOSTAT=io)nic
                 if (io/=0) goto 500
@@ -129,41 +131,45 @@ program postprocess_binary_outputs
                 read(100,IOSTAT=io)xi
                 if (io/=0) goto 500
 
-                write(200,*)xi(nptfinal:noc+1:-1)/1000.
+                write(200,*)xi(nptfinal:noc+1:-1)
 
-                read(100,IOSTAT=io)vp_data
+                read(100,IOSTAT=io)vpv ! careful! We store vpv, so we need to check it for the python postprocessing
                 if (io/=0) goto 500
 
-                write(200,*)vp_data(nptfinal:noc+1:-1)/1000.
+                write(200,*)vpv(nptfinal:noc+1:-1)/1000.
 
                 read(100,IOSTAT=io)like_w
                 if (io/=0) goto 500
 
-                write(200,*)like_w
-
                 read(100,IOSTAT=io)ndatad_R
                 if (io/=0) goto 500
-
-                write(200,*)ndatad_R
 
                 read(100,IOSTAT=io)d_cR
                 if (io/=0) goto 500
 
-                write(200,*)d_cR(:ndatad_R)
-
                 read(100,IOSTAT=io)ndatad_L
                 if (io/=0) goto 500
-
-                write(200,*)ndatad_L
 
                 read(100,IOSTAT=io)d_cL
                 if (io/=0) goto 500
 
+                ! because it wasn't put in the initial like_w
+                like_w=-like_w-ndatad_R*log(Ad_R)/widening_prop-ndatad_L*log(Ad_L)/widening_prop
+
+                write(200,*)like_w
+
+                write(200,*)ndatad_R
+
+                write(200,*)d_cR(:ndatad_R)
+
+                write(200,*)ndatad_L
+
                 write(200,*)d_cL(:ndatad_L)
             enddo
 
-        500 close(200)
+
         600 close(100)
+        500 close(200)
         enddo
         widening_prop2=widening_prop2+widening_step
     enddo
