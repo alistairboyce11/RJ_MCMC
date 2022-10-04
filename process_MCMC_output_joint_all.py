@@ -54,7 +54,7 @@ def get_alpha_max(comm,directories,widenings_in,clusters_in,params_dispersion,di
         dispersion_ref['alpha_max']=0.
         dispersion_all['alpha_max']=np.array(file.readline().split()).astype('float')
         for line in file:
-            print(line)
+            #print(line)
             data=line.split()
             cluster=int(data[0])
             widening=float(data[1])
@@ -78,7 +78,7 @@ def get_alpha_max(comm,directories,widenings_in,clusters_in,params_dispersion,di
         for widening in widenings_in:
             num_models_dict[cluster_cur][widening]=0
             # list files
-            files_all_tmp=glob.glob(directory+'/All_models_processed_prepare_*%14.2f.out'%widening)
+            files_all_tmp=glob.glob(directory+'/All_models_processed_prepare_*%4.2f.out'%widening)
             files_all_tmp.sort()
             files_all.extend(files_all_tmp)
 
@@ -93,9 +93,13 @@ def get_alpha_max(comm,directories,widenings_in,clusters_in,params_dispersion,di
             params_inversion=postprocess_util.read_header(f)
             f.close()
             num_to_store+=maxpercent/100.*params_inversion['everyall']
-        num_to_store=int(num_to_store)
+            #print(maxpercent/100.*params_inversion['everyall'],num_to_store)
+
+        num_to_store=round(num_to_store)
+        print('num to store',num_to_store)
 
     numdis=dispersion_all['numdis']
+
     #alpha_ref_max=np.ones((num_to_store))*float('-inf')
     alpha_max=np.ones((num_to_store,numdis))*float('-inf')
 
@@ -118,7 +122,7 @@ def get_alpha_max(comm,directories,widenings_in,clusters_in,params_dispersion,di
         cluster=clusters_in[i_dir]
         for widening in widenings_in:
 
-            files_all_tmp=glob.glob(directory+'/All_models_processed_prepare_*%14.2f.out'%widening)
+            files_all_tmp=glob.glob(directory+'/All_models_processed_prepare_*%4.2f.out'%widening)
             files_all_tmp.sort()
             files=[]
             for i in range(len(files_all_tmp)):
@@ -314,6 +318,7 @@ def apply_stuff(comm,directories,widenings_in,clusters_in,functions,params_dispe
     outputs_all={}
     params_inversion=postprocess_util.get_metadata(directories,widenings_in)
     for function in functions:
+        #print(params_inversion)
         outputs_all[function.__name__]=function('',{},model_ref,{'cluster':0},params_dispersion,params_inversion,dispersion_all,0.,np.zeros((1)),outputs={},init=True)
 
     # initialise weights
@@ -331,8 +336,8 @@ def apply_stuff(comm,directories,widenings_in,clusters_in,functions,params_dispe
         cluster_cur=clusters_in[i_dir]
         for widening in widenings_in:
             # list files
-            files_all.extend(glob.glob(directory+'/All_models_processed_prepare_*%14.2f.out'%widening))
-            numfiles=len(glob.glob(directory+'/All_models_processed_prepare_*%14.2f.out'%widening))
+            files_all.extend(glob.glob(directory+'/All_models_processed_prepare_*%4.2f.out'%widening))
+            numfiles=len(glob.glob(directory+'/All_models_processed_prepare_*%4.2f.out'%widening))
             clusters_all+=numfiles*[cluster_cur]
             widenings_all+=numfiles*[widening]
 
@@ -445,8 +450,9 @@ print(size,rank)
 # clusters=[0,1,2,6,8,9]
 # widenings=[1.,2.,3.,4.,5.]
 # #points=[100,1000,10000]
-# outdir='OUT_ALL'
+# outdir='OUT_ALL_10'
 # points='all'
+# maxpercent=10./(len(widenings)*8.*100000.*len(clusters))*100.
 
 # directories=['OUT_CLUSTER0_JOINT/OUT']
 # clusters=[0]
@@ -454,14 +460,15 @@ print(size,rank)
 # outdir='OUT_0_ALL'
 # points=[]
 
-directories=['OUT_CLUSTER0_AD1/OUT']
+directories=['OUT_TEST10/OUT']
 #directories=['OUT_CLUSTER0_JOINT/OUT','OUT_CLUSTER1_JOINT/OUT','OUT_CLUSTER2_JOINT/OUT','OUT_CLUSTER6_JOINT/OUT','OUT_CLUSTER8_JOINT/OUT','OUT_CLUSTER9_JOINT/OUT']
 clusters=[0]
-widenings=[1.]
-outdir='OUT_CLUSTER0_AD1'
+widenings=[5.]
+outdir='OUT_TEST10'
 if not os.path.exists(outdir):
     os.mkdir(outdir)
 points=[]
+maxpercent=0.
 
 functions=[postprocess_functions.create_posterior,postprocess_functions.get_average,postprocess_functions.get_histograms,postprocess_functions.get_dispersion_mean,postprocess_functions.get_tradeoff]
 
@@ -503,6 +510,7 @@ if rank==0:
     grp2.create_dataset('error',data=dispersion_all['R']['error'])
     f.close()
 
+comm.Barrier()
 #sys.exit()
 
 #widening=1.0
@@ -510,7 +518,7 @@ if rank==0:
 output={}
 print('get alphamax')
 alphafile=outdir+'/alphamax.txt'
-get_alpha_max(comm,directories,widenings,clusters,params_dispersion,dispersion_ref,dispersion_all,alphafile)
+get_alpha_max(comm,directories,widenings,clusters,params_dispersion,dispersion_ref,dispersion_all,alphafile,maxpercent=maxpercent)
 
 print('apply functions')
 output=apply_stuff(comm,directories,widenings,clusters,functions,params_dispersion,dispersion_ref,dispersion_all,model_ref) #

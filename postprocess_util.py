@@ -225,13 +225,13 @@ def get_metadata(directories,widenings):
         directory=directories[i]
         for j in range(len(widenings)):
 
-            files_all.extend(glob.glob(directory+'/All_models_processed_prepare_*%15.2f.out'%widenings[j]))
+            files_all.extend(glob.glob(directory+'/All_models_processed_prepare_*%4.2f.out'%widenings[j]))
 
     for file in files_all:
 
         f=open(file,'r')
 
-        print(file)
+        #print(file)
 
         params_inversion=read_header(f)
         f.close()
@@ -239,6 +239,7 @@ def get_metadata(directories,widenings):
         if not params_inversion:
             continue
         else:
+            #print('found data! ')
             return params_inversion
     return
 
@@ -521,7 +522,7 @@ def get_alpha_all(dispersion_one,clusters,widenings,params_dispersion,dispersion
     like_alt-=ndatad_R*np.log(Ad_R)
     like_alt-=ndatad_L*np.log(Ad_L)
 
-
+    #print(numdis)
 
     probsum=0
     numprob=0
@@ -558,6 +559,7 @@ def get_alpha_all(dispersion_one,clusters,widenings,params_dispersion,dispersion
                 print(np.sum(np.divide(np.square(dispersion_R_ref-dispersion_R_one),2*Ad_R**2*np.square(error_R_ref)),axis=0),np.sum(np.divide(np.square(dispersion_L_ref-dispersion_L_one),2*Ad_L**2*np.square(error_L_ref)),axis=0),error_R_ref_sum[i],error_L_ref_sum[i],ndatad_R*Ad_R,ndatad_L*Ad_L,widening)
                 print((-np.sum(np.divide(np.square(dispersion_R_ref-dispersion_R_one),2*Ad_R**2*np.square(error_R_ref)),axis=0)-np.sum(np.divide(np.square(dispersion_L_ref-dispersion_L_one),2*Ad_L**2*np.square(error_L_ref)),axis=0)-(error_R_ref_sum[i])-(error_L_ref_sum[i])-ndatad_R*np.log(Ad_R)-ndatad_L*np.log(Ad_L))/widening)
                 print(np.exp(like_one))
+                print('overflow error: too high exponential')
 
                 probsum=float('inf')
 
@@ -857,6 +859,8 @@ def process_one_file_all(file,cluster,clusters_in,widenings_in,functions,params_
 
         alpha_ref,alpha=get_alpha_all(dispersion_one,clusters_in,widenings_in,params_dispersion,dispersion_ref,dispersion_all)
         alpha-=np.log(params_dispersion['num_models'][cluster][widening])
+
+        #print(np.shape(alpha))
 
 #        print(np.amax(alpha-dispersion_all['alpha_max']))
 

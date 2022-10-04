@@ -37,8 +37,8 @@ def create_posterior(file,model,model_ref,dispersion_one,params_dispersion,param
         has 2 subdicts, 'stack' and 'nostack'.
 
     '''
-    ndatad=50
-    ndatav=50
+    ndatad=200
+    ndatav=200
 
     numdis=dispersion_all['numdis']
 
@@ -57,8 +57,8 @@ def create_posterior(file,model,model_ref,dispersion_one,params_dispersion,param
         outputs['nostack']['vels_vsv']=np.linspace(np.amin(model_ref['vsv']*(1-params_inversion['width_vsv'])),
                          np.amax(model_ref['vsv']*(1+params_inversion['width_vsv'])),
                          ndatav) # in km/s
-        outputs['nostack']['vels_vp']=np.linspace(np.amin(model_ref['vpv']*(1+params_inversion['vp_min'])),
-                         np.amax(model_ref['vpv']*(1+params_inversion['vp_max'])),
+        outputs['nostack']['vels_vp']=np.linspace(np.amin(model_ref['vpv'])*(1+params_inversion['vp_min']),
+                         np.amax(model_ref['vpv'])*(1+params_inversion['vp_max']),
                          ndatav) # in km/s
         outputs['nostack']['vels_xi']=np.linspace(params_inversion['xi_min'],params_inversion['xi_max'],ndatav)
 
@@ -76,8 +76,10 @@ def create_posterior(file,model,model_ref,dispersion_one,params_dispersion,param
     vp_model=model['vp']
     depth_model=model['depth']
     alpha_max=dispersion_all['alpha_max']
+    #print(np.shape(alpha),np.shape(alpha_max))
     alpha=np.minimum(np.zeros_like(alpha),alpha-alpha_max)
     alpha=np.exp(alpha)
+    #print(numdis)
 
     ind_vsv=np.digitize(np.interp(depths,depth_model,vsv_model),bins=vels_vsv,right=True)
     outputs['stack']['vsv_all'][np.arange(ndatad),ind_vsv,:numdis]+=np.tile(alpha,(ndatad,1))
@@ -90,6 +92,11 @@ def create_posterior(file,model,model_ref,dispersion_one,params_dispersion,param
     outputs['stack']['xi_all'][np.arange(ndatad),ind_xi,numdis]+=1.
 
     ind_vp=np.digitize(np.interp(depths,depth_model,vp_model),bins=vels_vp,right=True)
+    #
+    #if np.amax(ind_vp)>=50:
+    #    print(params_inversion['vp_max'],np.amax(ind_vp),np.amax(vp_model),np.amax(vels_vp))
+    #    pass
+    #else:
     outputs['stack']['vp_all'][np.arange(ndatad),ind_vp,:numdis]+=np.tile(alpha,(ndatad,1))
 
     outputs['stack']['vp_all'][np.arange(ndatad),ind_vp,numdis]+=1.
@@ -283,22 +290,22 @@ def get_dispersion_mean(file,model,model_ref,dispersion_one,params_dispersion,pa
         return
 
     alpha_alt=np.tile(alpha,(params_dispersion['R']['ndatad'],1))
-    outputs['stack']['dispersion_R'][:,numdis]+=np.multiply(dispersion_R_true_all,alpha_alt)
+    outputs['stack']['dispersion_R'][:,:numdis]+=np.multiply(dispersion_R_true_all,alpha_alt)
 
     dis_alt=np.transpose(np.tile(dispersion_R_model,(numdis,1)))-dispersion_R_true_all
-    outputs['stack']['dispersion_R_shift'][:,numdis]+=np.multiply(dis_alt,alpha_alt)
+    outputs['stack']['dispersion_R_shift'][:,:numdis]+=np.multiply(dis_alt,alpha_alt)
 
     dis_alt=np.square(np.transpose(np.tile(dispersion_R_model,(numdis,1)))-dispersion_R_true_all)
-    outputs['stack']['dispersion_R_sq'][:,numdis]+=np.multiply(dis_alt,alpha_alt)
+    outputs['stack']['dispersion_R_sq'][:,:numdis]+=np.multiply(dis_alt,alpha_alt)
 
     alpha_alt=np.tile(alpha,(params_dispersion['L']['ndatad'],1))
-    outputs['stack']['dispersion_L'][:,numdis]+=np.multiply(dispersion_R_true_all,alpha_alt)
+    outputs['stack']['dispersion_L'][:,:numdis]+=np.multiply(dispersion_R_true_all,alpha_alt)
 
     dis_alt=np.transpose(np.tile(dispersion_L_model,(numdis,1)))-dispersion_L_true_all
-    outputs['stack']['dispersion_L_shift'][:,numdis]+=np.multiply(dis_alt,alpha_alt)
+    outputs['stack']['dispersion_L_shift'][:,:numdis]+=np.multiply(dis_alt,alpha_alt)
 
     dis_alt=np.square(np.transpose(np.tile(dispersion_L_model,(numdis,1)))-dispersion_L_true_all)
-    outputs['stack']['dispersion_L_sq'][:,numdis]+=np.multiply(dis_alt,alpha_alt)
+    outputs['stack']['dispersion_L_sq'][:,:numdis]+=np.multiply(dis_alt,alpha_alt)
 
     return #outputs
 
