@@ -1638,7 +1638,7 @@ program RJ_MCMC
 
                 npt_prop=npt-1
 
-                if ((npt_prop<milay)).or.(ind==1)) then ! don't remove the first layer
+                if ((npt_prop<milay).or.(ind==1)) then ! don't remove the first layer
                     out=0
                 else
                     voro_prop(ind,:)=voro(npt,:)
