@@ -33,13 +33,13 @@ program RJ_MCMC
     real, parameter :: vp_scale = 2.0
 
     character (len=*), parameter :: mods_dirname = 'MODS_OUT_TEST' ! This is where output info files are saved and input data files are taken.
-    real, parameter :: noise_dspd = 0.04                            ! Gaussian noise added to disp data (>0). twice for Love.
-    real, parameter :: obs_err_R = 0.1                             ! Observational errors
-    real, parameter :: obs_err_L = 0.2                             ! Observational errors
+    real, parameter :: noise_dspd = 0.01                            ! Gaussian noise added to disp data (>0). twice for Love.
+    real, parameter :: obs_err_R = 0.04                             ! Observational errors - obs_err_R*Ad_R=noise_dspd_R (sigma_R)
+    real, parameter :: obs_err_L = 0.04                             ! Observational errors - obs_err_L*Ad_L=noise_dspd_L (sigma_L)
 
     character(len=64), parameter :: rp_file = 'rayp2.in'
-    real, parameter :: noise_PsPp = 0.04                              ! Gaussian noise added to travel time data (>0)
-    real, parameter :: obs_err_PsPp = 0.5                             ! Observational errors
+    real, parameter :: noise_PsPp = 0.05                             ! Gaussian noise added to travel time data (>0)
+    real, parameter :: obs_err_PsPp = 0.2                             ! Observational errors - obs_err_PsPp*Ad_PsPp=noise_PsPp (sigma_PsPp)
 
     character (len=*), parameter :: dirname = 'OUT_TEST' ! This is where output info files are saved and input data files are taken.
     character*8, parameter :: storename = 'STORFFC1'     ! This is where output models are saved
@@ -195,8 +195,6 @@ program RJ_MCMC
     real voromax(malay,4) ! best model
     character filenamemax*30  !filename for writing the best model
     real d_cRmoy(ndatadmax), d_cRmoys(ndatadmax), d_cLmoy(ndatadmax), d_cLmoys(ndatadmax) ! average dispersion curve
-    real d_cRmoy_shift(ndatadmax), d_cRmoys_shift(ndatadmax)
-    real d_cLmoy_shift(ndatadmax), d_cLmoys_shift(ndatadmax) ! shifted average dispersion curve
     real d_cRdelta(ndatadmax), d_cRdeltas(ndatadmax), d_cLdelta(ndatadmax), d_cLdeltas(ndatadmax) ! standart deviation of dispersion curve
     real model_ref(mk,9) ! reference model, all models are deviations from it
     real,dimension(mk) :: r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,xi,vp_data,vs_data ! input for forward modelling
@@ -323,10 +321,6 @@ program RJ_MCMC
     d_cLmoy=0
     d_cRmoys=0
     d_cLmoys=0
-    d_cRmoy_shift=0
-    d_cLmoy_shift=0
-    d_cRmoys_shift=0
-    d_cLmoys_shift=0
     d_cRdelta=0
     d_cLdelta=0
     d_cRdeltas=0
@@ -388,7 +382,7 @@ program RJ_MCMC
 
         ! GET SYNTH SWD DATA ----------------------------------------------------------------
         nlims_cur=1
-        open(65,file='./Durand_data_raw_fund.in',status='old')! 65: name of the opened file in memory (unit identifier)
+        open(65,file='./Durand_data_raw.in',status='old')! 65: name of the opened file in memory (unit identifier)
         read(65,*,IOSTAT=io)ndatad_R ! number of Rayleigh modes
         read(65,*,IOSTAT=io)nharm_R ! number of harmonics
 
@@ -986,7 +980,9 @@ program RJ_MCMC
                             else !Going down
                                 sigmav_new=sigmav*(1-perturb)
                             endif
-                            sigmavp_new=sigmavp
+                            ! sigmavp_new=sigmavp
+                            sigmav_old=sigmav
+                            sigmav=sigmav_new
                         else
                             ! sigmavp
                             if (sigmavp>sigmavp_old) then !Going up
@@ -994,7 +990,9 @@ program RJ_MCMC
                             else !Going down
                                 sigmavp_new=sigmavp*(1-perturb)
                             endif
-                            sigmav_new=sigmav
+                            ! sigmav_new=sigmav
+                            sigmavp_old=sigmavp
+                            sigmavp=sigmavp_new
                         endif
                     else ! Going in the wrong direction
                         if (mod(int(sigma_count/switch_sigma),2)==0) then
@@ -1003,7 +1001,9 @@ program RJ_MCMC
                             else
                                 sigmav_new=sigmav*(1+perturb)
                             endif
-                            sigmavp_new=sigmavp
+                            ! sigmavp_new=sigmavp
+                            sigmav_old=sigmav
+                            sigmav=sigmav_new
                         else
                             ! sigmavp
                             if (sigmavp>sigmavp_old) then !Going up
@@ -1011,7 +1011,9 @@ program RJ_MCMC
                             else
                                 sigmavp_new=sigmavp*(1+perturb)
                             endif
-                            sigmav_new=sigmav
+                            ! sigmav_new=sigmav
+                            sigmavp_old=sigmavp
+                            sigmavp=sigmavp_new
                         endif
                     endif
                 else
@@ -1033,11 +1035,11 @@ program RJ_MCMC
 
                 !write(*,*)sigmav_new
                 !write(*,*)
-                sigmav_old=sigmav
-                sigmav=sigmav_new
+                ! sigmav_old=sigmav
+                ! sigmav=sigmav_new
 
-                sigmavp_old=sigmavp
-                sigmavp=sigmavp_new
+                ! sigmavp_old=sigmavp
+                ! sigmavp=sigmavp_new
 
                 Ar_birth_old=AcB/PrB
                 PrB=0
@@ -2121,8 +2123,6 @@ program RJ_MCMC
         !
         call MPI_REDUCE(d_cRmoy,d_cRmoys,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(d_cLmoy,d_cLmoys,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-        call MPI_REDUCE(d_cRmoy_shift,d_cRmoys_shift,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
-        call MPI_REDUCE(d_cLmoy_shift,d_cLmoys_shift,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(d_cRdelta,d_cRdeltas,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
         call MPI_REDUCE(d_cLdelta,d_cLdeltas,ndatadmax,MPI_Real,MPI_Sum,0,MPI_COMM_small,ierror)
 
@@ -2142,7 +2142,6 @@ program RJ_MCMC
 
         d_cRmoys=d_cRmoys/j
         d_cLmoys=d_cLmoys/j
-
         d_cRmoys_shift=d_cRmoys_shift/j
         d_cLmoys_shift=d_cLmoys_shift/j
         d_cRdeltas=sqrt(d_cRdeltas/j-d_cRmoys_shift**2)
