@@ -1,7 +1,7 @@
 subroutine whichcell_d(point,voro,npt,ind)
 include '../params.h'
 
-    real, intent(in) :: point,voro(maxlay,5)
+    real, intent(in) :: point,voro(malay,4)
     integer, intent(in) :: npt
     integer, intent(out) :: ind
 
