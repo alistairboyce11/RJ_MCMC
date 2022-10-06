@@ -230,7 +230,7 @@ c     ------ Al Edits ------
       common/mtab/we(2),de(2),ke(2),wtry,bm
       dimension wt(2)
       data inss/5/
-c     ------ Al Edits ------
+c     ------ Al Edits ------ 
       ! error_flag = .false.
 
       cmhz=pi/500.d0
@@ -756,12 +756,12 @@ c**** of the secular determinant as det and the count of zero crossings.
       common/eifx/a(14,mk),dum(mk)
       common/rindx/nic,noc,nsl,nicp1,nocp1,nslp1,n
       dimension ass(14),vf(mk),zi(4)
-c     ------ Al Edits ------
+c     ------ Al Edits ------ 
       logical :: error_flag
       real*8    :: start_time, cur_time, run_time
       parameter (run_lim=5.0)
       parameter (cg_lim=1000000)
-c     ------ Al Edits ------
+c     ------ Al Edits ------ 
       ! error_flag = .false.
 
       call cpu_time(cur_time)
@@ -783,21 +783,21 @@ c     ------ Al Edits ------
 
       ! print *, "cg, cg_norm, cg_norm_ref, vn",cg*vn,cg,5000./vn,vn
 
-c***  Al Check statement
+c***  Al Check statement    
       if(wdim.lt.0) then
-c         print *, 'wdim -ve'
-c         print *, 'wdim, knt, det, ifeif, wn, w'
-c         print *, wdim,knt,det,ifeif,wn,w
-c         print *, "Exiting..."
+c       print *, 'wdim -ve'
+c       print *, 'wdim, knt, det, ifeif, wn, w'
+c       print *, wdim,knt,det,ifeif,wn,w
+c       print *, "Exiting..."
         error_flag=.true.
         return
       else if (cg*vn.gt.cg_lim) then
-c         print *, 'cg*vn > cg_lim'
-c         print *, "cg*vn, cg_lim, cg, cg_ref, vn"
-c         print *, cg*vn,cg_lim,cg,5000./vn,vn
-c         print *, 'wdim, knt, det, ifeif, wn, w'
-c         print *, wdim,knt,det,ifeif,wn,w
-c         print *, "Exiting..."
+c       print *, 'cg*vn > cg_lim'
+c       print *, "cg*vn, cg_lim, cg, cg_ref, vn"
+c       print *, cg*vn,cg_lim,cg,5000./vn,vn
+c       print *, 'wdim, knt, det, ifeif, wn, w'
+c       print *, wdim,knt,det,ifeif,wn,w
+c       print *, "Exiting..."
         error_flag=.true.
         return
       ! else

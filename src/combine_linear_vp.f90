@@ -15,14 +15,22 @@ subroutine combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
     real,dimension(malay) :: vshvsv,vpvsv
     real,dimension(malay+1) :: radius
     integer :: i,j,k,c
-
+    
     real,dimension(mk),intent(out) :: r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta
     real,dimension(mk),intent(out) :: xi,vp_data,vs_data
-    ! real,dimension(mk) :: vs_data
     integer,intent(out) :: nptfinal,nic,noc
+    
+    ! write(*,*) nptref, nic_ref, noc_ref
+    ! do i = 1,nptref
+    !      write(*,*) i, model_ref(i,1),&
+    !                 model_ref(i,2),model_ref(i,3),model_ref(i,4),model_ref(i,5),&
+    !                 model_ref(i,6),model_ref(i,7),model_ref(i,8),model_ref(i,9)
+    ! end do
+
 
     voro2=voro
-
+    !call quicksort(voro2,npt)
+    
     do i=1,npt
         do j=1,npt-1
             if (voro2(j,1).gt.voro2(j+1,1)) then
@@ -31,6 +39,7 @@ subroutine combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
         ENDDO
     ENDDO
 
+    !voro(i,:)=[thickness,vsv,(vsh/vsv)**2,vp/vsv]
     do i=1,npt
         ! radius(i)=rearth-float(int(voro2(i,1)*1000)) ! Round to nearest meter
         radius(i)=rearth-float(int(voro2(i,1))*1000) ! Round to nearest km
@@ -42,7 +51,7 @@ subroutine combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
         vshvsv(i)=voro2(i,3)
         if (vshvsv(i)==-1) vshvsv(i)=1
     end do
-
+    
     ! do i=1,npt
     !     vpvsv(i)=vpvs*(1+voro2(i,4))
     ! end do
@@ -62,24 +71,20 @@ subroutine combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
     eta(k)=model_ref(i,9)
 
     vsv(k)=model_ref(i,4)*(1+voro2(j,2))
-    ! vph(k)=vsv(k)*vpvsv(j)
-    ! vpv(k)=vph(k)
     vsh(k)=vsv(k)*sqrt(vshvsv(j))
 
     !!!!!!!!!!!!!!!!! New !!!!!!!!!!!!!!!!!!!!!!!!
     vph(k)=model_ref(i,7)*(1+voro2(j,4))
     vpv(k)=vph(k)*sqrt(phi)
 
-
     xi(k)=vshvsv(j)
     vp_data(k)=voro2(j,4)
     vs_data(k)=voro2(j,2)
-
+    
     j=j+1
 
     k=k-1
     i=i-1
-
 
     do while ((i>=1).or.(j<npt+2))
 
@@ -105,12 +110,11 @@ subroutine combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
 
             elseif (model_ref(i,1)<=radius(j)) then
                 r(k)=radius(j)
-
                 rho(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,2),model_ref(i+1,2),r(k))
                 qkappa(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,5),model_ref(i+1,5),r(k))
                 qshear(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,6),model_ref(i+1,6),r(k))
                 eta(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,9),model_ref(i+1,9),r(k))
-
+                
                 vsv(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,4),model_ref(i+1,4),r(k))*(1+voro2(j-1,2))
                 vph(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,7),model_ref(i+1,7),r(k))*(1+voro2(j-1,4))
                 vsh(k)=vsv(k)*sqrt(vshvsv(j-1))
@@ -128,23 +132,22 @@ subroutine combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 qkappa(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,5),model_ref(i+1,5),r(k))
                 qshear(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,6),model_ref(i+1,6),r(k))
                 eta(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,9),model_ref(i+1,9),r(k))
-
+                
                 vsh(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,8),model_ref(i+1,8),r(k))
                 vpv(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,3),model_ref(i+1,3),r(k))
                 vsv(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,4),model_ref(i+1,4),r(k))
                 vph(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,7),model_ref(i+1,7),r(k))
-
+                
                 xi(k)=(vsh(k)/vsv(k))**2
                 vp_data(k)=0.0
                 vs_data(k)=0.0
                 ! write(*,*)r(k), "Here 3"
                 if (r(k)<model_ref(nic_ref,1)) nic=nic+2
-                if (r(k)<model_ref(noc_ref,1)) noc=noc+2
-
+                if (r(k)<model_ref(noc_ref,1)) noc=noc+2  
+                
                 k=k-1
-
+                
                 j=j+1
-
 
             elseif (model_ref(i,1)>radius(j)) then
 
@@ -153,7 +156,7 @@ subroutine combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 qkappa(k)=model_ref(i,5)
                 qshear(k)=model_ref(i,6)
                 eta(k)=model_ref(i,9)
-
+                
                 vsv(k)=model_ref(i,4)*(1+voro2(j-1,2))
                 vph(k)=model_ref(i,7)*(1+voro2(j-1,4))
                 vsh(k)=vsv(k)*sqrt(vshvsv(j-1))
@@ -179,7 +182,7 @@ subroutine combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 qkappa(k)=model_ref(i,5)
                 qshear(k)=model_ref(i,6)
                 eta(k)=model_ref(i,9)
-
+                
                 vsv(k)=model_ref(i,4)*(1+voro2(j-1,2))
                 vph(k)=model_ref(i,7)*(1+voro2(j-1,4))
                 vsh(k)=vsv(k)*sqrt(vshvsv(j-1))
@@ -192,7 +195,6 @@ subroutine combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 k=k-1
                 i=i-1
 
-
             elseif (model_ref(i,1)<radius(j)) then
 
                 r(k)=radius(j)
@@ -201,7 +203,7 @@ subroutine combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 qkappa(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,5),model_ref(i+1,5),r(k))
                 qshear(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,6),model_ref(i+1,6),r(k))
                 eta(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,9),model_ref(i+1,9),r(k))
-
+                
                 vsv(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,4),model_ref(i+1,4),r(k))*(1+voro2(j-1,2))
                 vph(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,7),model_ref(i+1,7),r(k))*(1+voro2(j-1,4))
                 vsh(k)=vsv(k)*sqrt(vshvsv(j-1))
@@ -224,22 +226,15 @@ subroutine combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 vph(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,7),model_ref(i+1,7),r(k))*(1+voro2(j,4))
                 vsh(k)=vsv(k)*sqrt(vshvsv(j))
                 vpv(k)=vph(k)*sqrt(phi)
-
-
-                ! vpv(k)=vsv(k)*vpvsv(j)
-                ! vsh(k)=vsv(k)*sqrt(vshvsv(j))
-                ! vph(k)=vpv(k)
                 xi(k)=vshvsv(j)
                 vp_data(k)=voro2(j,4)
                 vs_data(k)=voro2(j,2)
-
+                
                 if (r(k)<model_ref(nic_ref,1)) nic=nic+2
-                if (r(k)<model_ref(noc_ref,1)) noc=noc+2
+                if (r(k)<model_ref(noc_ref,1)) noc=noc+2        
                 ! write(*,*)r(k), "Here 7"
                 k=k-1
                 j=j+1
-
-
 
             elseif (model_ref(i,1)==radius(j)) then
                 ! current Node in Voro at same depth as discont in reference model
@@ -283,13 +278,12 @@ subroutine combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 nptfinal=nptfinal-2
                 c=c+1
 
-
             else
                 write(*,*)'unaccounted case j<=npt'
             endif
         endif
-
-
+        
+        
     enddo
 
     ! Account for decreasing nptfinal
@@ -323,5 +317,4 @@ subroutine combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
     end if
 
 end subroutine combine_linear_vp
-
 
