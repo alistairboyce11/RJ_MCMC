@@ -155,6 +155,7 @@ program RJ_MCMC
     real convsigmavps_bi(burn_in)
 
     integer th_all
+    logical getting_old
 
     ! for mpi write purposes
     integer filehandle
@@ -1027,6 +1028,135 @@ program RJ_MCMC
 
 
     burnin_in_progress=.true.
+
+    getting_old=.false.
+
+    if (getting_old) then
+        write(filenamemax,"('/last_model_',I3.3,'.inout')") rank
+        open(65,file=dirname//filenamemax,status='old')
+        read(65,*,IOSTAT=io)Ad_R
+        read(65,*,IOSTAT=io)Ad_L
+        read(65,*,IOSTAT=io)pxi
+        read(65,*,IOSTAT=io)p_vp
+        read(65,*,IOSTAT=io)pAd_R
+        read(65,*,IOSTAT=io)pAd_L
+        read(65,*,IOSTAT=io)pv
+        read(65,*,IOSTAT=io)pd
+        read(65,*,IOSTAT=io)sigmav
+        read(65,*,IOSTAT=io)sigmavp
+        read(65,*,IOSTAT=io)npt
+        do i=1,npt
+            read(65,*,IOSTAT=io)voro(i,1),voro(i,2),voro(i,3),voro(i,4)
+        enddo
+        close(65)
+        j=j+1
+        burnin_in_progress=.false.
+
+        write(*,*)'before combine_linear'
+        call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,vs_data,xi,vp_data)
+
+        write(*,*)'after combine_linear'
+
+        if (ndatad_R>0) then
+
+            jcom=3 !rayleigh waves
+
+            do iharm=1,nharm_R
+                nmodes=0
+                call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
+                    qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,&
+                    wmin_R(iharm),wmax_R(iharm),numharm_R(iharm),numharm_R(iharm),&
+                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
+                if (error_flag) then
+                    tes=.false.
+                    write(*,*)"Minos_bran FAILED for RAYLEIGH 004"
+                end if
+                peri_R_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)=peri_R(nlims_R(1,iharm):nlims_R(2,iharm))
+                n_R_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)=n_R(nlims_R(1,iharm):nlims_R(2,iharm))
+                ndatad_R_tmp=nlims_R(2,iharm)-nlims_R(1,iharm)+1 ! fortran slices take the first and the last element
+                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
+                    peri_R_tmp,n_R_tmp,d_cR_tmp,rq_R,ndatad_R_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
+                d_cR(nlims_R(1,iharm):nlims_R(2,iharm))=d_cR_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)
+                if (ier) then
+                    tes=.false.
+                    write(*,*)"Minos_bran FAILED for RAYLEIGH 005"
+                endif
+                if (maxval(abs(rq_R(:ndatad_R_tmp)))>maxrq*eps) tes=.false.
+            enddo
+        endif
+
+        write(*,*)'after rayleigh'
+
+        if (ndatad_L>0) then
+
+            jcom=2 !love waves
+            do iharm=1,nharm_L
+                nmodes=0
+                call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
+                    qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,&
+                    wmin_L(iharm),wmax_L(iharm),numharm_L(iharm),numharm_L(iharm),&
+                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
+                if (error_flag) then
+                    tes=.false.
+                    write(*,*)"Minos_bran FAILED for LOVE 004"
+                end if
+                peri_L_tmp(:nlims_L(2,iharm)-nlims_L(1,iharm)+1)=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                n_L_tmp(:nlims_L(2,iharm)-nlims_L(1,iharm)+1)=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
+                ndatad_L_tmp=nlims_L(2,iharm)-nlims_L(1,iharm)+1 ! fortran slices take the first and the last element
+                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
+                peri_L_tmp,n_L_tmp,d_cL_tmp,rq_L,ndatad_L_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
+                d_cL(nlims_L(1,iharm):nlims_L(2,iharm))=d_cL_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)
+                if (ier) then
+                    tes=.false.
+                    write(*,*)"Minos_bran FAILED for LOVE 005"
+                endif
+                if (maxval(abs(rq_L(:ndatad_L_tmp)))>maxrq*eps) tes=.false.
+            enddo
+
+        endif
+
+        ! isoflag says if a layer is isotropic
+        do i=1,npt
+            if (voro(i,3)==-1) then
+                isoflag(i)=.true.
+            else
+                isoflag(i)=.false.
+            endif
+        enddo
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! Check and double-check
+
+        !***********************************************************
+
+        !                 Get initial likelihood
+
+        !***********************************************************
+
+        lsd_R=0
+        lsd_L=0
+        liked_R=0
+        liked_L=0
+        do i=1,ndatad_R
+            lsd_R=lsd_R+(d_obsdCR(i)-d_cR(i))**2
+            liked_R=liked_R+(d_obsdCR(i)-d_cR(i))**2&
+            /(2*(Ad_R*d_obsdCRe(i)*(d_obsdCR(i)/100))**2) ! gaussian errors
+        enddo
+        do i=1,ndatad_L
+            lsd_L=lsd_L+(d_obsdCL(i)-d_cL(i))**2
+            liked_L=liked_L+(d_obsdCL(i)-d_cL(i))**2&
+            /(2*(Ad_L*d_obsdCLe(i)*(d_obsdCL(i)/100))**2)
+        enddo
+        lsd_R_min=lsd_R
+        lsd_L_min=lsd_L
+
+        like= (liked_R + liked_L)
+        like_w=like/widening_prop
+
+    endif
+
     do i_w=1,n_w
 
         ran=rank
@@ -1793,8 +1923,8 @@ program RJ_MCMC
 
             endif
 
-            write(*,*)'true',d_obsdCL(:ndatad_L)
-            write(*,*)'synth',d_cL_prop(:ndatad_L)
+            !write(*,*)'true',d_obsdCL(:ndatad_L)
+            !write(*,*)'synth',d_cL_prop(:ndatad_L)
 
             like_prop=(liked_R_prop+liked_L_prop) !log-likelihood of the proposed model
             like_prop_w=like_prop/widening_prop
@@ -2333,6 +2463,24 @@ program RJ_MCMC
                     endif
 
                 endif
+
+                write(filenamemax,"('/last_model_',I3.3,'.inout')") rank
+                open(65,file=dirname//filenamemax,status='replace')
+                write(65,*)Ad_R
+                write(65,*)Ad_L
+                write(65,*)pxi
+                write(65,*)p_vp
+                write(65,*)pAd_R
+                write(65,*)pAd_L
+                write(65,*)pv
+                write(65,*)pd
+                write(65,*)sigmav
+                write(65,*)sigmavp
+                write(65,*)npt
+                do i=1,npt
+                    write(65,*)voro(i,:)
+                enddo
+                close(65)
 
                 cycle ! continue the loop skipping anything below
             endif

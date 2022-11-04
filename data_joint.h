@@ -2,11 +2,10 @@
     character (len=*), parameter :: dirname = 'OUT'
     character*8, parameter :: storename = 'STORFFC1'
     integer, parameter :: burn_in = 100000! 55000 !Burn-in period
-    integer,parameter :: nsample_widening=500000! 50000!Post burn-in
-    integer,parameter :: burn_in_widening=100000! 50000!Post burn-in
-    integer,parameter :: nsample=1000
+    integer,parameter :: nsample_widening=200000! 50000!Post burn-in
+    integer,parameter :: burn_in_widening=00000! 50000!Post burn-in
 
-    integer, parameter :: thin = 1    !Thinning of the chain
+    integer, parameter :: thin = 25    !Thinning of the chain
 
     integer, parameter :: Scratch = 1     ! 0: Start from Stored model 1: Start from scratch
     integer, parameter :: store = 99999999    !Store models every "store" iteration.
@@ -77,7 +76,7 @@
     real, parameter :: logalpha_min=-100
     real, parameter :: logalpha_max=5
     integer, parameter :: num_logalpha=200
-    real, parameter :: widening_start=5.
+    real, parameter :: widening_start=1.
     integer, parameter :: n_w=1
     real,parameter :: widening_step=1.
 
