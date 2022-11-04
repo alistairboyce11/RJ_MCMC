@@ -460,11 +460,11 @@ print(size,rank)
 # outdir='OUT_0_ALL'
 # points=[]
 
-directories=['OUT_TEST10/OUT']
+directories=['OUT_TEST_REAL_SIGMAV_CONSTANT/OUT']
 #directories=['OUT_CLUSTER0_JOINT/OUT','OUT_CLUSTER1_JOINT/OUT','OUT_CLUSTER2_JOINT/OUT','OUT_CLUSTER6_JOINT/OUT','OUT_CLUSTER8_JOINT/OUT','OUT_CLUSTER9_JOINT/OUT']
 clusters=[0]
 widenings=[5.]
-outdir='OUT_TEST10'
+outdir='OUT_TEST_REAL_SIGMAV_CONSTANT'
 if not os.path.exists(outdir):
     os.mkdir(outdir)
 points=[]

@@ -42,7 +42,7 @@ program RJ_MCMC
         Ac_vp,PrP,PrV,AcP,AcV ! to adjust acceptance rates for all different parameters
     real lsd_L,lsd_L_prop,lsd_L_min,lsd_R,lsd_R_prop,lsd_R_min !logprob without uncertainties
     real logprob_vsv,logprob_vp !for reversible jump
-    real voro(malay,4),vsref_min,vsref_max,vpref_min,vpref_max !the model with its bounds
+    real voro(malay,4) !the model
     real voro_prop(malay,4)
     real t1,t2 !timers
     real like,like_prop,u,& !log-likelyhoods
@@ -162,7 +162,7 @@ program RJ_MCMC
     integer nb_bytes_integer,nb_bytes_real,nb_bytes_double
     integer nb_bytes_header,nb_bytes_model,nb_bytes_offset
     integer(kind=MPI_OFFSET_KIND) :: position_file
-    integer :: num_file=0
+    integer :: num_file=0,num_file_new
 
 !     ! for delayed writing purposes
 !     integer :: number_write
@@ -215,25 +215,21 @@ program RJ_MCMC
     !************************************************************
     !                READ PREM
     !************************************************************
-    open(7,file="Model_PREM_SIMPLE.in",status='old',form='formatted')
+    open(7,file="Model_PREM_DISC_20.in",status='old',form='formatted')
+    !open(7,file="Model_PREM_SIMPLE.in",status='old',form='formatted')
     !  110 format(20a4)
     read(7,*) nptref,nic_ref,noc_ref
-    read(7,'(f8.0, 3f9.2, 2f9.1, 2f9.2, f9.5)') (model_ref(i,1),&
-        model_ref(i,2),model_ref(i,3),model_ref(i,4),model_ref(i,5),&
-        model_ref(i,6),model_ref(i,7),model_ref(i,8),model_ref(i,9),&
-        i=1,nptref)
+    do i = 1,nptref
+         read(7,*) model_ref(i,1),&
+                    model_ref(i,2),model_ref(i,3),model_ref(i,4),model_ref(i,5),&
+                    model_ref(i,6),model_ref(i,7),model_ref(i,8),model_ref(i,9)
+    end do
     close(7)
     j=1
     do while (model_ref(j,1)<rearth-d_max*1000.)
         j=j+1
     end do
     j=j-1
-
-    vsref_min=minval(model_ref(j:nptref,4)*(1-width)) ! setting min/max velocities for writing later
-    vsref_max=maxval(model_ref(j:nptref,4)*(1+width))
-
-    vpref_min=minval(model_ref(j:nptref,7)*(1-vp_max)) ! setting min/max velocities for writing later
-    vpref_max=maxval(model_ref(j:nptref,7)*(1+vp_max))
 
     write(*,*)'read prem'
 
@@ -423,62 +419,62 @@ program RJ_MCMC
         voro(1,4)=0.0  !vph=vph_prem*(1+voro(i,4))
         npt=1
 
-        voro(2,1)=50/2. !depth of interface
+        voro(2,1)=50 !depth of interface
         voro(2,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
         voro(2,3)=1.2!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
         voro(2,4)=0.0  !vph=vph_prem*(1+voro(i,4))
 
-        voro(3,1)=100/2. !depth of interface
+        voro(3,1)=100 !depth of interface
         voro(3,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
         voro(3,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
         voro(3,4)=0.0  !vph=vph_prem*(1+voro(i,4))
 
-        voro(4,1)=150/2. !depth of interface
+        voro(4,1)=150 !depth of interface
         voro(4,2)=0.15  !vsv=vsv_prem*(1+voro(i,2))
         voro(4,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
         voro(4,4)=0.0  !vph=vph_prem*(1+voro(i,4))
 
-        voro(5,1)=200/2. !depth of interface
+        voro(5,1)=200 !depth of interface
         voro(5,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
         voro(5,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
         voro(5,4)=0.0  !vph=vph_prem*(1+voro(i,4))
 
-        voro(6,1)=250/2. !depth of interface
+        voro(6,1)=250 !depth of interface
         voro(6,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
         voro(6,3)=0.8!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
         voro(6,4)=0.0  !vph=vph_prem*(1+voro(i,4))
 
-        voro(7,1)=300/2. !depth of interface
+        voro(7,1)=300 !depth of interface
         voro(7,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
         voro(7,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
         voro(7,4)=0.0  !vph=vph_prem*(1+voro(i,4))
 
-        voro(8,1)=350/2. !depth of interface
+        voro(8,1)=350 !depth of interface
         voro(8,2)=-0.15  !vsv=vsv_prem*(1+voro(i,2))
         voro(8,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
         voro(8,4)=0.0  !vph=vph_prem*(1+voro(i,4))
 
-        voro(9,1)=400/2. !depth of interface
+        voro(9,1)=400 !depth of interface
         voro(9,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
         voro(9,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
         voro(9,4)=0.0  !vph=vph_prem*(1+voro(i,4))
 
-        voro(10,1)=450/2. !depth of interface
+        voro(10,1)=450 !depth of interface
         voro(10,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
         voro(10,3)=1.2!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
         voro(10,4)=0.0  !vph=vph_prem*(1+voro(i,4))
 
-        voro(11,1)=500/2. !depth of interface
+        voro(11,1)=500 !depth of interface
         voro(11,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
         voro(11,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
         voro(11,4)=0.0  !vph=vph_prem*(1+voro(i,4))
 
-        voro(12,1)=550/2. !depth of interface
+        voro(12,1)=550 !depth of interface
         voro(12,2)=-0.13  !vsv=vsv_prem*(1+voro(i,2))
         voro(12,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
         voro(12,4)=0.0  !vph=vph_prem*(1+voro(i,4))
 
-        voro(13,1)=600/2. !depth of interface
+        voro(13,1)=600 !depth of interface
         voro(13,2)=0.0  !vsv=vsv_prem*(1+voro(i,2))
         voro(13,3)=-1!0.7+0.5/33.*i !xi=voro(i,3), -1 for isotropic layer
         voro(13,4)=0.0  !vph=vph_prem*(1+voro(i,4))
@@ -579,7 +575,7 @@ program RJ_MCMC
                     nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
                 if (error_flag) then
                     tes=.false.
-                    stop"Minos_bran FAILED for RAYLEIGH 004"
+                    stop "Minos_bran FAILED for RAYLEIGH 004"
                 end if
                 peri_R_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)=peri_R(nlims_R(1,iharm):nlims_R(2,iharm))
                 n_R_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)=n_R(nlims_R(1,iharm):nlims_R(2,iharm))
@@ -590,11 +586,11 @@ program RJ_MCMC
                 if (ier) then
                     tes=.false.
                     write(*,*)numharm_R(iharm)
-                    stop'Dispersion_minos RAYLEIGH error'
+                    stop 'Dispersion_minos RAYLEIGH error'
                 endif
                 if (maxval(abs(rq_R(:ndatad_R_tmp)))>maxrq*eps) then
                     tes=.false.
-                    stop'raylquo RAYLEIGH error'
+                    stop 'raylquo RAYLEIGH error'
                 endif
             enddo
         endif
@@ -610,7 +606,7 @@ program RJ_MCMC
                     nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
                 if (error_flag) then
                     tes=.false.
-                    stop"Minos_bran FAILED for LOVE 004"
+                    stop "Minos_bran FAILED for LOVE 004"
                 end if
                 peri_L_tmp(:nlims_L(2,iharm)-nlims_L(1,iharm)+1)=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
                 n_L_tmp(:nlims_L(2,iharm)-nlims_L(1,iharm)+1)=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
@@ -620,11 +616,11 @@ program RJ_MCMC
                 d_cL(nlims_L(1,iharm):nlims_L(2,iharm))=d_cL_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)
                 if (ier) then
                     tes=.false.
-                    stop'Dispersion_minos LOVE error'
+                    stop 'Dispersion_minos LOVE error'
                 endif
                 if (maxval(abs(rq_L(:ndatad_L_tmp)))>maxrq*eps) then
                     tes=.false.
-                    stop'raylquo LOVE error'
+                    stop 'raylquo LOVE error'
                 endif
 
             enddo
@@ -721,7 +717,6 @@ program RJ_MCMC
             read(65,*,IOSTAT=io)nlims_cur_diff
             nlims_R(1,k)=nlims_cur
             nlims_R(2,k)=nlims_R(1,k)+nlims_cur_diff
-            !read(65,*,IOSTAT=io)wmin_R(k),wmax_R(k)
             do i=nlims_cur,nlims_cur+nlims_cur_diff
                 read(65,*,IOSTAT=io)n_R(i),peri_R(i),d_obsdcR(i),d_obsdCRe(i)
                 do j=1,numdis
@@ -739,7 +734,6 @@ program RJ_MCMC
             read(65,*,IOSTAT=io)nlims_cur_diff
             nlims_L(1,k)=nlims_cur
             nlims_L(2,k)=nlims_L(1,k)+nlims_cur_diff
-            !read(65,*,IOSTAT=io)wmin_L(k),wmax_L(k)
             do i=nlims_cur,nlims_cur+nlims_cur_diff
                 read(65,*,IOSTAT=io)n_L(i),peri_L(i),d_obsdcL(i),d_obsdCLe(i)
                 do j=1,numdis
@@ -774,17 +768,13 @@ program RJ_MCMC
 
     open(56,file=dirname//'/parameters.out',status='replace')
     write(56,*)'burn-in',burn_in
-    write(56,*)'nsample',nsample
     write(56,*)'nsample_widening',nsample_widening
     write(56,*)'burn-in_widening',burn_in_widening
     close(56)
-    !***************************************************
-    !***************************************************
 
+    write(*,*)d_obsdcR(:ndatad_R)
+    write(*,*)d_obsdcL(:ndatad_L)
     !***************************************************
-
-    !    First loop to find the good widening
-
     !***************************************************
 
     !**************************************************************
@@ -794,7 +784,6 @@ program RJ_MCMC
     !**************************************************************
 
     write(*,*)dirname
-    !write(1000*rank,*)dirname
 
     widening_prop=widening_start
 
@@ -802,8 +791,8 @@ program RJ_MCMC
     p_vp = 0.1           ! proposal for change in vp
     pd = 10!0.2         ! proposal on change in position
     pv = 0.1!0.04     ! proposal on velocity
-    pAd_R = 0.5        ! proposal for change in R noise
-    pAd_L = 0.5        ! proposal for change in L noise
+    pAd_R = 5        ! proposal for change in R noise
+    pAd_L = 5        ! proposal for change in L noise
     sigmav=0.15         ! proposal for vsv when creating a new layer
     sigmavp=0.15         ! proposal for vp when creating a new layer
 
@@ -821,9 +810,9 @@ program RJ_MCMC
     Ad_R = Ad_R_max-pAd_R! Ad_min+ran3(ra)*(Ad_R_max-Ad_min)
     Ad_L = Ad_L_max-pAd_L
 
-    ! start from true Ad
-    Ad_R = 10
-    Ad_L = 5
+    !! start from true Ad
+    !Ad_R = 10
+    !Ad_L = 5
 
 
 
@@ -837,12 +826,13 @@ program RJ_MCMC
         npt=15 ! not too many or too few initial layers to avoid getting stuck right away
         if ((npt>malay).or.(npt<milay)) goto 150
         j=j+1 ! première couche à 0 km/1km qui ne change jamais ???
+        write(*,*)'initialising model',j
 
         ! first layer always at 0
         voro(1,1)= 0.
         voro(1,2)= (-0.1+2*0.1*ran3(ra)) ! have an initial model reasonably close to the reference
           if (ran3(ra)<0.5) then
-              voro(1,3)= xi_min+(xi_max-xi_min)*ran3(ra)
+              voro(1,3)= 0.8+(1.2-0.8)*ran3(ra)
           else
               voro(1,3)= -1
           endif
@@ -855,7 +845,7 @@ program RJ_MCMC
             voro(i,1)= d_min+ran3(ra)*(d_max-d_min)
             voro(i,2)= (-0.1+2*0.1*ran3(ra)) ! have an initial model reasonably close to the reference
               if (ran3(ra)<0.5) then
-                  voro(i,3)= xi_min+(xi_max-xi_min)*ran3(ra)
+                  voro(i,3)= 0.8+(1.2-0.8)*ran3(ra)
               else
                   voro(i,3)= -1
               endif
@@ -863,11 +853,11 @@ program RJ_MCMC
             voro(i,4)= vp_min+(vp_max-vp_min)*ran3(ra)
         enddo
 
-        !write(*,*)'before combine_linear'
+        write(*,*)'before combine_linear'
         call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
             r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,vs_data,xi,vp_data)
 
-        !write(*,*)'after combine_linear'
+        write(*,*)'after combine_linear'
 
         if (ndatad_R>0) then
 
@@ -897,6 +887,8 @@ program RJ_MCMC
             enddo
         endif
 
+        write(*,*)'after rayleigh'
+
         if (ndatad_L>0) then
 
             jcom=2 !love waves
@@ -924,6 +916,7 @@ program RJ_MCMC
             enddo
 
         endif
+        write(*,*)'wtf?'
 
         if (j>250) stop "CAN'T INITIALIZE MODEL" ! if it doesn't work after 250 tries, give up
 
@@ -955,14 +948,13 @@ program RJ_MCMC
     lsd_L=0
     liked_R=0
     liked_L=0
-
-    do i=1,ndatad_R ! calculate misfit -> log-likelihood of initial model
+    do i=1,ndatad_R
         lsd_R=lsd_R+(d_obsdCR(i)-d_cR(i))**2
-        liked_R=liked_R+(d_obsdCR(i)-d_cR(i))**2/(2*(Ad_R*d_obsdCRe(i))**2) ! gaussian errors
+        liked_R=liked_R+(d_obsdCR(i)-d_cR(i))**2/(2*(Ad_R*d_obsdCRe(i)*(d_obsdCR(i)/100))**2) ! gaussian errors
     enddo
     do i=1,ndatad_L
         lsd_L=lsd_L+(d_obsdCL(i)-d_cL(i))**2
-        liked_L=liked_L+(d_obsdCL(i)-d_cL(i))**2/(2*(Ad_L*d_obsdCLe(i))**2)
+        liked_L=liked_L+(d_obsdCL(i)-d_cL(i))**2/(2*(Ad_L*d_obsdCLe(i)*(d_obsdCL(i)/100))**2)
     enddo
     lsd_R_min=lsd_R
     lsd_L_min=lsd_L
@@ -1072,114 +1064,116 @@ program RJ_MCMC
 
         ier=.false.
 
-        call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
-            r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,vs_data,xi,vp_data)
+        write(*,*)voro
 
-        if (ndatad_R>0) then
-
-            jcom=3 !rayleigh waves
-
-            do iharm=1,nharm_R
-                nmodes=0
-                call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
-                    qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,&
-                    wmin_R(iharm),wmax_R(iharm),numharm_R(iharm),numharm_R(iharm),&
-                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
-                if (error_flag) then
-                    tes=.false.
-                    write(*,*)"Minos_bran FAILED for RAYLEIGH 004"
-                end if
-                peri_R_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)=peri_R(nlims_R(1,iharm):nlims_R(2,iharm))
-                n_R_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)=n_R(nlims_R(1,iharm):nlims_R(2,iharm))
-                ndatad_R_tmp=nlims_R(2,iharm)-nlims_R(1,iharm)+1 ! fortran slices take the first and the last element
-                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
-                    peri_R_tmp,n_R_tmp,d_cR_tmp,rq_R,ndatad_R_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
-                d_cR(nlims_R(1,iharm):nlims_R(2,iharm))=d_cR_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)
-                if (ier) then
-                    tes=.false.
-                    write(*,*)'Disperdion_minos RAYLEIGH error'
-                endif
-                if (maxval(abs(rq_R(:ndatad_R_tmp)))>maxrq*eps) then
-                    tes=.false.
-                    write(*,*)'raylquo RAYLEIGH error'
-                endif
-            enddo
-        endif
-
-        if (ndatad_L>0) then
-
-            jcom=2 !love waves
-            do iharm=1,nharm_L
-                nmodes=0
-                call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
-                    qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,&
-                    wmin_L(iharm),wmax_L(iharm),numharm_L(iharm),numharm_L(iharm),&
-                    nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
-                if (error_flag) then
-                    tes=.false.
-                    write(*,*)"Minos_bran FAILED for LOVE 004"
-                end if
-                peri_L_tmp(:nlims_L(2,iharm)-nlims_L(1,iharm)+1)=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
-                n_L_tmp(:nlims_L(2,iharm)-nlims_L(1,iharm)+1)=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
-                ndatad_L_tmp=nlims_L(2,iharm)-nlims_L(1,iharm)+1 ! fortran slices take the first and the last element
-                call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
-                peri_L_tmp,n_L_tmp,d_cL_tmp,rq_L,ndatad_L_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
-                d_cL(nlims_L(1,iharm):nlims_L(2,iharm))=d_cL_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)
-                if (ier) then
-                    tes=.false.
-                    write(*,*)'Disperdion_minos LOVE error'
-                endif
-                if (maxval(abs(rq_L(:ndatad_L_tmp)))>maxrq*eps) then
-                    tes=.false.
-                    write(*,*)'raylquo LOVE error'
-                endif
-
-            enddo
-
-        endif
-
-        if (.not.tes) stop 'Transition model failed ?????'
-
-        ! isoflag says if a layer is isotropic
-        do i=1,npt
-            if (voro(i,3)==-1) then
-                isoflag(i)=.true.
-            else
-                isoflag(i)=.false.
-            endif
-        enddo
-
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        ! Check and double-check
-
-        !***********************************************************
-
-        !                 Get initial likelihood
-
-        !***********************************************************
-
-        lsd_R=0
-        lsd_L=0
-        liked_R=0
-        liked_L=0
-
-        do i=1,ndatad_R ! calculate misfit -> log-likelihood of initial model
-            lsd_R=lsd_R+(d_obsdCR(i)-d_cR(i))**2
-            liked_R=liked_R+(d_obsdCR(i)-d_cR(i))**2/(2*(Ad_R*d_obsdCRe(i))**2) ! gaussian errors
-        enddo
-        do i=1,ndatad_L
-            lsd_L=lsd_L+(d_obsdCL(i)-d_cL(i))**2
-            liked_L=liked_L+(d_obsdCL(i)-d_cL(i))**2/(2*(Ad_L*d_obsdCLe(i))**2)
-        enddo
-        lsd_R_min=lsd_R
-        lsd_L_min=lsd_L
-
-        like= (liked_R + liked_L)
-        like_w=like/widening_prop
-
-        if (ran==0) write(*,*)widening_prop
-        if (ran==0) write(*,*)like,like_w
+!         call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+!             r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,vs_data,xi,vp_data)
+!
+!         if (ndatad_R>0) then
+!
+!             jcom=3 !rayleigh waves
+!
+!             do iharm=1,nharm_R
+!                 nmodes=0
+!                 call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
+!                     qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,&
+!                     wmin_R(iharm),wmax_R(iharm),numharm_R(iharm),numharm_R(iharm),&
+!                     nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
+!                 if (error_flag) then
+!                     tes=.false.
+!                     write(*,*)"Minos_bran FAILED for RAYLEIGH 004"
+!                 end if
+!                 peri_R_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)=peri_R(nlims_R(1,iharm):nlims_R(2,iharm))
+!                 n_R_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)=n_R(nlims_R(1,iharm):nlims_R(2,iharm))
+!                 ndatad_R_tmp=nlims_R(2,iharm)-nlims_R(1,iharm)+1 ! fortran slices take the first and the last element
+!                 call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
+!                     peri_R_tmp,n_R_tmp,d_cR_tmp,rq_R,ndatad_R_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
+!                 d_cR(nlims_R(1,iharm):nlims_R(2,iharm))=d_cR_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)
+!                 if (ier) then
+!                     tes=.false.
+!                     write(*,*)'Disperdion_minos RAYLEIGH error'
+!                 endif
+!                 if (maxval(abs(rq_R(:ndatad_R_tmp)))>maxrq*eps) then
+!                     tes=.false.
+!                     write(*,*)'raylquo RAYLEIGH error'
+!                 endif
+!             enddo
+!         endif
+!
+!         if (ndatad_L>0) then
+!
+!             jcom=2 !love waves
+!             do iharm=1,nharm_L
+!                 nmodes=0
+!                 call minos_bran(1,tref,nptfinal,nic,noc,r,rho,vpv,vph,vsv,vsh,&
+!                     qkappa,qshear,eta,eps,wgrav,jcom,lmin,lmax,&
+!                     wmin_L(iharm),wmax_L(iharm),numharm_L(iharm),numharm_L(iharm),&
+!                     nmodes_max,nmodes,n_mode,l_mode,c_ph,period,raylquo,error_flag) ! calculate normal modes
+!                 if (error_flag) then
+!                     tes=.false.
+!                     write(*,*)"Minos_bran FAILED for LOVE 004"
+!                 end if
+!                 peri_L_tmp(:nlims_L(2,iharm)-nlims_L(1,iharm)+1)=peri_L(nlims_L(1,iharm):nlims_L(2,iharm))
+!                 n_L_tmp(:nlims_L(2,iharm)-nlims_L(1,iharm)+1)=n_L(nlims_L(1,iharm):nlims_L(2,iharm))
+!                 ndatad_L_tmp=nlims_L(2,iharm)-nlims_L(1,iharm)+1 ! fortran slices take the first and the last element
+!                 call dispersion_minos(nmodes_max,nmodes,n_mode,c_ph,period,raylquo,&
+!                 peri_L_tmp,n_L_tmp,d_cL_tmp,rq_L,ndatad_L_tmp,ier) ! extract phase velocities from minos output (pretty ugly)
+!                 d_cL(nlims_L(1,iharm):nlims_L(2,iharm))=d_cL_tmp(:nlims_R(2,iharm)-nlims_R(1,iharm)+1)
+!                 if (ier) then
+!                     tes=.false.
+!                     write(*,*)'Dispersion_minos LOVE error'
+!                 endif
+!                 if (maxval(abs(rq_L(:ndatad_L_tmp)))>maxrq*eps) then
+!                     tes=.false.
+!                     write(*,*)'raylquo LOVE error'
+!                 endif
+!
+!             enddo
+!
+!         endif
+!
+!         if (.not.tes) stop 'Transition model failed ?????'
+!
+!         ! isoflag says if a layer is isotropic
+!         do i=1,npt
+!             if (voro(i,3)==-1) then
+!                 isoflag(i)=.true.
+!             else
+!                 isoflag(i)=.false.
+!             endif
+!         enddo
+!
+!         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!         ! Check and double-check
+!
+!         !***********************************************************
+!
+!         !                 Get initial likelihood
+!
+!         !***********************************************************
+!
+!         lsd_R=0
+!         lsd_L=0
+!         liked_R=0
+!         liked_L=0
+!
+!         do i=1,ndatad_R ! calculate misfit -> log-likelihood of initial model
+!             lsd_R=lsd_R+(d_obsdCR(i)-d_cR(i))**2
+!             liked_R=liked_R+(d_obsdCR(i)-d_cR(i))**2/(2*(Ad_R*d_obsdCRe(i)*(d_obsdCR(i)/100))**2) ! gaussian errors
+!         enddo
+!         do i=1,ndatad_L
+!             lsd_L=lsd_L+(d_obsdCL(i)-d_cL(i))**2
+!             liked_L=liked_L+(d_obsdCL(i)-d_cL(i))**2/(2*(Ad_L*d_obsdCLe(i)*(d_obsdCL(i)/100))**2)
+!         enddo
+!         lsd_R_min=lsd_R
+!         lsd_L_min=lsd_L
+!
+!         like= (liked_R + liked_L)
+!         like_w=like/widening_prop
+!
+!         if (ran==0) write(*,*)widening_prop
+!         if (ran==0) write(*,*)like,like_w
 
 
         sample=0
@@ -1217,7 +1211,7 @@ program RJ_MCMC
         ! Create a file with MPI to store the accepted models
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-        write(filenamemax,"('/All_models_prepare_',I3.3,'_',f5.2,'.out')")num_file,widening_prop
+        write(filenamemax,"('/All_models_prepare_',I4.4,'_',f5.2,'.out')")num_file,widening_prop
 
         write(*,*)filenamemax
         call MPI_FILE_OPEN(MPI_COMM_WORLD,dirname//filenamemax,MPI_MODE_WRONLY + MPI_MODE_CREATE, &
@@ -1533,7 +1527,6 @@ program RJ_MCMC
                 endif
             elseif (u<0.3) then !change position--------------------------------------------
                 move=.true.
-                !ind=ceiling(ran3(ra)*npt)
                 ! layer 1 always stays at depth 0
                 ind=1+ceiling(ran3(ra)*(npt-1))
                 if (ind==1) ind=2
@@ -1544,9 +1537,9 @@ program RJ_MCMC
                 if ((voro_prop(ind,1)<=d_min).or.(voro_prop(ind,1)>=d_max)) then
                     out=0
                 endif
-                if ((voro_prop(ind,2)<=-width).or.(voro_prop(ind,2)>=width)) then
-                    out=0
-                endif
+!                 if ((voro_prop(ind,2)<=-width).or.(voro_prop(ind,2)>=width)) then
+!                     out=0
+!                 endif
 
             elseif (u<0.4) then ! Change noise parameter for rayleigh waves
                 noisd_R=.true.
@@ -1791,17 +1784,21 @@ program RJ_MCMC
                 liked_L_prop=0
                 do i=1,ndatad_R
                     lsd_R_prop=lsd_R_prop+(d_obsdCR(i)-d_cR_prop(i))**2
-                    liked_R_prop=liked_R_prop+(d_obsdCR(i)-d_cR_prop(i))**2/(2*(Ad_R_prop*d_obsdCRe(i))**2) ! prendre en compte erreurs mesurées
+                    liked_R_prop=liked_R_prop+(d_obsdCR(i)-d_cR_prop(i))**2/(2*(Ad_R_prop*d_obsdCRe(i)*(d_obsdCR(i)/100))**2) ! prendre en compte erreurs mesurées
                 end do
                 do i=1,ndatad_L
                     lsd_L_prop=lsd_L_prop+(d_obsdCL(i)-d_cL_prop(i))**2
-                    liked_L_prop=liked_L_prop+(d_obsdCL(i)-d_cL_prop(i))**2/(2*(Ad_L_prop*d_obsdCLe(i))**2) ! prendre en compte erreurs mesurées
+                    liked_L_prop=liked_L_prop+(d_obsdCL(i)-d_cL_prop(i))**2/(2*(Ad_L_prop*d_obsdCLe(i)*(d_obsdCL(i)/100))**2) ! prendre en compte erreurs mesurées
                 end do
 
             endif
 
+            write(*,*)'true',d_obsdCL(:ndatad_L)
+            write(*,*)'synth',d_cL_prop(:ndatad_L)
+
             like_prop=(liked_R_prop+liked_L_prop) !log-likelihood of the proposed model
             like_prop_w=like_prop/widening_prop
+            like_w=like/widening_prop
 
             ! if add Ad_R/widening and Ad_L/widening to like_w, change postprocess_binary_outputs.f90
 
@@ -2043,11 +2040,9 @@ program RJ_MCMC
                 !     call MPI_Comm_free(MPI_COMM_small, ierror)
                     call MPI_BARRIER(MPI_COMM_WORLD, ierror)
 
-                    write(*,*)'writing outputs of widening tests'
-
                     IF (rank==0) THEN
 
-                        write(filenametmp,"('/Convergence_Birth_burn-in_',I3.3,'.out')")rank
+                        write(filenametmp,"('/Convergence_Birth_burn-in_',I4.4,'.out')")rank
                         open(54,file=dirname//filenametmp,status='replace')
                         write(54,*)burn_in,n_w,burn_in_widening,nsample_widening
                         do i=1,burn_in
@@ -2135,13 +2130,13 @@ program RJ_MCMC
                         enddo
                         close(53)
 
-!                         write(filenametmp,"('/Convergence_sigmavp_burn-in_',I3.3,'.out')")rank
-!                         open(53,file=dirname//filenametmp,status='replace')
-!                         write(53,*)burn_in,n_w,burn_in_widening,nsample_widening
-!                         do i=1,burn_in
-!                             write(53,*)convsigmavp_bi(i)
-!                         enddo
-!                         close(53)
+                        write(filenametmp,"('/Convergence_sigmavp_burn-in_',I3.3,'.out')")rank
+                        open(53,file=dirname//filenametmp,status='replace')
+                        write(53,*)burn_in,n_w,burn_in_widening,nsample_widening
+                        do i=1,burn_in
+                            write(53,*)convsigmavp_bi(i)
+                        enddo
+                        close(53)
 
                         write(filenametmp,"('/Convergence_Birth_burn-in_ref.out')")
                         open(54,file=dirname//filenametmp,status='replace')
@@ -2231,13 +2226,13 @@ program RJ_MCMC
                         enddo
                         close(53)
 
-!                         write(filenametmp,"('/Convergence_sigmavp_burn-in_ref.out')")
-!                         open(53,file=dirname//filenametmp,status='replace')
-!                         write(53,*)burn_in,n_w,burn_in_widening,nsample_widening
-!                         do i=1,burn_in
-!                             write(53,*)convsigmavps_bi(i)
-!                         enddo
-!                         close(53)
+                        write(filenametmp,"('/Convergence_sigmavp_burn-in_ref.out')")
+                        open(53,file=dirname//filenametmp,status='replace')
+                        write(53,*)burn_in,n_w,burn_in_widening,nsample_widening
+                        do i=1,burn_in
+                            write(53,*)convsigmavps_bi(i)
+                        enddo
+                        close(53)
 
                     else ! only print convergence diagnostics for the core
                         write(filenametmp,"('/Convergence_Birth_burn-in_',I3.3,'.out')")rank
@@ -2328,13 +2323,13 @@ program RJ_MCMC
                         enddo
                         close(53)
 
-!                         write(filenametmp,"('/Convergence_sigmavp_burn-in_',I3.3,'.out')")rank
-!                         open(53,file=dirname//filenametmp,status='replace')
-!                         write(53,*)burn_in,n_w,burn_in_widening,nsample_widening
-!                         do i=1,burn_in
-!                             write(53,*)convsigmavp_bi(i)
-!                         enddo
-!                         close(53)
+                        write(filenametmp,"('/Convergence_sigmavp_burn-in_',I3.3,'.out')")rank
+                        open(53,file=dirname//filenametmp,status='replace')
+                        write(53,*)burn_in,n_w,burn_in_widening,nsample_widening
+                        do i=1,burn_in
+                            write(53,*)convsigmavp_bi(i)
+                        enddo
+                        close(53)
                     endif
 
                 endif
@@ -2383,6 +2378,10 @@ program RJ_MCMC
             IF (ount.GT.burn_in_widening) THEN
                 sample=sample+1
 
+                if (out==nsample_widening) then
+                    write(*,*)voro
+                endif
+
                 IF (mod(ount,thin)==0) THEN
                     !CALL cpu_time(t1)
 
@@ -2392,17 +2391,22 @@ program RJ_MCMC
                     call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                         r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,vs_data,xi,vp_data)
 
-                    if ((mod((th-1)*nbproc,everyall)==0).and.(th>1)) then ! if enough models in current files, create a new file
-
+                    !write(*,*)th-1,nbproc,rank,(th-1)*nbproc,everyall,filenamemax
+                    num_file_new=(th*nbproc)/everyall
+                    !write(*,*)th,nbproc,num_file_new,num_file
+                    if (num_file_new/=num_file) then !.and.(th>0) ! if enough models in current files, create a new file
+                    call MPI_BARRIER(MPI_COMM_WORLD, ierror)
                     call MPI_FILE_CLOSE(filehandle,ierror)
 
-                    num_file=num_file+1
+                    num_file=num_file_new
 
+                    write(*,*)num_file,widening_prop
                     write(filenamemax,"('/All_models_prepare_',I3.3,'_',f5.2,'.out')")num_file,widening_prop
                     write(*,*)filenamemax
 
                     call MPI_FILE_OPEN(MPI_COMM_WORLD,dirname//filenamemax,MPI_MODE_WRONLY + MPI_MODE_CREATE, &
                     MPI_INFO_NULL,filehandle,ierror) ! check MPI_INFO_NULL: might lead to conflicting filehandles
+                    call MPI_BARRIER(MPI_COMM_WORLD, ierror)
 
                     if (rank==0) then ! create header
 
@@ -2482,7 +2486,7 @@ program RJ_MCMC
                         position_file=position_file+nb_bytes_integer
                     endif
 
-                    !call MPI_BARRIER(MPI_COMM_WORLD, ierror)
+                    call MPI_BARRIER(MPI_COMM_WORLD, ierror)
 
                     endif
 
@@ -2597,6 +2601,7 @@ program RJ_MCMC
 
             END IF
         end do !End Markov chain
+        call MPI_BARRIER(MPI_COMM_WORLD, ierror)
         call MPI_FILE_CLOSE(filehandle,ierror)
 
         k=0
@@ -2606,6 +2611,10 @@ program RJ_MCMC
             k=k+1
 
         endif
+
+        do i=1,nbproc
+            call MPI_REDUCE(inorout,inorouts,21000,MPI_Integer,MPI_Sum,i-1,MPI_COMM_WORLD,ierror)
+        enddo
 
         j=0
         k=0
@@ -2622,38 +2631,21 @@ program RJ_MCMC
             write(*,*)i_w,widening_prop,widening
         endif
 
-
-        do i=1,nbproc
-            call MPI_REDUCE(inorout,inorouts,21000,MPI_Integer,MPI_Sum,i-1,MPI_COMM_WORLD,ierror)
-        enddo
-
-        !write(*,*)'rank=',ran,'th=',th
-
-        j=0
-        k=0
-        do i=1,nbproc
-            j=j+inorouts(i)
-            if (inorouts(i).ne.0) then
-                k=k+1
-                members(k)=i-1
-            endif
-        enddo
-
         !IF (ran==0) write(*,*) 'k',k,'nbproc',nbproc
         !***************************************************************************
 
         ! Collect information from all the chains and average everything
 
         !***************************************************************************
-!         flag=0
-!         do i=1,j
-!             if (ran==members(i)) flag=1
-!         enddo
-!
-!         call MPI_Group_incl(group_world, j, members, good_group, ierror)
-!         call MPI_Comm_create(MPI_COMM_WORLD, good_group, MPI_COMM_small, ierror)
-!
-!         if (flag==1) then
+        flag=0
+        do i=1,j
+            if (ran==members(i)) flag=1
+        enddo
+
+        call MPI_Group_incl(group_world, j, members, good_group, ierror)
+        call MPI_Comm_create(MPI_COMM_WORLD, good_group, MPI_COMM_small, ierror)
+
+        if (flag==1) then
 
 
         call MPI_REDUCE(convBa,convBas,(burn_in_widening+nsample_widening),&
@@ -2705,9 +2697,10 @@ program RJ_MCMC
             convsigmavps=convsigmavps/nbproc
             ncells=ncells/nbproc
         endif
+        endif
 
-!         call MPI_Group_free(good_group, ierror)
-!         call MPI_Comm_free(MPI_COMM_small, ierror)
+        call MPI_Group_free(good_group, ierror)
+        call MPI_Comm_free(MPI_COMM_small, ierror)
         call MPI_BARRIER(MPI_COMM_WORLD, ierror)
 
         write(*,*)'writing outputs of widening tests'
@@ -2802,13 +2795,13 @@ program RJ_MCMC
             enddo
             close(53)
 
-!             write(filenametmp,"('/Convergence_sigmavp_',f5.2'_',I3.3,'.out')")widening_prop,rank
-!             open(53,file=dirname//filenametmp,status='replace')
-!             write(53,*)burn_in,n_w,burn_in_widening,nsample_widening
-!             do i=1,(burn_in_widening+nsample_widening)
-!                 write(53,*)convsigmavp(i)
-!             enddo
-!             close(53)
+            write(filenametmp,"('/Convergence_sigmavp_',f5.2'_',I3.3,'.out')")widening_prop,rank
+            open(53,file=dirname//filenametmp,status='replace')
+            write(53,*)burn_in,n_w,burn_in_widening,nsample_widening
+            do i=1,(burn_in_widening+nsample_widening)
+                write(53,*)convsigmavp(i)
+            enddo
+            close(53)
 
             write(filenametmp,"('/Convergence_Birth_',f5.2'_ref.out')")widening_prop
             open(54,file=dirname//filenametmp,status='replace')
@@ -2862,7 +2855,7 @@ program RJ_MCMC
             open(54,file=dirname//filenametmp,status='replace')
             write(54,*)burn_in,n_w,burn_in_widening,nsample_widening
             do i=1,(burn_in_widening+nsample_widening)
-                write(54,*),convd_Rs(i),convd_Ls(i)
+                write(54,*)convd_Rs(i),convd_Ls(i)
             enddo
             close(54)
 
@@ -2898,13 +2891,13 @@ program RJ_MCMC
             enddo
             close(53)
 
-!             write(filenametmp,"('/Convergence_sigmavp_',f5.2'_ref.out')")widening_prop
-!             open(53,file=dirname//filenametmp,status='replace')
-!             write(53,*)burn_in,n_w,burn_in_widening,nsample_widening
-!             do i=1,(burn_in_widening+nsample_widening)
-!                 write(53,*)convsigmavps(i)
-!             enddo
-!             close(53)
+            write(filenametmp,"('/Convergence_sigmavp_',f5.2'_ref.out')")widening_prop
+            open(53,file=dirname//filenametmp,status='replace')
+            write(53,*)burn_in,n_w,burn_in_widening,nsample_widening
+            do i=1,(burn_in_widening+nsample_widening)
+                write(53,*)convsigmavps(i)
+            enddo
+            close(53)
         else
             write(filenametmp,"('/Convergence_Birth_',f5.2'_',I3.3,'.out')")widening_prop,rank
             open(54,file=dirname//filenametmp,status='replace')
@@ -2994,14 +2987,16 @@ program RJ_MCMC
             enddo
             close(53)
 
-!             write(filenametmp,"('/Convergence_sigmavp_',f5.2'_',I3.3,'.out')")widening_prop,rank
-!             open(53,file=dirname//filenametmp,status='replace')
-!             write(53,*)burn_in,n_w,burn_in_widening,nsample_widening
-!             do i=1,(burn_in_widening+nsample_widening)
-!                 write(53,*)convsigmavp(i)
-!             enddo
-!             close(53)
+            write(filenametmp,"('/Convergence_sigmavp_',f5.2'_',I3.3,'.out')")widening_prop,rank
+            open(53,file=dirname//filenametmp,status='replace')
+            write(53,*)burn_in,n_w,burn_in_widening,nsample_widening
+            do i=1,(burn_in_widening+nsample_widening)
+                write(53,*)convsigmavp(i)
+            enddo
+            close(53)
         ENDIF
+
+        write(*,*)voro
 
         widening_prop=widening_prop+widening_step
     enddo

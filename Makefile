@@ -13,7 +13,7 @@
 #
 #
 #F77c =  mpif90 -check all  # -check bounds
-F77 =  mpif90 -O3 #-fbounds-check#-O3 #-check bounds # -O3 -Wall
+F77 =  mpif90 -O3 -mcmodel=medium #-fbounds-check#-O3 #-check bounds # -O3 -Wall
 #F77 =  mpiifort -O3 #-Wall -fbounds-check#-O3 #-check bounds
 # F77c =  mpif90  -O3  -fbounds-check #-check bounds
 
@@ -57,8 +57,52 @@ joint_invert: params.h
 	$(F77) -o run2 RJ_MCMC_test_joint_invert.f90 \
 	-L./ -lroutines -lm
 
+joint_invert1: params.h
+	$(F77) -o run2 RJ_MCMC_test_joint_invert_1.f90 \
+	-L./ -lroutines -lm
+
+joint_invert1_1: params.h
+	$(F77) -o run2 RJ_MCMC_test_joint_invert_1_1.f90 \
+	-L./ -lroutines -lm
+
+joint_invert1_2: params.h
+	$(F77) -o run2 RJ_MCMC_test_joint_invert_1_2.f90 \
+	-L./ -lroutines -lm
+
+joint_invert1_3: params.h
+	$(F77) -o run2 RJ_MCMC_test_joint_invert_1_3.f90 \
+	-L./ -lroutines -lm
+
+joint_invert2: params.h
+	$(F77) -o run2 RJ_MCMC_test_joint_invert_2.f90 \
+	-L./ -lroutines -lm
+
+joint_invert3: params.h
+	$(F77) -o run2 RJ_MCMC_test_joint_invert_3.f90 \
+	-L./ -lroutines -lm
+
+joint_invert4: params.h
+	$(F77) -o run2 RJ_MCMC_test_joint_invert_4.f90 \
+	-L./ -lroutines -lm
+
+joint_invert5: params.h
+	$(F77) -o run2 RJ_MCMC_test_joint_invert_5.f90 \
+	-L./ -lroutines -lm
+
+joint_invert6: params.h
+	$(F77) -o run2 RJ_MCMC_test_joint_invert_6.f90 \
+	-L./ -lroutines -lm
+
+joint_invert7: params.h
+	$(F77) -o run2 RJ_MCMC_test_joint_invert_7.f90 \
+	-L./ -lroutines -lm
+
 joint_store_prepare: params.h
 	$(F77) -o run RJ_MCMC_joint_prepare_store.f90 \
+	-L./ -lroutines -lm
+
+joint_test: params.h
+	$(F77) -o run RJ_MCMC_joint.f90 \
 	-L./ -lroutines -lm
 
 joint_store_prepare_delayed: params.h
@@ -96,7 +140,7 @@ synth: params.h data_params.h
 postprocess_binary: params.h
 	$(F77) -o run_binary postprocess_binary_outputs.f90 \
 	-L./ -lroutines -lm
-	
+
 toy: params.h
 	$(F77) -o run_toy create_toy.f90 \
 	-L./ -lroutines -lm

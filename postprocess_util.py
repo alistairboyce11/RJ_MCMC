@@ -627,6 +627,10 @@ def read_model(f,widening,cluster):
     model['Ad_R']=dispersion_one['R']['Ad']
     model['Ad_L']=dispersion_one['L']['Ad']
 
+    if npt_true==0:
+        print('no model')
+        return False,{},{}
+
     # new output
     d=np.array(f.readline().split()).astype('float')
     vsv=np.array(f.readline().split()).astype('float')
