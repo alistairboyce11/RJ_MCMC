@@ -14,13 +14,15 @@ matplotlib.rcParams['font.size'] = 10
 import os, sys
 import matplotlib.patches as patches
 from matplotlib.ticker import NullFormatter, LinearLocator
+from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,AutoMinorLocator)
+user=os.getlogin()
 from scipy import stats
 import json
 from scipy import stats
 import pandas
 from numpy import unravel_index
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-
+cm = 1/2.54
 # Make it work for Python 2+3 and with Unicode
 import io
 try:
@@ -33,13 +35,13 @@ except NameError:
 
 Layer_Hist      = True
 Layers_Aniso_Tr = True
+Dispersion      = True
 Posterior       = True
 Posterior2      = True
 Sigmad          = True
-Dispersion      = True
 Convergence     = True
-PsPp_Fit        = True
-Corr_Hist      = True
+PsPp_Fit        = False
+Corr_Hist       = False
 
 
 
@@ -48,7 +50,7 @@ Corr_Hist      = True
 num_args=len(sys.argv)
 
 if Corr_Hist:
-    if num_args < 8:
+    if num_args != 8:
         print('Required :       Script.py <dir> <av_int> <dis> <p1> <av_u_dep1> <p2> <av_u_dep2>')
         print('Arguments:      ',sys.argv)
         print('Options [1] :     RJ_MCMC_Tests/XYZ_test/OUT_TEST')
@@ -87,10 +89,8 @@ if Corr_Hist:
         exit('exiting....')
     p2_u_dep=int(sys.argv[7])
 
-
-
 else:
-    if num_args < 2:
+    if num_args != 2:
         print('Required :       Script.py test_directory')
         print('Arguments:      ',sys.argv)
         print('Options [1] :     RJ_MCMC_Tests/XYZ_test/OUT_TEST')
@@ -105,6 +105,9 @@ if not os.path.exists(directory+'/PLOTS/'):
 maxnlay = 80
 
 fname_pre=str(os.getcwd().split('/')[-1])+'_'
+
+PREM_loc='/Users/alistair/Google_Drive/Lyon_Pdoc/mk_synth_data/DISC_PREM_20'
+
 
 
 def weighted_avg_and_std(values, weights):
@@ -238,6 +241,184 @@ if Layers_Aniso_Tr:
         plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Layers_Aniso_Tr.png',dpi=200)
         plt.close()
 
+################################# Average dispersion curves ################################################
+if Dispersion:
+    if os.path.isfile(directory+'/'+'Dispersion_mean.out') or os.path.isfile(directory+'/'+'Proc_Dispersion_mean.out'):
+        try:
+            file=open(directory+'/'+'Dispersion_mean.out','r')
+        except:
+            file=open(directory+'/'+'Proc_Dispersion_mean.out','r')
+        lines=file.readlines()
+        file.close()
+
+        ndatad_R=int(lines[0].split()[0])
+        ndatad_L=int(lines[0].split()[1])
+
+        period_R=[]
+        n_R=[]
+        c_R=[]
+        dc_R=[]
+        for line in lines[1:ndatad_R+1]:
+            data=line.split()
+            period_R.append(float(data[0]))
+            n_R.append(int(float(data[1])))
+            c_R.append(float(data[2]))
+            dc_R.append(float(data[3]))
+
+        period_L=[]
+        n_L=[]
+        c_L=[]
+        dc_L=[]
+        for line in lines[ndatad_R+1:]:
+            data=line.split()
+            period_L.append(float(data[0]))
+            n_L.append(int(float(data[1])))
+            c_L.append(float(data[2]))
+            dc_L.append(float(data[3]))
+
+        # true dispersion curves (data)
+        try:
+            file=open(directory+'/'+'Dispersion_obs.out','r')
+        except:
+            file=open(directory+'/'+'Proc_Dispersion_obs.out','r')
+        lines=file.readlines()
+        file.close()
+
+        ndatad_R=int(lines[0].split()[0])
+        ndatad_L=int(lines[0].split()[1])
+
+        period_R_obs=[]
+        n_R_obs=[]
+        c_R_obs=[]
+        dc_R_obs=[]
+        for line in lines[1:ndatad_R+1]:
+            data=line.split()
+            period_R_obs.append(float(data[0]))
+            n_R_obs.append(int(float(data[1])))
+            c_R_obs.append(float(data[2]))
+            dc_R_obs.append(float(data[3]))
+
+        period_L_obs=[]
+        n_L_obs=[]
+        c_L_obs=[]
+        dc_L_obs=[]
+        for line in lines[ndatad_R+1:]:
+            data=line.split()
+            period_L_obs.append(float(data[0]))
+            n_L_obs.append(int(float(data[1])))
+            c_L_obs.append(float(data[2]))
+            dc_L_obs.append(float(data[3]))
+
+        Modes_R=np.unique(n_R)
+        Modes_L=np.unique(n_L)
+
+        # Get Ref:
+        REF_loc='/Users/alistair/Google_Drive/Lyon_Pdoc/mk_synth_data/ZERO_MOD_BAYES_FR_O/'
+        file=open(REF_loc+'/'+'Dispersion_ref.out','r')
+        lines=file.readlines()
+        file.close()
+
+        ndatad_R=int(lines[0].split()[0])
+        ndatad_L=int(lines[0].split()[1])
+
+        period_R_ref=[]
+        n_R_ref=[]
+        c_R_ref=[]
+        dc_R_ref=[]
+        for line in lines[1:ndatad_R+1]:
+            data=line.split()
+            period_R_ref.append(float(data[0]))
+            n_R_ref.append(int(float(data[1])))
+            c_R_ref.append(float(data[2]))
+            dc_R_ref.append(float(data[3]))
+
+        period_L_ref=[]
+        n_L_ref=[]
+        c_L_ref=[]
+        dc_L_ref=[]
+        for line in lines[ndatad_R+1:]:
+            data=line.split()
+            period_L_ref.append(float(data[0]))
+            n_L_ref.append(int(float(data[1])))
+            c_L_ref.append(float(data[2]))
+            dc_L_ref.append(float(data[3]))
+
+
+        ### Calc data misfit:
+        ndtot=ndatad_R+ndatad_L
+        chi2=np.zeros(ndtot)
+        chi2_i=np.zeros(ndtot)
+        # To give rayleigh and love different sigma
+        for k in range(0,int(ndtot/2)):
+            chi2[k]=(c_R_obs[k]-c_R[k])**2/0.04 # (sigmad_R)
+            chi2_i[k]=(c_R_obs[k]-c_R_ref[k])**2/0.04 # (sigmad_R)
+
+        for k in range(0,int(ndtot/2)):
+            chi2[k+int(ndtot/2)]=(c_L_obs[k]-c_L[k])**2/0.04 # (sigmad_L)
+            chi2_i[k+int(ndtot/2)]=(c_L_obs[k]-c_L_ref[k])**2/0.04 # (sigmad_L)
+
+
+        chi=np.sqrt((np.mean(chi2)))
+        chi_i=np.sqrt((np.mean(chi2_i)))
+
+        data_red=((((chi_i-chi)/chi_i))*100)
+
+        print('Inversion done')
+        print('chi0 = '+str(chi_i))
+        print('chi = '+str(chi))
+        print('chi0 = '+str(chi_i)+'; chi = '+str(chi))
+        print('chi^2 residual reduction = '+str(data_red)+'%')
+
+
+        plt.figure('dispersion')
+
+        if len(Modes_R)>0:
+            for R_mode in Modes_R:
+                ave_R='ave_R_'+str(R_mode)
+                obs_R='obs_R_'+str(R_mode)
+                # print(ave_R)
+                ind=np.where(n_R==R_mode)
+                ave_R=plt.errorbar(np.array(period_R)[ind[0]],np.array(c_R)[ind[0]],yerr=np.array(dc_R)[ind[0]],marker='o',zorder=0,label='Rayleigh average',mfc='blue',mec='blue', c='blue')
+                obs_R=plt.errorbar(np.array(period_R_obs)[ind[0]]-0.1,np.array(c_R_obs)[ind[0]],yerr=np.array(dc_R_obs)[ind[0]],marker='o',zorder=0,label='Rayleigh observed',mfc='limegreen',mec='limegreen', c='limegreen')
+
+        if len(Modes_L)>0:
+            for L_mode in Modes_L:
+                ave_L='ave_L_'+str(L_mode)
+                obs_L='obs_L_'+str(L_mode)
+                # print(ave_L)
+                ind=np.where(n_L==L_mode)
+                ave_L=plt.errorbar(np.array(period_L)[ind[0]]+0.1,np.array(c_L)[ind[0]],yerr=np.array(dc_L)[ind[0]],marker='o',zorder=0,label='Love average',mfc='orange',mec='orange', c='orange')
+                obs_L=plt.errorbar(np.array(period_L_obs)[ind[0]]+0.2,np.array(c_L_obs)[ind[0]],yerr=np.array(dc_L_obs)[ind[0]],marker='o',zorder=0,label='Love observed',mfc='red',mec='red', c='red')
+
+
+        # plt.errorbar(np.array(period_R),c_R,yerr=dc_R,marker='o',zorder=0,label='Rayleigh average')
+        # plt.errorbar(np.array(period_L)+0.1,c_L,yerr=dc_L,marker='o',zorder=0,label='Love average')
+        # plt.errorbar(np.array(period_R_obs)-0.1,c_R_obs,yerr=dc_R_obs,marker='o',zorder=0,label='Rayleigh observed')
+        # plt.errorbar(np.array(period_L_obs)+0.2,c_L_obs,yerr=dc_L_obs,marker='o',zorder=0,label='Love observed')
+        # plt.legend()
+        
+        if len(Modes_R)>0 and len(Modes_L)>0:
+            plt.legend([ave_R, obs_R, ave_L, obs_L], ['Rayleigh average', 'Rayleigh observed', 'Love average', 'Love observed'])
+        elif len(Modes_R)>0 and len(Modes_L)==0:
+            plt.legend([ave_R, obs_R], ['Rayleigh average', 'Rayleigh observed'])
+        elif len(Modes_R)==0 and len(Modes_L)>0:
+            plt.legend([ave_L, obs_L], ['Love average', 'Love observed'])
+
+        
+        # plt.xlim([40,360])
+        plt.ylim([2.5,9.5])
+        plt.xlabel('Period (s)')
+        plt.ylabel('Phase Velocity (km/s)')
+        plt.title('Compare Dispersion Curves')
+
+        plt.xlim([np.min(period_R+period_L),np.max(period_R+period_L)])
+
+        # plt.show()
+        plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Dispersion.png',dpi=200)
+        plt.close()
+
+
+
 ############ Posterior #######################
 if Posterior:
 
@@ -258,11 +439,13 @@ if Posterior:
     disd=int(data0[1]) # Depth discretisation
     dmax=float(data0[2])
 
-    burn_in=int(float(data0[3]))
-    nsample=int(float(data0[4]))
-    thinning=int(float(data0[5]))
-    cores=int(float(data0[6]))
-
+    try: 
+        burn_in=int(float(data0[3]))
+        nsample=int(float(data0[4]))
+        thinning=int(float(data0[5]))
+        cores=int(float(data0[6]))
+    except:
+        dummy=1
 
     [vref_min,vref_max,disv,width,xi_min,xi_max,vp_min,vp_max]=[float(i) for i in lines[1].split()]
     disv=int(disv) # Velocity/aniso discretisation
@@ -295,11 +478,12 @@ if Posterior:
         s=np.amax(vpd[i,:])
         vpd[i,:]=vpd[i,:]/s
     vpd[-1,:]=0.0
-    
+
     for i in range(np.shape(xid)[0]): # normalisation by depth, not strictly necessary
         s=np.amax(xid[i,:])
         xid[i,:]=xid[i,:]/s
     xid[-1,:]=0.0
+
 
     ################# Average distribution ABOVE depth
 
@@ -677,9 +861,9 @@ if Posterior:
     fig, (ax0, ax1, ax2, ax4, ax5) = plt.subplots(nrows=1, ncols=5, sharey=True,
                                         figsize=(12, 6))
 
-    vsvs=np.linspace(vref_min,vref_max,disv+1)
-    xis=np.linspace(xi_min,xi_max,disv+1)
-    vps=np.linspace(vp_min,vp_max,disv+1)
+    vsvs=np.linspace(vref_min,vref_max,disv+1) # -np.round(vref_max-vref_min,2)/disv/2
+    xis=np.linspace(xi_min,xi_max,disv+1) # FUDGE -np.round(xi_max-xi_min,2)/disv/2
+    vps=np.linspace(vp_min,vp_max,disv+1) # -np.round(vp_max-vp_min,2)/disv/2
     depths=np.linspace(0,prof,disd+1)
 
     ax0.invert_yaxis()
@@ -688,9 +872,12 @@ if Posterior:
     ax0.set_title('S-wave velocity')
     ax1.set_ylim([prof,0.])
     ax1.set_xlabel('$Xi$',fontsize=10)
-    ax1.set_xlim([xi_min,xi_max])
-    # ax1.set_xlim([0.5, 1.5])
+    # ax1.set_xlim([xi_min,xi_max])
+    ax1.set_xlim([0.6, 1.4])
     ax1.set_title('Radial Anisotropy')
+    ax1.xaxis.set_minor_locator(MultipleLocator(0.1))
+    ax1.xaxis.set_major_locator(MultipleLocator(0.2))
+
     ax2.set_xlim([vp_min,vp_max])
     # ax2.set_xlim([-0.5,0.5])
     ax0.set_ylabel('Depth (km)',fontsize=10)
@@ -726,11 +913,40 @@ if Posterior:
         # True models in cyan.
         true,=ax0.plot(true_vsv,true_depth,c='white',linewidth=1)
         try:
-            ax1.plot(true_xi,true_depth,c='white',linewidth=1,alpha=1,marker='o',markersize=2,mfc='k')
+            # ax1.plot(true_xi,true_depth,c='white',linewidth=1,alpha=1,marker='o',markersize=2,mfc='k')
             ax2.plot(true_vp,true_depth,c='white',linewidth=1)
 
         except:
             pass
+    else:
+        file=open(PREM_loc+'/'+'true_model.out','r')
+        lines=file.readlines()
+        file.close()
+
+        prem_depth=[]
+        prem_vsv=[]
+        prem_xi=[]
+        prem_vp=[]
+        for line in lines[1:]:
+            data=line.split()
+            prem_depth.append(float(data[0]))
+            prem_vsv.append(float(data[1]))
+            try:
+                prem_xi.append(float(data[2]))
+                prem_vp.append(float(data[3]))
+                # pass
+            except:
+                pass
+
+        # prem models in cyan.
+        prem,=ax0.plot(prem_vsv,prem_depth,c='white',linewidth=1)
+        try:
+            # ax1.plot(prem_xi,prem_depth,c='white',linewidth=1,alpha=1,marker='o',markersize=2,mfc='k')
+            ax2.plot(prem_vp,prem_depth,c='white',linewidth=1)
+
+        except:
+            pass
+
 
     ax2.pcolormesh(vps,depths,vpd,cmap='viridis')
     plt.setp(ax2.get_yticklabels(), visible=False)
@@ -777,7 +993,7 @@ if Posterior:
         
     # Average models in red.
     ave,=ax0.plot(average_vs,depths,c='r',linewidth=1)
-    ax1.plot(average_xi,depths,c='r',linewidth=1)
+    # ax1.plot(average_xi,depths,c='r',linewidth=1)
     ax2.plot(average_vp,depths,c='r',linewidth=1)
     ax4.plot(average_probani,depths,c='k',linewidth=1)
 
@@ -806,14 +1022,16 @@ if Posterior:
     if os.path.isfile(directory+'/'+'true_model.out'):
         plt.legend([true, ave], ['true', 'ave'])
     else:
-        plt.legend([ave], ['ave'])
+        plt.legend([prem, ave], ['reference', 'ave'])
     fig.suptitle('Posterior and Averages')
 
     # plt.show()
     plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Posterior.png',dpi=200)
     plt.close()
 
-
+########################################################################################################################
+# =====================================================================================================================#
+########################################################################################################################
 if Posterior2:
 
 
@@ -834,11 +1052,13 @@ if Posterior2:
     disd=int(data0[1]) # Depth discretisation
     dmax=float(data0[2])
 
-    burn_in=int(float(data0[3]))
-    nsample=int(float(data0[4]))
-    thinning=int(float(data0[5]))
-    cores=int(float(data0[6]))
-
+    try:
+        burn_in=int(float(data0[3]))
+        nsample=int(float(data0[4]))
+        thinning=int(float(data0[5]))
+        cores=int(float(data0[6]))
+    except:
+        dummy=1
 
     [vref_min,vref_max,disv,width,xi_min,xi_max,vp_min,vp_max]=[float(i) for i in lines[1].split()]
     disv=int(disv) # Velocity/aniso discretisation
@@ -848,7 +1068,7 @@ if Posterior2:
     vpd=np.zeros((disd,disv))
 
     vsvs=np.linspace(vref_min,vref_max,disv)
-    xis=np.linspace(xi_min,xi_max,disv)
+    xis=np.linspace(xi_min,xi_max,disv) # FUDGE -np.round(xi_max-xi_min,2)/disv/2
     vps=np.linspace(vp_min,vp_max,disv)
     depths=np.linspace(0,prof,disd)
 
@@ -862,66 +1082,142 @@ if Posterior2:
             j=0
             i+=1
 
-    vsvd_means=[]; vsvd_medians=[]; vsvd_975=[]; vsvd_825=[]; vsvd_175=[]; vsvd_025=[]; vsvd_std=[]
-    xid_means=[]; xid_medians=[]; xid_975=[]; xid_825=[]; xid_175=[]; xid_025=[]; xid_std=[]
-    vpd_means=[]; vpd_medians=[]; vpd_975=[]; vpd_825=[]; vpd_175=[]; vpd_025=[]; vpd_std=[]
+    vsvd_means=[]; vsvd_medians=[]; vsvd_975=[]; vsvd_840=[]; vsvd_690=[]; vsvd_550=[]; vsvd_450=[]; vsvd_310=[]; vsvd_160=[]; vsvd_025=[]; vsvd_std=[]
+    xid_means=[];   xid_medians=[];  xid_975=[];  xid_840=[];  xid_690=[];  xid_550=[];  xid_450=[];  xid_310=[];  xid_160=[];  xid_025=[];  xid_std=[]
+    vpd_means=[];   vpd_medians=[];  vpd_975=[];  vpd_840=[];  vpd_690=[];  vpd_550=[];  vpd_450=[];  vpd_310=[];  vpd_160=[];  vpd_025=[];  vpd_std=[]
 
-    x_vals=[]; y_vals=[]; vsvd_vals=[]; xid_vals=[]; vpd_vals=[]
+    x1_vals=[]; x2_vals=[]; x3_vals=[]; y_vals=[]; vsvd_vals=[]; xid_vals=[]; vpd_vals=[]
     for i in range(np.shape(vsvd)[0]):
         for j in range(np.shape(vsvd)[1]):
             vsvd_vals.append(int(vsvd[i,j]))
-            xid_vals.append(int(vsvd[i,j]))
-            vpd_vals.append(int(vsvd[i,j]))
+            xid_vals.append(int(xid[i,j]))
+            vpd_vals.append(int(vpd[i,j]))
             y_vals.append(depths[i])
-            x_vals.append(vsvs[j])
+            x1_vals.append(vsvs[j])
+            x2_vals.append(xis[j])
+            x3_vals.append(vps[j])
 
-    hist_vsvd, bins_y, bins_x=np.histogram2d(y_vals, x_vals, weights=vsvd_vals, bins=(len(depths),len(vsvs)))
-    hist_xid,  bins_y, bins_x=np.histogram2d(y_vals, x_vals, weights=xid_vals,  bins=(len(depths),len(xis)))
-    hist_vpd,  bins_y, bins_x=np.histogram2d(y_vals, x_vals, weights=vpd_vals,  bins=(len(depths),len(vps)))
+    hist_vsvd, bins_y1, bins_x1=np.histogram2d(y_vals, x1_vals, weights=vsvd_vals, bins=(len(depths),len(vsvs)))
+    hist_xid,  bins_y2, bins_x2=np.histogram2d(y_vals, x2_vals, weights=xid_vals,  bins=(len(depths),len(xis)))
+    hist_vpd,  bins_y3, bins_x3=np.histogram2d(y_vals, x3_vals, weights=vpd_vals,  bins=(len(depths),len(vps)))
 
 
 
-    for i in range(np.shape(hist_vsvd)[0]):
-        print('layer: '+str(i))
-        temp_vsvd=[]
-        temp_xid =[]
-        temp_vpd =[]
-        for j in range(np.shape(hist_vsvd)[1]):
-            val_vsvd=int(vsvd[i,j])
-            for k in range(0,val_vsvd):
-                temp_vsvd.append(vsvs[j])
+    if os.path.isfile(directory+'/Proc2_Vs_abs.txt'):
+        Proc2_Vs_abs=np.loadtxt(directory+'/Proc2_Vs_abs.txt')
+        Proc2_Xi_abs=np.loadtxt(directory+'/Proc2_Xi_abs.txt')
+        Proc2_Vp_abs=np.loadtxt(directory+'/Proc2_Vp_abs.txt')
 
-            val_xid=int(xid[i,j])
-            for k in range(0,val_xid):
-                temp_xid.append(xis[j])
+        vsvd_depths=Proc2_Vs_abs[:,0]
+        vsvd_means=Proc2_Vs_abs[:,1]
+        vsvd_medians=Proc2_Vs_abs[:,2]
+        vsvd_025=Proc2_Vs_abs[:,3]
+        vsvd_160=Proc2_Vs_abs[:,4]
+        vsvd_310=Proc2_Vs_abs[:,5]
+        vsvd_450=Proc2_Vs_abs[:,6]
+        vsvd_550=Proc2_Vs_abs[:,7]
+        vsvd_690=Proc2_Vs_abs[:,8]
+        vsvd_840=Proc2_Vs_abs[:,9]
+        vsvd_975=Proc2_Vs_abs[:,10]
 
-            val_vpd=int(vpd[i,j])
-            for k in range(0,val_vpd):
-                temp_vpd.append(vps[j])
+        xid_depths=Proc2_Xi_abs[:,0]
+        xid_means=Proc2_Xi_abs[:,1]
+        xid_medians=Proc2_Xi_abs[:,2]
+        xid_025=Proc2_Xi_abs[:,3]
+        xid_160=Proc2_Xi_abs[:,4]
+        xid_310=Proc2_Xi_abs[:,5]
+        xid_450=Proc2_Xi_abs[:,6]
+        xid_550=Proc2_Xi_abs[:,7]
+        xid_690=Proc2_Xi_abs[:,8]
+        xid_840=Proc2_Xi_abs[:,9]
+        xid_975=Proc2_Xi_abs[:,10]
 
-        # vsvd_means.append(np.round_(np.mean(temp_vsvd),4))
-        vsvd_medians.append(np.round_(np.median(temp_vsvd),4))
-        vsvd_975.append(np.round_(np.quantile(temp_vsvd, 0.975),4))
-        vsvd_825.append(np.round_(np.quantile(temp_vsvd, 0.825),4))
-        vsvd_175.append(np.round_(np.quantile(temp_vsvd, 0.175),4))
-        vsvd_025.append(np.round_(np.quantile(temp_vsvd, 0.025),4))
-        vsvd_std.append(np.round_(np.std(temp_vsvd),4))
+        vpd_depths=Proc2_Vp_abs[:,0]
+        vpd_means=Proc2_Vp_abs[:,1]
+        vpd_medians=Proc2_Vp_abs[:,2]
+        vpd_025=Proc2_Vp_abs[:,3]
+        vpd_160=Proc2_Vp_abs[:,4]
+        vpd_310=Proc2_Vp_abs[:,5]
+        vpd_450=Proc2_Vp_abs[:,6]
+        vpd_550=Proc2_Vp_abs[:,7]
+        vpd_690=Proc2_Vp_abs[:,8]
+        vpd_840=Proc2_Vp_abs[:,9]
+        vpd_975=Proc2_Vp_abs[:,10]
+        
+    else:
 
-        # xid_means.append(np.round_(np.mean(temp_xid),4))
-        xid_medians.append(np.round_(np.median(temp_xid),4))
-        xid_975.append(np.round_(np.quantile(temp_xid, 0.975),4))
-        xid_825.append(np.round_(np.quantile(temp_xid, 0.825),4))
-        xid_175.append(np.round_(np.quantile(temp_xid, 0.175),4))
-        xid_025.append(np.round_(np.quantile(temp_xid, 0.025),4))
-        xid_std.append(np.round_(np.std(temp_xid),4))
 
-        # vpd_means.append(np.round_(np.mean(temp_vpd),4))
-        vpd_medians.append(np.round_(np.median(temp_vpd),4))
-        vpd_975.append(np.round_(np.quantile(temp_vpd, 0.975),4))
-        vpd_825.append(np.round_(np.quantile(temp_vpd, 0.825),4))
-        vpd_175.append(np.round_(np.quantile(temp_vpd, 0.175),4))
-        vpd_025.append(np.round_(np.quantile(temp_vpd, 0.025),4))
-        vpd_std.append(np.round_(np.std(temp_vpd),4))
+        fname_VsProc=directory+'/Proc2_Vs_abs.txt'
+        f_VsProc=open(fname_VsProc,'w')
+
+        fname_XiProc=directory+'/Proc2_Xi_abs.txt'
+        f_XiProc=open(fname_XiProc,'w')
+        
+        fname_VpProc=directory+'/Proc2_Vp_abs.txt'
+        f_VpProc=open(fname_VpProc,'w')
+
+        for i in range(np.shape(hist_vsvd)[0]):
+            print('layer: '+str(i))
+            temp_vsvd=[]
+            temp_xid =[]
+            temp_vpd =[]
+            for j in range(np.shape(hist_vsvd)[1]):
+                val_vsvd=int(vsvd[i,j])
+                for k in range(0,val_vsvd):
+                    temp_vsvd.append(vsvs[j])
+
+                val_xid=int(xid[i,j])
+                for k in range(0,val_xid):
+                    temp_xid.append(xis[j])
+
+                val_vpd=int(vpd[i,j])
+                for k in range(0,val_vpd):
+                    temp_vpd.append(vps[j])
+
+            vsvd_means.append(np.round_(np.mean(temp_vsvd),4))
+            vsvd_medians.append(np.round_(np.median(temp_vsvd),4))
+            vsvd_975.append(np.round_(np.quantile(temp_vsvd, 0.975),4))
+            vsvd_840.append(np.round_(np.quantile(temp_vsvd, 0.84),4))
+            vsvd_690.append(np.round_(np.quantile(temp_vsvd, 0.69),4))
+            vsvd_550.append(np.round_(np.quantile(temp_vsvd, 0.55),4))
+            vsvd_450.append(np.round_(np.quantile(temp_vsvd, 0.45),4))
+            vsvd_310.append(np.round_(np.quantile(temp_vsvd, 0.31),4))
+            vsvd_160.append(np.round_(np.quantile(temp_vsvd, 0.16),4))
+            vsvd_025.append(np.round_(np.quantile(temp_vsvd, 0.025),4))
+            vsvd_std.append(np.round_(np.std(temp_vsvd),4))
+
+            xid_means.append(np.round_(np.mean(temp_xid),4))
+            xid_medians.append(np.round_(np.median(temp_xid),4))
+            xid_975.append(np.round_(np.quantile(temp_xid, 0.975),4))
+            xid_840.append(np.round_(np.quantile(temp_xid, 0.84),4))
+            xid_690.append(np.round_(np.quantile(temp_xid, 0.69),4))
+            xid_550.append(np.round_(np.quantile(temp_xid, 0.55),4))
+            xid_450.append(np.round_(np.quantile(temp_xid, 0.45),4))
+            xid_310.append(np.round_(np.quantile(temp_xid, 0.31),4))
+            xid_160.append(np.round_(np.quantile(temp_xid, 0.16),4))
+            xid_025.append(np.round_(np.quantile(temp_xid, 0.025),4))
+            xid_std.append(np.round_(np.std(temp_xid),4))
+
+            vpd_means.append(np.round_(np.mean(temp_vpd),4))
+            vpd_medians.append(np.round_(np.median(temp_vpd),4))
+            vpd_975.append(np.round_(np.quantile(temp_vpd, 0.975),4))
+            vpd_840.append(np.round_(np.quantile(temp_vpd, 0.84),4))
+            vpd_690.append(np.round_(np.quantile(temp_vpd, 0.69),4))
+            vpd_550.append(np.round_(np.quantile(temp_vpd, 0.55),4))
+            vpd_450.append(np.round_(np.quantile(temp_vpd, 0.45),4))
+            vpd_310.append(np.round_(np.quantile(temp_vpd, 0.31),4))
+            vpd_160.append(np.round_(np.quantile(temp_vpd, 0.16),4))
+            vpd_025.append(np.round_(np.quantile(temp_vpd, 0.025),4))
+            vpd_std.append(np.round_(np.std(temp_vpd),4))
+
+        # for i in range(len(vsvd_means)):
+            f_VsProc.write('  %3.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f\n' % (depths[i], vsvd_means[i], vsvd_medians[i], vsvd_025[i], vsvd_160[i], vsvd_310[i], vsvd_450[i], vsvd_550[i], vsvd_690[i], vsvd_840[i], vsvd_975[i]))
+            f_XiProc.write('  %3.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f\n' % (depths[i], xid_means[i], xid_medians[i], xid_025[i],     xid_160[i],  xid_310[i],  xid_450[i],  xid_550[i],  xid_690[i],  xid_840[i], xid_975[i]))
+            f_VpProc.write('  %3.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f\n' % (depths[i], vpd_means[i], vpd_medians[i], vpd_025[i],     vpd_160[i],  vpd_310[i],  vpd_450[i],  vpd_550[i],  vpd_690[i],  vpd_840[i], vpd_975[i]))
+
+        f_VsProc.close()
+        f_XiProc.close()
+        f_VpProc.close()
 
     fig, (ax0, ax1, ax2, ax4, ax5) = plt.subplots(nrows=1, ncols=5, sharey=True,
                                         figsize=(12, 6))
@@ -948,13 +1244,23 @@ if Posterior2:
     # ax0.pcolormesh(vsvs,depths,vsvd,cmap='viridis')
 
     ax0.fill_betweenx(depths,vsvd_025,vsvd_975,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.15)
-    ax0.fill_betweenx(depths,vsvd_175,vsvd_825,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.25)
+    ax0.fill_betweenx(depths,vsvd_160,vsvd_840,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.25)
+    ax0.fill_betweenx(depths,vsvd_310,vsvd_690,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.35)
+    ax0.fill_betweenx(depths,vsvd_450,vsvd_550,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.45)
 
     ax1.fill_betweenx(depths,xid_025,xid_975,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.15)
-    ax1.fill_betweenx(depths,xid_175,xid_825,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.25)
+    ax1.fill_betweenx(depths,xid_160,xid_840,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.25)
+    ax1.fill_betweenx(depths,xid_310,xid_690,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.35)
+    ax1.fill_betweenx(depths,xid_450,xid_550,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.45)
 
     ax2.fill_betweenx(depths,vpd_025,vpd_975,facecolor='darkgreen', rasterized=False, alpha=0.15)
-    ax2.fill_betweenx(depths,vpd_175,vpd_825,facecolor='darkgreen', rasterized=False, alpha=0.25)
+    ax2.fill_betweenx(depths,vpd_160,vpd_840,facecolor='darkgreen', rasterized=False, alpha=0.25)
+    ax2.fill_betweenx(depths,vpd_310,vpd_690,facecolor='darkgreen', rasterized=False, alpha=0.35)
+    ax2.fill_betweenx(depths,vpd_450,vpd_550,facecolor='darkgreen', rasterized=False, alpha=0.45)
+
+
+
+
 
     # mean2,=ax0.plot(vsvd_means,depths,c='b',linewidth=1)
     # ax1.plot(xid_means,depths,c='b',linewidth=1)
@@ -974,8 +1280,13 @@ if Posterior2:
         true_vsv=[]
         true_xi=[]
         true_vp=[]
-        for line in lines[1:]:
+        # for line in lines[1:]:
+
+        for k in range(len(lines)-1,-1,-1):
+            line=lines[k]
+            
             data=line.split()
+            # print(k, data)
             true_depth.append(float(data[0]))
             true_vsv.append(float(data[1]))
             try:
@@ -985,13 +1296,81 @@ if Posterior2:
             except:
                 pass
 
+        # true_depth        
+        # true_vsv
+        # true_xi
+        # true_vp
         # True models in cyan.
-        true,=ax0.plot(true_vsv,true_depth,c='k',linewidth=1)
+        true,=ax0.plot(true_vsv,true_depth,c='k',linewidth=2)
         try:
-            ax1.plot(true_xi,true_depth,c='k',linewidth=1) # ,alpha=1,marker='o',markersize=2,mfc='k'
-            ax2.plot(true_vp,true_depth,c='k',linewidth=1)
+            ax1.plot(true_xi,true_depth,c='k',linewidth=2) # ,alpha=1,marker='o',markersize=2,mfc='k'
+            ax2.plot(true_vp,true_depth,c='k',linewidth=2)
         except:
             pass
+
+        ############################# Process true model and compare to median for model fit
+
+        # depths=np.linspace(0,prof,disd)
+        # INterpolate true model to the above array to match mean and average:
+        interp_true_vsv=[]
+        interp_true_xi=[]
+        interp_true_vp=[]
+
+        # bottom_ind=np.where(np.array(true_depth[:])==prof)[0][-1]
+
+        # for i in range(0, bottom_ind):
+        #     print(true_depth[i], true_vsv[i], true_xi[i], true_vp[i])
+
+        for i in range(len(depths)):
+            # print(depths[i])
+            ind=np.argmin(np.abs(depths[i]-true_depth))
+            if len([ind]) > 1:
+                print('AHHHHHH', ind)
+            else:
+                if depths[i]>true_depth[ind]:
+                    ind=ind+1
+                # print(i, depths[i], ind, true_depth[ind], true_vsv[ind], true_xi[ind], true_vp[ind])
+                interp_true_vsv.append(true_vsv[ind])
+                interp_true_xi.append(true_xi[ind])
+                interp_true_vp.append(true_vp[ind])
+
+
+# ##      Check by plotting..... Turn this off now......  
+#         ax0.plot(interp_true_vsv,depths,c='green',linewidth=1)
+#         try:
+#             ax1.plot(interp_true_xi,depths,c='green',linewidth=1) # ,alpha=1,marker='o',markersize=2,mfc='k'
+#             ax2.plot(interp_true_vp,depths,c='green',linewidth=1)
+#         except:
+#             pass
+    else:
+        file=open(PREM_loc+'/'+'true_model.out','r')
+        lines=file.readlines()
+        file.close()
+
+        prem_depth=[]
+        prem_vsv=[]
+        prem_xi=[]
+        prem_vp=[]
+        for line in lines[1:]:
+            data=line.split()
+            prem_depth.append(float(data[0]))
+            prem_vsv.append(float(data[1]))
+            try:
+                prem_xi.append(float(data[2]))
+                prem_vp.append(float(data[3]))
+                # pass
+            except:
+                pass
+
+        # prem models in black.
+        prem,=ax0.plot(prem_vsv,prem_depth,c='k',linewidth=1)
+        try:
+            ax1.plot(prem_xi,prem_depth,c='k',linewidth=1)
+            ax2.plot(prem_vp,prem_depth,c='k',linewidth=1)
+
+        except:
+            pass
+
 
     # ax2.pcolormesh(vps,depths,vpd,cmap='viridis')
     plt.setp(ax2.get_yticklabels(), visible=False)
@@ -1017,7 +1396,7 @@ if Posterior2:
 
     # average model overlaid on the posterior (only for synthetic tests)
     # and anisotropy probability
-    depths=[]
+    average_depths=[]
     average_vs=[]
     average_xi=[]
     average_vp=[]
@@ -1030,28 +1409,38 @@ if Posterior2:
 
         for line in lines:
             data=line.split()
-            depths.append(float(data[0]))
+            average_depths.append(float(data[0]))
             average_vs.append(float(data[1]))
             average_xi.append(float(data[2]))
             average_vp.append(float(data[3]))
             average_probani.append(float(data[4]))
     
-    # Average models in red.
-    mean,=ax0.plot(average_vs,depths,c='r',linewidth=2)
-    ax1.plot(average_xi,depths,c='r',linewidth=2)
-    ax2.plot(average_vp,depths,c='r',linewidth=2)
-    ax4.plot(average_probani,depths,c='k',linewidth=1)
+        # Average models in red.
+        mean,=ax0.plot(average_vs,average_depths,c='r',linewidth=2)
+        ax1.plot(average_xi,average_depths,c='r',linewidth=2)
+        ax2.plot(average_vp,average_depths,c='r',linewidth=2)
+        ax4.plot(average_probani,average_depths,c='k',linewidth=1)
+
+    else:
+        mean,=ax0.plot(vsvd_means,depths,c='r',linewidth=2)
+        ax1.plot(xid_means,depths,c='r',linewidth=2)
+        ax2.plot(vpd_means,depths,c='r',linewidth=2)
+
+
     ax4.set_xlabel('Probability',fontsize=10)
     ax4.set_title('Anisotropy')
 
     ax4.set_xlim([0,100])
     # Make proxy artists to make the legend work
     q95,=ax0.fill(np.NaN, np.NaN, 'r', alpha=0.15)
-    q65,=ax0.fill(np.NaN, np.NaN, 'r', alpha=0.25)
+    q68,=ax0.fill(np.NaN, np.NaN, 'r', alpha=0.25)
+    q38,=ax0.fill(np.NaN, np.NaN, 'r', alpha=0.35)
+    q10,=ax0.fill(np.NaN, np.NaN, 'r', alpha=0.45)
+
     if os.path.isfile(directory+'/'+'true_model.out'):
-        plt.legend([true, mean, median2, q95, (q95, q65)], ['true', 'mean', 'median', '95% mods.', '65% mods.'],loc='lower right')
+        plt.legend([true, mean, median2, q95, (q95, q68), (q95, q68, q38), (q95, q68, q38, q10)], ['true', 'mean', 'median', '95% mods.', '68% mods.', '38% mods.', '10% mods.'],loc='lower right')
     else:
-        plt.legend([mean, median2, q95, (q95, q65)], ['mean', 'median', '95% mods.', '65% mods.'],loc='lower right')
+        plt.legend([prem, mean, median2, q95, (q95, q68), (q95, q68, q38), (q95, q68, q38, q10)], ['reference', 'mean', 'median', '95% mods.', '68% mods.', '38% mods.', '10% mods.'],loc='lower right')
 
     ax0.annotate('(a)',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=10,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
     ax1.annotate('(b)',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=10,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
@@ -1064,6 +1453,400 @@ if Posterior2:
     # plt.show()
     plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Posterior2.png',dpi=300)
     plt.close()
+
+    ######################################### Make a relative plot here ###############################################
+
+    matplotlib.rcParams['font.size'] = 8
+    fig2, (Rax0, Rax1, Rax2) = plt.subplots(nrows=1, ncols=3, sharey=True,
+                                        figsize=(13*cm,11*cm))
+    Rax1.set_xticks([]); Rax1.set_yticks([]); Rax2.set_xticks([]); Rax2.set_yticks([]); Rax0.set_xticks([]); Rax0.set_yticks([])
+
+    prof=660.0
+
+    if not os.path.isfile(directory+'/'+'true_model.out'):  
+
+        rel_title_temp=fname_pre.split('_')
+        rel_title=rel_title_temp[0]+' '+rel_title_temp[1]+' '+rel_title_temp[2]
+        
+    else:
+
+        if 'FAST_LS_6'in directory:
+            rel_title='4: Fast Vsv - No Xi, Vp'
+        elif 'GREN_1.1' in directory and 'IX' not in directory:
+            rel_title='1: Fast Lithosphere - Low Xi'
+        elif 'GREN_1.1_IX' in directory:
+            rel_title='5: Fast Lithosphere - High Xi'
+        elif 'LCRATMOD_6.3' in directory:
+            rel_title='6: Fast Vsv - No Xi - Low Vp'
+        elif 'LCRAT_6.3' in directory:
+            rel_title='3: Fast Lithosphere - No Xi'
+        elif 'SN_LOW_Xi_2' in directory:
+            rel_title='2: Low Xi'
+        else:
+            rel_title='Posterior and Averages'
+        
+    fig2.suptitle(rel_title, fontsize=14)
+
+    # vsvs=np.linspace(vref_min,vref_max,disv+1)
+    # xis=np.linspace(xi_min,xi_max,disv+1)
+    # vps=np.linspace(vp_min,vp_max,disv+1)
+    # depths=np.linspace(0,prof,disd+1)
+
+    if '16_' in os.getcwd():
+        R_vref_min=-40
+        R_vref_max=40
+        R_xi_min=-40
+        R_xi_max=40
+        R_vp_min=-40
+        R_vp_max=40
+        x_minor=[10,10,10]
+        x_major=[20,20,20]
+    else:
+        R_vref_min=-10
+        R_vref_max=10
+        R_xi_min=-10
+        R_xi_max=10
+        R_vp_min=-10
+        R_vp_max=10
+        x_minor=[5,5,5]
+        x_major=[10,10,10]
+
+    Rax0.invert_yaxis()
+    Rax0.set_xlim([R_vref_min,R_vref_max])
+    Rax0.set_xlabel('$V_{SV}$ (%)', fontsize=10)
+    Rax0.set_title('S-wave velocity',fontsize=10)
+    Rax1.set_ylim([prof,0.])
+    Rax1.set_xlabel('$Xi$ (%)',fontsize=10)
+    Rax1.set_xlim([R_xi_min,R_xi_max])
+    Rax1.set_title('Radial Anisotropy',fontsize=10)
+    Rax2.set_xlim([R_vp_min,R_vp_max])
+    Rax0.set_ylabel('Depth (km)',fontsize=10)
+    Rax2.set_xlabel('$V_{PH}$ (%)',fontsize=10)
+    Rax2.set_title('P-wave velocity',fontsize=10)
+
+
+    axes_list=[Rax0,Rax1,Rax2]
+    legend_list=[]
+    for j, ax in enumerate(axes_list):
+        
+        ax.spines["right"].set_linewidth(1.5)
+        ax.spines["left"].set_linewidth(1.5)
+        ax.spines["top"].set_linewidth(1.5)
+        ax.spines["bottom"].set_linewidth(1.5)
+        ax.tick_params(labelsize=10)
+        ax.yaxis.set_minor_locator(MultipleLocator(50))
+        ax.yaxis.set_major_locator(MultipleLocator(100))
+        ax.xaxis.set_minor_locator(MultipleLocator(x_minor[j]))
+        ax.xaxis.set_major_locator(MultipleLocator(x_major[j]))
+
+
+
+
+    file=open(PREM_loc+'/'+'true_model.out','r')
+    lines=file.readlines()
+    file.close()
+
+    prem_depth=[]
+    prem_vsv=[]
+    prem_xi=[]
+    prem_vph=[]
+    for line in lines[1:]:
+        data=line.split()
+        prem_depth.append(float(data[0]))
+        prem_vsv.append(float(data[1]))
+        try:
+            prem_xi.append(float(data[2]))
+            prem_vph.append(float(data[3]))
+            # pass
+        except:
+            pass
+
+    prem_depth=np.array(prem_depth)
+    prem_vsv=np.array(prem_vsv)
+    prem_xi=np.array(prem_xi)
+    prem_vph=np.array(prem_vph)
+
+    prem_vsv_disd=np.zeros(len(depths))
+    prem_xi_disd=np.zeros(len(depths))
+    prem_vph_disd=np.zeros(len(depths))
+
+    for k in range(len(depths)):
+        a=np.abs(depths[k]-prem_depth)
+        a1=np.where(a==a.min())[0]
+        if len(a1) != 1:
+            if depths[k]>prem_depth[a1[0]]:
+                ind=a1[0]
+            else:
+                ind=a1[1]
+        else:
+            ind=a1
+        prem_vsv_disd[k]=prem_vsv[ind]
+        prem_xi_disd[k]=prem_xi[ind]
+        prem_vph_disd[k]=prem_vph[ind]
+
+    average_depths=[]
+    average_vsv=[]
+    average_xi=[]
+    average_vph=[]
+
+    if os.path.isfile(directory+'/'+'Average.out'):
+        file=open(directory+'/'+'Average.out','r')
+        lines=file.readlines()
+        file.close()
+
+        for line in lines:
+            data=line.split()
+            average_depths.append(float(data[0]))
+            average_vsv.append(float(data[1]))
+            average_xi.append(float(data[2]))
+            average_vph.append(float(data[3]))
+
+    vsvd_medians=np.array(vsvd_medians)
+    xid_medians=np.array(xid_medians)
+    vpd_medians=np.array(vpd_medians)
+
+    if os.path.isfile(directory+'/Proc2_Vs_rel.txt'):
+        Proc2_Vs_rel=np.loadtxt(directory+'/Proc2_Vs_rel.txt')
+        Proc2_Xi_rel=np.loadtxt(directory+'/Proc2_Xi_rel.txt')
+        Proc2_Vp_rel=np.loadtxt(directory+'/Proc2_Vp_rel.txt')
+
+        depths_vsv_rel=Proc2_Vs_rel[:,0]
+        average_vsv_rel=Proc2_Vs_rel[:,1]
+        vsvd_medians_rel=Proc2_Vs_rel[:,2]
+        vsvd_025_rel=Proc2_Vs_rel[:,3]
+        vsvd_160_rel=Proc2_Vs_rel[:,4]
+        vsvd_310_rel=Proc2_Vs_rel[:,5]
+        vsvd_450_rel=Proc2_Vs_rel[:,6]
+        vsvd_550_rel=Proc2_Vs_rel[:,7]
+        vsvd_690_rel=Proc2_Vs_rel[:,8]
+        vsvd_840_rel=Proc2_Vs_rel[:,9]
+        vsvd_975_rel=Proc2_Vs_rel[:,10]
+
+        depths_xi_rel=Proc2_Xi_rel[:,0]
+        average_xi_rel=Proc2_Xi_rel[:,1]
+        xid_medians_rel=Proc2_Xi_rel[:,2]
+        xid_025_rel=Proc2_Xi_rel[:,3]
+        xid_160_rel=Proc2_Xi_rel[:,4]
+        xid_310_rel=Proc2_Xi_rel[:,5]
+        xid_450_rel=Proc2_Xi_rel[:,6]
+        xid_550_rel=Proc2_Xi_rel[:,7]
+        xid_690_rel=Proc2_Xi_rel[:,8]
+        xid_840_rel=Proc2_Xi_rel[:,9]
+        xid_975_rel=Proc2_Xi_rel[:,10]
+
+        depths_vph_rel=Proc2_Vp_rel[:,0]
+        average_vph_rel=Proc2_Vp_rel[:,1]
+        vpd_medians_rel=Proc2_Vp_rel[:,2]
+        vpd_025_rel=Proc2_Vp_rel[:,3]
+        vpd_160_rel=Proc2_Vp_rel[:,4]
+        vpd_310_rel=Proc2_Vp_rel[:,5]
+        vpd_450_rel=Proc2_Vp_rel[:,6]
+        vpd_550_rel=Proc2_Vp_rel[:,7]
+        vpd_690_rel=Proc2_Vp_rel[:,8]
+        vpd_840_rel=Proc2_Vp_rel[:,9]
+        vpd_975_rel=Proc2_Vp_rel[:,10]
+
+    else:
+
+
+        vsvd_medians_rel=((vsvd_medians-prem_vsv_disd)/prem_vsv_disd)*100
+        xid_medians_rel=((xid_medians-prem_xi_disd)/prem_xi_disd)*100
+        vpd_medians_rel=((vpd_medians-prem_vph_disd)/prem_vph_disd)*100
+
+        try:
+            average_vsv_rel=((np.array(average_vsv)-prem_vsv_disd)/prem_vsv_disd)*100
+            average_xi_rel=((np.array(average_xi)-prem_xi_disd)/prem_xi_disd)*100
+            average_vph_rel=((np.array(average_vph)-prem_vph_disd)/prem_vph_disd)*100
+        except:
+            average_vsv_rel=((np.array(vsvd_means)-prem_vsv_disd)/prem_vsv_disd)*100
+            average_xi_rel=((np.array(xid_means)-prem_xi_disd)/prem_xi_disd)*100
+            average_vph_rel=((np.array(vpd_means)-prem_vph_disd)/prem_vph_disd)*100
+
+
+
+        vsvd_025_rel=((np.array(vsvd_025)-prem_vsv_disd)/prem_vsv_disd)*100
+        vsvd_160_rel=((np.array(vsvd_160)-prem_vsv_disd)/prem_vsv_disd)*100
+        vsvd_310_rel=((np.array(vsvd_310)-prem_vsv_disd)/prem_vsv_disd)*100
+        vsvd_450_rel=((np.array(vsvd_450)-prem_vsv_disd)/prem_vsv_disd)*100
+        vsvd_550_rel=((np.array(vsvd_550)-prem_vsv_disd)/prem_vsv_disd)*100
+        vsvd_690_rel=((np.array(vsvd_690)-prem_vsv_disd)/prem_vsv_disd)*100
+        vsvd_840_rel=((np.array(vsvd_840)-prem_vsv_disd)/prem_vsv_disd)*100
+        vsvd_975_rel=((np.array(vsvd_975)-prem_vsv_disd)/prem_vsv_disd)*100
+
+        xid_025_rel=((np.array(xid_025)-prem_xi_disd)/prem_xi_disd)*100
+        xid_160_rel=((np.array(xid_160)-prem_xi_disd)/prem_xi_disd)*100
+        xid_310_rel=((np.array(xid_310)-prem_xi_disd)/prem_xi_disd)*100
+        xid_450_rel=((np.array(xid_450)-prem_xi_disd)/prem_xi_disd)*100
+        xid_550_rel=((np.array(xid_550)-prem_xi_disd)/prem_xi_disd)*100
+        xid_690_rel=((np.array(xid_690)-prem_xi_disd)/prem_xi_disd)*100
+        xid_840_rel=((np.array(xid_840)-prem_xi_disd)/prem_xi_disd)*100
+        xid_975_rel=((np.array(xid_975)-prem_xi_disd)/prem_xi_disd)*100
+
+        vpd_025_rel=((np.array(vpd_025)-prem_vph_disd)/prem_vph_disd)*100
+        vpd_160_rel=((np.array(vpd_160)-prem_vph_disd)/prem_vph_disd)*100
+        vpd_310_rel=((np.array(vpd_310)-prem_vph_disd)/prem_vph_disd)*100
+        vpd_450_rel=((np.array(vpd_450)-prem_vph_disd)/prem_vph_disd)*100
+        vpd_550_rel=((np.array(vpd_550)-prem_vph_disd)/prem_vph_disd)*100
+        vpd_690_rel=((np.array(vpd_690)-prem_vph_disd)/prem_vph_disd)*100
+        vpd_840_rel=((np.array(vpd_840)-prem_vph_disd)/prem_vph_disd)*100
+        vpd_975_rel=((np.array(vpd_975)-prem_vph_disd)/prem_vph_disd)*100
+
+        fname_VsProc_rel=directory+'/Proc2_Vs_rel.txt'
+        f_VsProc_rel=open(fname_VsProc_rel,'w')
+
+        fname_XiProc_rel=directory+'/Proc2_Xi_rel.txt'
+        f_XiProc_rel=open(fname_XiProc_rel,'w')
+        
+        fname_VpProc_rel=directory+'/Proc2_Vp_rel.txt'
+        f_VpProc_rel=open(fname_VpProc_rel,'w')
+
+        for i in range(len(vsvd_means)):
+            f_VsProc_rel.write('  %3.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f\n' % (depths[i], average_vsv_rel[i], vsvd_medians_rel[i], vsvd_025_rel[i], vsvd_160_rel[i], vsvd_310_rel[i], vsvd_450_rel[i], vsvd_550_rel[i], vsvd_690_rel[i], vsvd_840_rel[i], vsvd_975_rel[i]))
+            f_XiProc_rel.write('  %3.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f\n' % (depths[i], average_xi_rel[i],   xid_medians_rel[i],  xid_025_rel[i],  xid_160_rel[i],  xid_310_rel[i],  xid_450_rel[i],  xid_550_rel[i],  xid_690_rel[i],  xid_840_rel[i],  xid_975_rel[i]))
+            f_VpProc_rel.write('  %3.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f\n' % (depths[i], average_vph_rel[i],  vpd_medians_rel[i],  vpd_025_rel[i],  vpd_160_rel[i],  vpd_310_rel[i],  vpd_450_rel[i],  vpd_550_rel[i],  vpd_690_rel[i],  vpd_840_rel[i],  vpd_975_rel[i]))
+
+        f_VsProc_rel.close()
+        f_XiProc_rel.close()
+        f_VpProc_rel.close()
+
+
+    Rax0.fill_betweenx(depths,vsvd_025_rel,vsvd_975_rel,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.15)
+    Rax0.fill_betweenx(depths,vsvd_160_rel,vsvd_840_rel,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.25)
+    Rax0.fill_betweenx(depths,vsvd_310_rel,vsvd_690_rel,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.35)
+    Rax0.fill_betweenx(depths,vsvd_450_rel,vsvd_550_rel,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.45)
+
+    Rax1.fill_betweenx(depths,xid_025_rel,xid_975_rel,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.15)
+    Rax1.fill_betweenx(depths,xid_160_rel,xid_840_rel,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.25)
+    Rax1.fill_betweenx(depths,xid_310_rel,xid_690_rel,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.35)
+    Rax1.fill_betweenx(depths,xid_450_rel,xid_550_rel,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.45)
+
+    Rax2.fill_betweenx(depths,vpd_025_rel,vpd_975_rel,facecolor='darkgreen', rasterized=False, alpha=0.15)
+    Rax2.fill_betweenx(depths,vpd_160_rel,vpd_840_rel,facecolor='darkgreen', rasterized=False, alpha=0.25)
+    Rax2.fill_betweenx(depths,vpd_310_rel,vpd_690_rel,facecolor='darkgreen', rasterized=False, alpha=0.35)
+    Rax2.fill_betweenx(depths,vpd_450_rel,vpd_550_rel,facecolor='darkgreen', rasterized=False, alpha=0.45)
+
+
+    # prem models in black. - i.e. zero percent.
+    prem,=Rax0.plot([0,0],[0,dmax],c='grey',linewidth=0.5)
+    Rax1.plot([0,0],[0,dmax],c='grey',linewidth=0.5)
+    Rax2.plot([0,0],[0,dmax],c='grey',linewidth=0.5)
+
+    # true model overlaid on the posterior (only for synthetic tests)
+    if os.path.isfile(directory+'/'+'true_model.out'):
+        file=open(directory+'/'+'true_model.out','r')
+        lines=file.readlines()
+        file.close()
+
+        true_depth=[]
+        true_vsv=[]
+        true_xi=[]
+        true_vph=[]
+        for line in lines[1:]:
+            data=line.split()
+            true_depth.append(float(data[0]))
+            true_vsv.append(float(data[1]))
+            try:
+                true_xi.append(float(data[2]))
+                true_vph.append(float(data[3]))
+                # pass
+            except:
+                pass
+
+        true_depth=np.array(true_depth)
+        true_vsv=np.array(true_vsv)
+        true_xi=np.array(true_xi)
+        true_vph=np.array(true_vph)
+
+        true_vsv_disd=np.zeros(len(depths))
+        true_xi_disd=np.zeros(len(depths))
+        true_vph_disd=np.zeros(len(depths))
+
+        for k in range(len(depths)):
+            a=np.abs(depths[k]-true_depth)
+            a1=np.where(a==a.min())[0]
+            if len(a1) != 1:
+                if depths[k]>true_depth[a1[0]]:
+                    ind=a1[0]
+                else:
+                    ind=a1[1]
+            else:
+                ind=a1
+            true_vsv_disd[k]=true_vsv[ind]
+            true_xi_disd[k]=true_xi[ind]
+            true_vph_disd[k]=true_vph[ind]
+
+        true_vsv_rel=((true_vsv_disd-prem_vsv_disd)/prem_vsv_disd)*100
+        true_xi_rel=((true_xi_disd-prem_xi_disd)/prem_xi_disd)*100
+        true_vph_rel=((true_vph_disd-prem_vph_disd)/prem_vph_disd)*100
+
+
+        Fit_vsv_xi=True
+
+        vsv_2_sum=np.zeros(disd)
+        xi_2_sum=np.zeros(disd)
+        vph_2_sum=np.zeros(disd)
+        for i in range(0,disd):
+            vsv_2_sum[i]=((vsvd_medians_rel[i]-true_vsv_rel[i])**2)
+            xi_2_sum[i]=((xid_medians_rel[i]-true_xi_rel[i])**2)
+            vph_2_sum[i]=((vpd_medians_rel[i]-true_vph_rel[i])**2)
+            # print(depths[i], np.sqrt(vsv_2_sum[i]), np.sqrt(xi_2_sum[i]))
+        if Fit_vsv_xi:
+            # Model_fit=(1-np.sqrt((np.sum(np.hstack((vsv_2_sum)))/(disd*2))))*100
+            Model_fit=np.sqrt(np.mean(np.hstack((vsv_2_sum,xi_2_sum))))
+        else:
+            Model_fit=np.sqrt(np.mean(np.hstack((vsv_2_sum))))
+        print('****')
+
+        print('Model Fit: '+str(Model_fit))
+        print('****')
+
+    if os.path.isfile(directory+'/'+'true_model.out'):
+        # True models in cyan.
+        true,=Rax0.plot(true_vsv_rel,depths,c='k',linewidth=1)
+        Rax1.plot(true_xi_rel,depths,c='k',linewidth=1) # ,alpha=1,marker='o',markersize=2,mfc='k'
+        Rax2.plot(true_vph_rel,depths,c='k',linewidth=1)
+
+    median2,=Rax0.plot(vsvd_medians_rel,depths,c='b',linewidth=2)
+    Rax1.plot(xid_medians_rel,depths,c='b',linewidth=2)
+    if '16_' in os.getcwd():
+        Rax2.plot(vpd_medians_rel,depths,c='b',linewidth=2) 
+
+    # mean,=Rax0.plot(average_vsv_rel,depths,c='r',linewidth=2)
+    # Rax1.plot(average_xi_rel,depths,c='r',linewidth=2)
+    # Rax2.plot(average_vph_rel,depths,c='r',linewidth=2)
+
+
+    # Make proxy artists to make the legend work
+    q95,=Rax0.fill(np.NaN, np.NaN, 'r', alpha=0.15)
+    q68,=Rax0.fill(np.NaN, np.NaN, 'r', alpha=0.25)
+    q38,=Rax0.fill(np.NaN, np.NaN, 'r', alpha=0.35)
+    q10,=Rax0.fill(np.NaN, np.NaN, 'r', alpha=0.45)
+    if os.path.isfile(directory+'/'+'true_model.out'):
+        # plt.legend([prem, true, mean, median2, q95, (q95, q65)], ['PREM', 'true', 'mean', 'median', '95% mods.', '65% mods.'],loc='lower right')
+        plt.legend([prem, true, median2, q95, (q95, q68), (q95, q68, q38), (q95, q68, q38, q10)], ['reference', 'true', 'median', '95% mods.', '68% mods.', '38% mods.', '10% mods.'],loc='lower right')
+    else:
+        # plt.legend([prem, mean, median2, q95, (q95, q65)], ['PREM', 'mean', 'median', '95% mods.', '65% mods.'],loc='lower right')
+        plt.legend([prem, median2, q95, (q95, q68), (q95, q68, q38), (q95, q68, q38, q10)], ['reference', 'median', '95% mods.', '68% mods.', '38% mods.', '10% mods.'],loc='lower right')
+
+    if os.path.isfile(directory+'/'+'true_model.out'):
+        Rax1.annotate('$\u03A7^{2}_{M}$='+str(np.round(Model_fit,2))+'%',(0, 0),xytext=(5,5),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='bottom', bbox=dict(facecolor='white',edgecolor='grey', pad=2.0, alpha=0.5))
+    Rax0.annotate('$\u03A7^{2}_{D}$='+str(np.round(chi,2))+'km/s',(0, 0),xytext=(5,5),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='bottom', bbox=dict(facecolor='white',edgecolor='grey', pad=2.0, alpha=0.5))
+
+    Rax0.annotate('a',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=10,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
+    Rax1.annotate('b',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=10,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
+    Rax2.annotate('c',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=10,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
+
+
+
+
+    # plt.show()
+    plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Posterior_rel.pdf') # ,dpi=300)
+    plt.close()
+
+
+
+matplotlib.rcParams['font.size'] = 10
+
 
 
 #################### histogram of rayleigh uncertainty parameter
@@ -1503,119 +2286,6 @@ if Convergence:
         plt.close()
 
 
-################################# Average dispersion curves ################################################
-if Dispersion:
-    if os.path.isfile(directory+'/'+'Dispersion_mean.out'):
-        file=open(directory+'/'+'Dispersion_mean.out','r')
-        lines=file.readlines()
-        file.close()
-
-        ndatad_R=int(lines[0].split()[0])
-        ndatad_L=int(lines[0].split()[1])
-
-        period_R=[]
-        n_R=[]
-        c_R=[]
-        dc_R=[]
-        for line in lines[1:ndatad_R+1]:
-            data=line.split()
-            period_R.append(float(data[0]))
-            n_R.append(int(float(data[1])))
-            c_R.append(float(data[2]))
-            dc_R.append(float(data[3]))
-
-        period_L=[]
-        n_L=[]
-        c_L=[]
-        dc_L=[]
-        for line in lines[ndatad_R+1:]:
-            data=line.split()
-            period_L.append(float(data[0]))
-            n_L.append(int(float(data[1])))
-            c_L.append(float(data[2]))
-            dc_L.append(float(data[3]))
-
-        # true dispersion curves (data)
-        file=open(directory+'/'+'Dispersion_obs.out','r')
-        lines=file.readlines()
-        file.close()
-
-        ndatad_R=int(lines[0].split()[0])
-        ndatad_L=int(lines[0].split()[1])
-
-        period_R_obs=[]
-        n_R_obs=[]
-        c_R_obs=[]
-        dc_R_obs=[]
-        for line in lines[1:ndatad_R+1]:
-            data=line.split()
-            period_R_obs.append(float(data[0]))
-            n_R_obs.append(int(float(data[1])))
-            c_R_obs.append(float(data[2]))
-            dc_R_obs.append(float(data[3]))
-
-        period_L_obs=[]
-        n_L_obs=[]
-        c_L_obs=[]
-        dc_L_obs=[]
-        for line in lines[ndatad_R+1:]:
-            data=line.split()
-            period_L_obs.append(float(data[0]))
-            n_L_obs.append(int(float(data[1])))
-            c_L_obs.append(float(data[2]))
-            dc_L_obs.append(float(data[3]))
-
-        Modes_R=np.unique(n_R)
-        Modes_L=np.unique(n_L)
-
-        plt.figure('dispersion')
-
-        if len(Modes_R)>0:
-            for R_mode in Modes_R:
-                ave_R='ave_R_'+str(R_mode)
-                obs_R='obs_R_'+str(R_mode)
-                # print(ave_R)
-                ind=np.where(n_R==R_mode)
-                ave_R=plt.errorbar(np.array(period_R)[ind[0]],np.array(c_R)[ind[0]],yerr=np.array(dc_R)[ind[0]],marker='o',zorder=0,label='Rayleigh average',mfc='blue',mec='blue', c='blue')
-                obs_R=plt.errorbar(np.array(period_R_obs)[ind[0]]-0.1,np.array(c_R_obs)[ind[0]],yerr=np.array(dc_R_obs)[ind[0]],marker='o',zorder=0,label='Rayleigh observed',mfc='limegreen',mec='limegreen', c='limegreen')
-
-        if len(Modes_L)>0:
-            for L_mode in Modes_L:
-                ave_L='ave_L_'+str(L_mode)
-                obs_L='obs_L_'+str(L_mode)
-                # print(ave_L)
-                ind=np.where(n_L==L_mode)
-                ave_L=plt.errorbar(np.array(period_L)[ind[0]]+0.1,np.array(c_L)[ind[0]],yerr=np.array(dc_L)[ind[0]],marker='o',zorder=0,label='Love average',mfc='orange',mec='orange', c='orange')
-                obs_L=plt.errorbar(np.array(period_L_obs)[ind[0]]+0.2,np.array(c_L_obs)[ind[0]],yerr=np.array(dc_L_obs)[ind[0]],marker='o',zorder=0,label='Love observed',mfc='red',mec='red', c='red')
-
-
-        # plt.errorbar(np.array(period_R),c_R,yerr=dc_R,marker='o',zorder=0,label='Rayleigh average')
-        # plt.errorbar(np.array(period_L)+0.1,c_L,yerr=dc_L,marker='o',zorder=0,label='Love average')
-        # plt.errorbar(np.array(period_R_obs)-0.1,c_R_obs,yerr=dc_R_obs,marker='o',zorder=0,label='Rayleigh observed')
-        # plt.errorbar(np.array(period_L_obs)+0.2,c_L_obs,yerr=dc_L_obs,marker='o',zorder=0,label='Love observed')
-        # plt.legend()
-        
-        if len(Modes_R)>0 and len(Modes_L)>0:
-            plt.legend([ave_R, obs_R, ave_L, obs_L], ['Rayleigh average', 'Rayleigh observed', 'Love average', 'Love observed'])
-        elif len(Modes_R)>0 and len(Modes_L)==0:
-            plt.legend([ave_R, obs_R], ['Rayleigh average', 'Rayleigh observed'])
-        elif len(Modes_R)==0 and len(Modes_L)>0:
-            plt.legend([ave_L, obs_L], ['Love average', 'Love observed'])
-
-        
-        # plt.xlim([40,360])
-        plt.ylim([2.5,9.5])
-        plt.xlabel('Period (s)')
-        plt.ylabel('Phase Velocity (m/s)')
-        plt.title('Compare Dispersion Curves')
-
-        plt.xlim([np.min(period_R+period_L),np.max(period_R+period_L)])
-
-        # plt.show()
-        plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Dispersion.png',dpi=200)
-        plt.close()
-
-
 ################################# Average PsPp Fit ################################################
 if PsPp_Fit:
     if os.path.isfile(directory+'/'+'PsPp_mean.out'):
@@ -1644,7 +2314,7 @@ if PsPp_Fit:
         mean[:,2]=d_PsPpe[:]
         sorted_mean = mean[np.argsort(mean[:, 0])]
 
-        # true dispersion curves (data)
+        # true PsPp (data)
         file=open(directory+'/'+'PsPp_obs.out','r')
         lines=file.readlines()
         file.close()
@@ -1689,10 +2359,10 @@ if PsPp_Fit:
 
 
 if Corr_Hist:
-    if os.path.isfile(directory+'/'+'Posterior_corr.json'):
+    if os.path.isfile(directory+'/'+'Posterior_corr_100_200.json'):
         print('Posterior Correlation file present')
         
-        with open(directory+'/'+'Posterior_corr.json') as data_file:
+        with open(directory+'/'+'Posterior_corr_100_200.json') as data_file:
             corrs = json.load(data_file)
 
         nsample  = int(corrs['params_inversion']['nsample'])

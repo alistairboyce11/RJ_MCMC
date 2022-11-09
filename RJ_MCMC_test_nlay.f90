@@ -43,8 +43,8 @@ program RJ_MCMC
 
     character (len=*), parameter :: dirname = 'OUT_TEST' ! This is where output info files are saved and input data files are taken.
     character*8, parameter :: storename = 'STORFFC1'     ! This is where output models are saved
-    integer, parameter :: burn_in = 200000 ! 55000 !Burn-in period
-    integer, parameter :: nsample = 200000 ! 50000!Post burn-in
+    integer, parameter :: burn_in = 300000 ! 55000 !Burn-in period
+    integer, parameter :: nsample = 300000 ! 50000!Post burn-in
     integer, parameter :: thin = 50    !Thinning of the chain 
 
     integer, parameter :: Scratch = 1     ! 0: Start from Stored model 1: Start from scratch
@@ -68,26 +68,26 @@ program RJ_MCMC
     real, parameter :: xi_min = 0.6 ! bounds of the prior in xi
     real, parameter :: xi_max = 1.4
 
-    double precision, parameter ::    Ad_R_max = 25 ! bounds of the prior in Ad_R - the error parameter for rayleigh wave velocity
-    double precision, parameter ::    Ad_R_min = 0.0000002
+    double precision, parameter ::    Ad_R_max = 100 ! bounds of the prior in Ad_R - the error parameter for rayleigh wave velocity
+    double precision, parameter ::    Ad_R_min = 0.1
 
-    double precision, parameter ::    Ad_L_max = 25 ! bounds of the prior in Ad_L
-    double precision, parameter ::    Ad_L_min = 0.0000002
+    double precision, parameter ::    Ad_L_max = 100 ! bounds of the prior in Ad_L
+    double precision, parameter ::    Ad_L_min = 0.1
 
     !!!!!!!!!!!!!!! AL mods for P-wave stuff !!!!!!!!!!!!!!!!!
-    double precision, parameter ::    Ad_PsPp_max = 25 ! bounds of the prior in Ad_PsPp
-    double precision, parameter ::    Ad_PsPp_min = 0.0000002
+    double precision, parameter ::    Ad_PsPp_max = 100 ! bounds of the prior in Ad_PsPp
+    double precision, parameter ::    Ad_PsPp_min = 0.1
 
     !!!!!!!!!!!!!!! Add a prior for starting models close to PREM !!!!!!!!!!!!!!!!!
-    real, parameter :: sp_width = 0.4 ! width of the prior in vsv
-    real, parameter :: sp_vp_min = -0.4
-    real, parameter :: sp_vp_max = 0.4 ! bounds of the prior in vp
-    real, parameter :: sp_xi_min = 0.6 ! bounds of the prior in xi
-    real, parameter :: sp_xi_max = 1.4
-    real, parameter :: sp_malay = 80
-    double precision, parameter ::    sp_Ad_R_max = 25 ! bounds of the prior in Ad_R - the error parameter for rayleigh wave velocity
-    double precision, parameter ::    sp_Ad_L_max = 25 ! bounds of the prior in Ad_L
-    double precision, parameter ::    sp_Ad_PsPp_max = 25 ! bounds of the prior in Ad_PsPp
+    real, parameter :: sp_width = 0.15 ! width of the prior in vsv
+    real, parameter :: sp_vp_min = -0.15
+    real, parameter :: sp_vp_max = 0.15 ! bounds of the prior in vp
+    real, parameter :: sp_xi_min = 0.85 ! bounds of the prior in xi
+    real, parameter :: sp_xi_max = 1.15
+    real, parameter :: sp_malay = 40
+    double precision, parameter ::    sp_Ad_R_max = 65 ! bounds of the prior in Ad_R - the error parameter for rayleigh wave velocity
+    double precision, parameter ::    sp_Ad_L_max = 65 ! bounds of the prior in Ad_L
+    double precision, parameter ::    sp_Ad_PsPp_max = 65 ! bounds of the prior in Ad_PsPp
 
 
     !-----------------------------------------
@@ -116,8 +116,8 @@ program RJ_MCMC
      !This is because the solution is visualized as an histogram, 
      !and hence we need to define the number of bins
 
-    integer, parameter :: disd = 200 !depth
-    integer, parameter :: disv = 100 !velocity/anisotropy
+    integer, parameter :: disd = 100 !depth
+    integer, parameter :: disv = 400 !velocity/anisotropy
     integer, parameter :: disA = 200 !for noise parameter 
 
     !depth of model for display
@@ -254,16 +254,16 @@ program RJ_MCMC
     
     write(*,*)dirname
     
-    pxi = 0.4             ! proposal for change in xi
+    pxi = 0.1             ! proposal for change in xi
     p_vp = 0.1           ! proposal for change in vp
     pd1 = 10! 0.2         ! proposal on change in position  
     pv1 = 0.1! 0.04     ! proposal on velocity
-    pAd_R = 0.5        ! proposal for change in R noise
-    pAd_L = 0.5        ! proposal for change in L noise
-    sigmav=0.15        ! proposal for vsv when creating a new layer
-    sigmavp=0.15     ! proposal for vp when creating a new layer
+    pAd_R = 5        ! proposal for change in R noise
+    pAd_L = 5        ! proposal for change in L noise
+    sigmav=0.05        ! proposal for vsv when creating a new layer
+    sigmavp=0.05     ! proposal for vp when creating a new layer
     if (PsPp_flag==1) then
-        pAd_PsPp = 0.5        ! proposal for change in PsPp tdiff noise
+        pAd_PsPp = 5        ! proposal for change in PsPp tdiff noise
     end if
 
     testing=.false.
@@ -876,11 +876,11 @@ program RJ_MCMC
     
     do i=1,ndatad_R ! calculate misfit -> log-likelihood of initial model
         lsd_R=lsd_R+(d_obsdcR(i)-d_cR(i))**2                                ! Sum of squared misfits
-        liked_R=liked_R+(d_obsdcR(i)-d_cR(i))**2/(2*(Ad_R*d_obsdcRe(i))**2) ! gaussian errors
+        liked_R=liked_R+(d_obsdcR(i)-d_cR(i))**2/(2*(Ad_R*d_obsdcRe(i)*(d_obsdcR(i)/100))**2) ! gaussian errors
     enddo
     do i=1,ndatad_L
         lsd_L=lsd_L+(d_obsdcL(i)-d_cL(i))**2
-        liked_L=liked_L+(d_obsdcL(i)-d_cL(i))**2/(2*(Ad_L*d_obsdcLe(i))**2) 
+        liked_L=liked_L+(d_obsdcL(i)-d_cL(i))**2/(2*(Ad_L*d_obsdcLe(i)*(d_obsdcL(i)/100))**2) 
     enddo
 
     if (PsPp_flag==1) then
@@ -997,94 +997,100 @@ program RJ_MCMC
             ! if ((Acp(2)/(Prp(2)+1))>0.54) pd2=pd2*(1+perturb)
             ! if ((Acp(2)/(Prp(2)+1))<0.34) pd2=pd2*(1-perturb)
             !------------------------------------------------
-            ! UPDATE SIGMAV & SIGMAVP
+            ! ! UPDATE SIGMAV & SIGMAVP
 
-            !write(*,*) '****',AcB/PrB,(Ar_birth_old/100.),0.5*((AcB/PrB)-(AcD/PrD))
-            if ((abs((AcB/PrB)-Ar_birth_old)>2*abs((AcB/PrB)-(AcD/PrD))).and.&
-                (AcB.ne.0)) then !special treatement for adding/removing layers
-                !write(*,*)
-                !write(*,*)'update ---------------------'
-                !write(*,*)Ar_birth_old,100*AcB/PrB
-                !write(*,*)sigmav_old,sigmav
+            ! !write(*,*) '****',AcB/PrB,(Ar_birth_old/100.),0.5*((AcB/PrB)-(AcD/PrD))
+            ! if ((abs((AcB/PrB)-Ar_birth_old)>2*abs((AcB/PrB)-(AcD/PrD))).and.&
+            !     (AcB.ne.0)) then !special treatement for adding/removing layers
+            !     !write(*,*)
+            !     !write(*,*)'update ---------------------'
+            !     !write(*,*)Ar_birth_old,100*AcB/PrB
+            !     !write(*,*)sigmav_old,sigmav
                                 
-                sigma_count=sigma_count+1
-                if (vp_flag==0) then
-                    ! Vp Free
-                    if ((AcB/PrB)>Ar_birth_old) then! Going in the right direction
-                        if (mod(int(sigma_count/switch_sigma),2)==0) then
-                            if (sigmav>sigmav_old) then !Going up
-                                sigmav_new=sigmav*(1+perturb)
-                            else !Going down
-                                sigmav_new=sigmav*(1-perturb)
-                            endif
-                            ! sigmavp_new=sigmavp
-                            sigmav_old=sigmav
-                            sigmav=sigmav_new
-                        else
-                            ! sigmavp
-                            if (sigmavp>sigmavp_old) then !Going up
-                                sigmavp_new=sigmavp*(1+perturb)
-                            else !Going down
-                                sigmavp_new=sigmavp*(1-perturb)
-                            endif
-                            ! sigmav_new=sigmav
-                            sigmavp_old=sigmavp
-                            sigmavp=sigmavp_new
-                        endif
-                    else ! Going in the wrong direction
-                        if (mod(int(sigma_count/switch_sigma),2)==0) then
-                            if (sigmav>sigmav_old) then !Going up
-                                sigmav_new=sigmav*(1-perturb)
-                            else
-                                sigmav_new=sigmav*(1+perturb)
-                            endif
-                            ! sigmavp_new=sigmavp
-                            sigmav_old=sigmav
-                            sigmav=sigmav_new
-                        else
-                            ! sigmavp
-                            if (sigmavp>sigmavp_old) then !Going up
-                                sigmavp_new=sigmavp*(1-perturb)
-                            else
-                                sigmavp_new=sigmavp*(1+perturb)
-                            endif
-                            ! sigmav_new=sigmav
-                            sigmavp_old=sigmavp
-                            sigmavp=sigmavp_new
-                        endif
-                    endif
-                else
-                    if ((AcB/PrB)>Ar_birth_old) then! Going in the right direction
-                        if (sigmav>sigmav_old) then !Going up
-                            sigmav_new=sigmav*(1+perturb)
-                        else !Going down
-                            sigmav_new=sigmav*(1-perturb)
-                        endif
-                    else ! Going in the wrong direction
-                        if (sigmav>sigmav_old) then !Going up
-                            sigmav_new=sigmav*(1-perturb)
-                        else
-                            sigmav_new=sigmav*(1+perturb)
-                        endif
-                    endif
-                    sigmavp_new=sigmavp
-                endif
+            !     sigma_count=sigma_count+1
+            !     if (vp_flag==0) then
+            !         ! Vp Free
+            !         if ((AcB/PrB)>Ar_birth_old) then! Going in the right direction
+            !             if (mod(int(sigma_count/switch_sigma),2)==0) then
+            !                 if (sigmav>sigmav_old) then !Going up
+            !                     sigmav_new=sigmav*(1+perturb)
+            !                 else !Going down
+            !                     sigmav_new=sigmav*(1-perturb)
+            !                 endif
+            !                 ! sigmavp_new=sigmavp
+            !                 sigmav_old=sigmav
+            !                 sigmav=sigmav_new
+            !             else
+            !                 ! sigmavp
+            !                 if (sigmavp>sigmavp_old) then !Going up
+            !                     sigmavp_new=sigmavp*(1+perturb)
+            !                 else !Going down
+            !                     sigmavp_new=sigmavp*(1-perturb)
+            !                 endif
+            !                 ! sigmav_new=sigmav
+            !                 sigmavp_old=sigmavp
+            !                 sigmavp=sigmavp_new
+            !             endif
+            !         else ! Going in the wrong direction
+            !             if (mod(int(sigma_count/switch_sigma),2)==0) then
+            !                 if (sigmav>sigmav_old) then !Going up
+            !                     sigmav_new=sigmav*(1-perturb)
+            !                 else
+            !                     sigmav_new=sigmav*(1+perturb)
+            !                 endif
+            !                 ! sigmavp_new=sigmavp
+            !                 sigmav_old=sigmav
+            !                 sigmav=sigmav_new
+            !             else
+            !                 ! sigmavp
+            !                 if (sigmavp>sigmavp_old) then !Going up
+            !                     sigmavp_new=sigmavp*(1-perturb)
+            !                 else
+            !                     sigmavp_new=sigmavp*(1+perturb)
+            !                 endif
+            !                 ! sigmav_new=sigmav
+            !                 sigmavp_old=sigmavp
+            !                 sigmavp=sigmavp_new
+            !             endif
+            !         endif
+            !     else
+            !         if ((AcB/PrB)>Ar_birth_old) then! Going in the right direction
+            !             if (sigmav>sigmav_old) then !Going up
+            !                 sigmav_new=sigmav*(1+perturb)
+            !             else !Going down
+            !                 sigmav_new=sigmav*(1-perturb)
+            !             endif
+            !         else ! Going in the wrong direction
+            !             if (sigmav>sigmav_old) then !Going up
+            !                 sigmav_new=sigmav*(1-perturb)
+            !             else
+            !                 sigmav_new=sigmav*(1+perturb)
+            !             endif
+            !         endif
+            !         sigmavp_new=sigmavp
+            !     endif
 
-                !write(*,*)sigmav_new
-                !write(*,*)
-                ! sigmav_old=sigmav
-                ! sigmav=sigmav_new
+            !     !write(*,*)sigmav_new
+            !     !write(*,*)
+            !     ! sigmav_old=sigmav
+            !     ! sigmav=sigmav_new
 
-                ! sigmavp_old=sigmavp
-                ! sigmavp=sigmavp_new
+            !     ! sigmavp_old=sigmavp
+            !     ! sigmavp=sigmavp_new
 
-                Ar_birth_old=AcB/PrB
-                PrB=0
-                PrD=0
-                AcB=0
-                AcD=0
-            endif
+            !     Ar_birth_old=AcB/PrB
+            !     PrB=0
+            !     PrD=0
+            !     AcB=0
+            !     AcD=0
+            ! endif
             
+            PrB=0
+            PrD=0
+            AcB=0
+            AcD=0
+
+
             if (vp_flag==0) then
                 ! Vp Free
                 if ((Ac_vp/(Pr_vp+1))<0.01) then 
@@ -1600,11 +1606,11 @@ program RJ_MCMC
             liked_L_prop=0
             do i=1,ndatad_R
                 lsd_R_prop=lsd_R_prop+(d_obsdcR(i)-d_cR_prop(i))**2
-                liked_R_prop=liked_R_prop+(d_obsdcR(i)-d_cR_prop(i))**2/(2*(Ad_R_prop*d_obsdcRe(i))**2) ! prendre en compte erreurs mesurées / include measurement errors
+                liked_R_prop=liked_R_prop+(d_obsdcR(i)-d_cR_prop(i))**2/(2*(Ad_R_prop*d_obsdcRe(i)*(d_obsdcR(i)/100))**2) ! prendre en compte erreurs mesurées / include measurement errors
             end do
             do i=1,ndatad_L
                 lsd_L_prop=lsd_L_prop+(d_obsdcL(i)-d_cL_prop(i))**2
-                liked_L_prop=liked_L_prop+(d_obsdcL(i)-d_cL_prop(i))**2/(2*(Ad_L_prop*d_obsdcLe(i))**2) ! prendre en compte erreurs mesurées / include measurement errors
+                liked_L_prop=liked_L_prop+(d_obsdcL(i)-d_cL_prop(i))**2/(2*(Ad_L_prop*d_obsdcLe(i)*(d_obsdcL(i)/100))**2) ! prendre en compte erreurs mesurées / include measurement errors
             end do
 
 
@@ -2026,8 +2032,8 @@ program RJ_MCMC
                 write(*,*)'Ad_R',Ad_R,'Ad_L',Ad_L
             end if
             write(*,*)'Acceptance rates'
-            write(*,*)'AR_move',100*AcP/PrP
-            write(*,*)'AR_value',100*AcV/PrV
+            write(*,*)'AR_move',100*AcP/PrP,'p_d',pd1
+            write(*,*)'AR_value',100*AcV/PrV,'p_vs',pv1
             write(*,*)'AR_Birth',100*AcB/PrB,'AR_Death',100*AcD/PrD,'sigmav',sigmav,'sigmavp',sigmavp
             write(*,*)'AR_Birtha',100*AcBa/PrBa,'AR_Deatha',100*AcDa/PrDa
             write(*,*)'AR_xi',100*Acxi/Prxi,'pxi',pxi
