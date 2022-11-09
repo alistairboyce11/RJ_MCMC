@@ -96,7 +96,7 @@ def get_metadata(input_directory):
         d=f.readline()
         print(ind)
     data=f.readline().split() # contains a third parameter, the thinning. Not used currently, but can be added easily
-    print(data)
+    # print(data)
     params_inversion['burn-in']=float(data[0])
     params_inversion['nsample']=float(data[1])
     params_inversion['thinning']=float(data[2])
@@ -137,7 +137,6 @@ def get_metadata(input_directory):
 
 
     return params_inversion
-
 
 #########################################################
 # Get Reference model values
@@ -201,6 +200,119 @@ def get_model_ref(filename='Model_PREM_SIMPLE.in'):
     model_ref['vsh']=vsh
     
     return model_ref
+#########################################################
+# Get Observed dispersion curve
+#########################################################
+
+def get_obs_disp(output_directory):
+    '''
+    reads the observed dispersion curve we are trying to fit
+    contains: 
+        wave type: R/L
+        mode: 0-5
+        period: 40-200
+        phase vel: (km/s)
+        obs_err: (km/s)
+
+    Parameters
+    ----------
+    filename : str
+        file containing the output directory (location of dispersion files.)
+    
+    Returns
+    -------
+    obs_disp : dict
+        contains the data of the observed dispersion curve.
+
+    !!!!!!!!!!!!!!!!!!!!! INITIALLY CODED for 47 periods for overtones now !!!!!!!!!!!!
+    ---------------------- May work for different number of data ----------------------
+    '''
+
+    # read file
+    f=open(output_directory+'/mod_dispersion.in','r')
+    print(output_directory+'/mod_dispersion.in')
+
+    # fline=f.readline()
+    # if not fline:
+    #     print('file ' +output_directory+'/mod_dispersion.in' + ' empty')
+    #     # return
+
+    obs_disp={}
+    obs_disp['R']={}
+    obs_disp['L']={}
+
+    obs_disp['R']['ndata']=[]
+    obs_disp['R']['modes']=[]
+    obs_disp['R']['periods']=[]
+    obs_disp['R']['phase_vel']=[]
+    obs_disp['R']['error']=[]
+
+    obs_disp['L']['ndata']=[]
+    obs_disp['L']['modes']=[]
+    obs_disp['L']['periods']=[]
+    obs_disp['L']['phase_vel']=[]
+    obs_disp['L']['error']=[]
+
+
+
+    num_R=int(f.readline())
+    obs_disp['R']['ndata']=num_R
+    num_R_modes=int(f.readline())
+    for mode in range(num_R_modes):
+        num_R_mode=int(f.readline())
+        # print(mode,'=',num_R_mode)
+        num_R_mode_periods=int(f.readline())
+        for num_period in range(num_R_mode_periods+1):
+            line=f.readline()
+            data=line.split()
+            m=int(data[0])
+            p=float(data[1])
+            c=float(data[2])
+            e=float(data[3])
+            # print(m,p,c,e)
+            obs_disp['R']['modes'].append(m)
+            obs_disp['R']['periods'].append(p)
+            obs_disp['R']['phase_vel'].append(c)
+            obs_disp['R']['error'].append(e)
+
+    num_L=int(f.readline())
+    obs_disp['L']['ndata']=num_L
+    num_L_modes=int(f.readline())
+    for mode in range(num_L_modes):
+        num_L_mode=int(f.readline())
+        # print(mode,'=',num_L_mode)
+        num_L_mode_periods=int(f.readline())
+        for num_period in range(num_L_mode_periods+1):
+            line=f.readline()
+            data=line.split()
+            m=int(data[0])
+            p=float(data[1])
+            c=float(data[2])
+            e=float(data[3])
+            # print(m,p,c,e)
+            obs_disp['L']['modes'].append(m)
+            obs_disp['L']['periods'].append(p)
+            obs_disp['L']['phase_vel'].append(c)
+            obs_disp['L']['error'].append(e)
+    f.close()
+
+    # print(obs_disp['R']['ndata'], obs_disp['L']['ndata'])
+    # for k in range(obs_disp['R']['ndata']):
+    #     print(obs_disp['R']['periods'][k],obs_disp['R']['modes'][k],obs_disp['R']['phase_vel'][k],obs_disp['R']['error'][k])
+    # for k in range(obs_disp['L']['ndata']):
+    #     print(obs_disp['L']['periods'][k],obs_disp['L']['modes'][k],obs_disp['L']['phase_vel'][k],obs_disp['L']['error'][k])
+
+    fname_out=output_directory+'/Proc_Dispersion_obs.out'
+    f_out=open(fname_out,'w')
+    f_out.write('          %1i          %1i\n' % (int(obs_disp['R']['ndata']), int(obs_disp['L']['ndata'])))
+    for k in range(obs_disp['R']['ndata']):
+        f_out.write('   %3.6f               %1i    %4.8f       %6.8f\n' % (obs_disp['R']['periods'][k],obs_disp['R']['modes'][k],obs_disp['R']['phase_vel'][k],obs_disp['R']['error'][k]))
+    for k in range(obs_disp['L']['ndata']):
+        f_out.write('   %3.6f               %1i    %1.8f       %1.8f\n' % (obs_disp['L']['periods'][k],obs_disp['L']['modes'][k],obs_disp['L']['phase_vel'][k],obs_disp['L']['error'][k]))
+    f_out.close()
+    print('Written Processed Observed Dispersion curve to: '+str(fname_out))
+    return obs_disp
+
 
 #########################################################
 # A function to return sensible bounds on velocities tied to reference model and prior with 5% buffer.
@@ -260,7 +372,7 @@ def get_layer_vel_bounds(model_ref, ud, ld, vs_min, vs_max, vp_min, vp_max):
 # Process the files in parallel.
 #########################################################
 
-def apply_stuff(input_directory,cores,functions,params_inversion,model_ref):
+def apply_stuff(input_directory,cores,functions,params_inversion,model_ref,obs_disp):
     '''
     Takes a list of functions, reads all models, applies each function to all of the models and stacks the results
 
@@ -322,6 +434,7 @@ def apply_stuff(input_directory,cores,functions,params_inversion,model_ref):
         input_dict['functions']=functions
         input_dict['params_inversion']=params_inversion
         input_dict['model_ref']=model_ref
+        input_dict['obs_disp']=obs_disp
         input_dicts.append(input_dict)
             
     # Parallel processing
@@ -383,7 +496,7 @@ def apply_stuff(input_directory,cores,functions,params_inversion,model_ref):
 
 def process_one_file(input_dict):
     '''
-    Processes one file, reading the podels in the file, applying the functions to them and stacking the results
+    Processes one file, reading the models in the file, applying the functions to them and stacking the results
 
     Parameters
     ----------
@@ -403,6 +516,7 @@ def process_one_file(input_dict):
     functions=input_dict['functions']
     params_inversion=input_dict['params_inversion']
     model_ref=input_dict['model_ref']
+    obs_disp=input_dict['obs_disp']
     outputs={}
         
     numtot=0
@@ -466,16 +580,16 @@ def process_one_file(input_dict):
 
         f.readline()
         dispersion_R_one=np.fromiter(map(float,f.readline().split()),float)
-        dispersion_one['R']['dispersion']=dispersion_R_one
+        dispersion_one['R']['dispersion']=np.array(dispersion_R_one)
 
         f.readline()
         dispersion_L_one=np.fromiter(map(float,f.readline().split()),float)
-        dispersion_one['L']['dispersion']=dispersion_L_one
+        dispersion_one['L']['dispersion']=np.array(dispersion_L_one)
 
         # apply functions
         for function in functions:
 
-            output=function(model,model_ref,params_inversion,first=(numtot==0))
+            output=function(model,model_ref,dispersion_one,obs_disp,params_inversion,first=(numtot==0))
             
             # stack outputs
             if function.__name__ in outputs:
@@ -542,14 +656,11 @@ def process_one_file(input_dict):
     f.close()
     return outputs
 
-#########################################################
-# Example to produce posterior for vsv.
-#########################################################
 
-def create_post_array_ref(model,model_ref,params_inversion,first=True):
+def create_disp_mean(model,model_ref,dispersion_one,obs_disp,params_inversion,first=True):
     '''
-    example of a function to be applied to the data
-    creates a 2D histogram of vsv, xi and vph for the reference
+    Function applied to the data to create mean dispersion curves after processing.
+    creates a Stacked (mean) dispersion curves for all models in input
     The functions will be called a lot of times, so vectorisation is very important, optimize as much as possible
 
     Parameters
@@ -557,6 +668,10 @@ def create_post_array_ref(model,model_ref,params_inversion,first=True):
     model : dict
 
     model_ref : dict
+
+    dispersion_one : dict 
+
+    obs_disp : dict 
 
     params_inversion : dict
 
@@ -569,8 +684,99 @@ def create_post_array_ref(model,model_ref,params_inversion,first=True):
         has 2 subdicts, 'stack' and 'nostack'.
 
     '''
-    ndatad=200
-    ndatav=100
+    outputs={}
+    outputs['stack']={}
+    outputs['stack']['R']={}
+    outputs['stack']['L']={}
+    outputs['stack']['R']['dummy']={} # This accounts for the stack dictionary structure.
+    outputs['stack']['L']['dummy']={} # That either have 1 or 3 keys, we ideally want 2 so just add 'dummy'.
+    if first:
+        outputs['nostack']={}
+        outputs['nostack']['L']={}
+        outputs['nostack']['L']['ndata']=obs_disp['L']['ndata']
+        outputs['nostack']['L']['modes']=obs_disp['L']['modes']
+        outputs['nostack']['L']['periods']=obs_disp['L']['periods']
+
+        outputs['nostack']['R']={}
+        outputs['nostack']['R']['ndata']=obs_disp['R']['ndata']
+        outputs['nostack']['R']['modes']=obs_disp['R']['modes']
+        outputs['nostack']['R']['periods']=obs_disp['R']['periods']
+
+    outputs['stack']['R']['dummy']['phase_vel']=dispersion_one['R']['dispersion']
+    outputs['stack']['L']['dummy']['phase_vel']=dispersion_one['L']['dispersion']
+
+    outputs['stack']['R']['dummy']['error']=(dispersion_one['R']['dispersion']**2)
+    outputs['stack']['L']['dummy']['error']=(dispersion_one['L']['dispersion']**2)
+
+
+
+    return outputs
+
+def write_posterior_disp_mean(output_directory,input,params_inversion):
+    '''
+    Writes posterior mean dispersion curve to mimic the original fortran output.
+    
+    Parameters
+    ----------
+    output_directory : str - location to save output
+
+    input : dictionary of posterior to be saved: phase velocities, errors etc
+
+    params_inversion : dict
+
+    Returns
+    -------
+    outputs : saved output file: filename_out
+
+    '''
+    mean_disp=input
+    filename_out=output_directory+'/Proc_Dispersion_mean.out'
+
+    f_out=open(filename_out,'w')
+    f_out.write('          %1i          %1i\n' % (int(mean_disp['nostack']['R']['ndata']), int(mean_disp['nostack']['L']['ndata'])))
+    for k in range(mean_disp['nostack']['R']['ndata']):
+        err=np.sqrt(mean_disp['stack']['R']['dummy']['error'][k]-(mean_disp['stack']['R']['dummy']['phase_vel'][k]**2))
+        f_out.write('   %3.6f               %1i    %4.8f       %6.8f\n' % (mean_disp['nostack']['R']['periods'][k], mean_disp['nostack']['R']['modes'][k], mean_disp['stack']['R']['dummy']['phase_vel'][k], err))
+    for k in range(mean_disp['nostack']['L']['ndata']):
+        err=np.sqrt(mean_disp['stack']['L']['dummy']['error'][k]-(mean_disp['stack']['L']['dummy']['phase_vel'][k]**2))
+        f_out.write('   %3.6f               %1i    %1.8f       %1.8f\n' % (mean_disp['nostack']['L']['periods'][k], mean_disp['nostack']['L']['modes'][k], mean_disp['stack']['L']['dummy']['phase_vel'][k], err))
+    f_out.close()
+
+
+    print('Written Processed Mean Dispersion curve to: '+str(filename_out))
+    return()
+
+#########################################################
+# Example to produce posterior for vsv.
+#########################################################
+
+def create_post_array_ref(model,model_ref,dispersion_one,obs_disp,params_inversion,first=True):
+    '''
+    example of a function to be applied to the data
+    creates a 2D histogram of vsv, xi and vph for the reference
+    The functions will be called a lot of times, so vectorisation is very important, optimize as much as possible
+
+    Parameters
+    ----------
+    model : dict
+
+    model_ref : dict
+
+    dispersion_one : dict 
+    
+    params_inversion : dict
+
+    first : bool, optional
+        whether this model is the first of its file. May provide a minor speed boost. The default is True.
+
+    Returns
+    -------
+    outputs : dict
+        has 2 subdicts, 'stack' and 'nostack'.
+
+    '''
+    ndatad=100
+    ndatav=401
     outputs={}
     outputs['stack']={}
     if first:
@@ -679,7 +885,7 @@ def write_posterior_vsv_xi_vph(output_directory,input,params_inversion):
 # Produce correlations between posterior vsv, xi, vph
 #########################################################
 
-def posterior_correlations(model,model_ref,params_inversion,first=True):
+def posterior_correlations(model,model_ref,dispersion_one,obs_disp,params_inversion,first=True):
     '''
     Compute the discretized correlations between parameters averaged over depth intervals 
     creates a 2D histogram of correlation between each parameter at each depth
@@ -691,6 +897,8 @@ def posterior_correlations(model,model_ref,params_inversion,first=True):
 
     model_ref : dict
 
+    dispersion_one : dict 
+    
     params_inversion : dict
 
     first : bool, optional
@@ -989,24 +1197,29 @@ def main():
         model_ref=get_model_ref(filename='Model_PREM_SIMPLE.in')
     else:
         sys.exit('Ref model not found... exit')
-        
-
+    
     print('got model ref')
     params_inversion=get_metadata(input_directory)
     print('got metadata')
-    output=apply_stuff(input_directory,cores,[create_post_array_ref, posterior_correlations],params_inversion,model_ref)
-    print('applied functions')
 
-    # udep=200
-    # ldep=300
-    # lay_vsv_min, lay_vsv_max, lay_vph_min, lay_vph_max=get_layer_vel_bounds(model_ref,udep,ldep,-1.0*params_inversion['width_vsv'],params_inversion['width_vsv'],params_inversion['vp_min'],params_inversion['vp_max'])
+    # Decide whether to do dispersion curve stacking.
+    if os.path.isfile(output_directory+'/'+'Dispersion_mean.out'):
+        print('dispersion curves not required....')
+        obs_disp={}
+        output=apply_stuff(input_directory,cores,[create_post_array_ref],params_inversion,model_ref,obs_disp) # , posterior_correlations
+        print('applied functions')
+        write_posterior_vsv_xi_vph(output_directory,input=output['create_post_array_ref'],params_inversion=params_inversion)
+        # write_posterior_corr_dict(output_directory,input=output['posterior_correlations'],params_inversion=params_inversion)
 
-    write_posterior_vsv_xi_vph(output_directory,input=output['create_post_array_ref'],params_inversion=params_inversion)
-
-    write_posterior_corr_dict(output_directory,input=output['posterior_correlations'],params_inversion=params_inversion)
-
-
-
+    else:
+        print('dispersion curves required....')
+        obs_disp=get_obs_disp(output_directory)
+        print('got observed dispersion curve')
+        output=apply_stuff(input_directory,cores,[create_post_array_ref, create_disp_mean],params_inversion,model_ref,obs_disp) # , posterior_correlations
+        print('applied functions')
+        write_posterior_vsv_xi_vph(output_directory,input=output['create_post_array_ref'],params_inversion=params_inversion)
+        # write_posterior_corr_dict(output_directory,input=output['posterior_correlations'],params_inversion=params_inversion)
+        write_posterior_disp_mean(output_directory,input=output['create_disp_mean'],params_inversion=params_inversion)
 
 if __name__ == '__main__':
     main()
