@@ -37,7 +37,7 @@ def create_posterior(file,model,model_ref,dispersion_one,params_dispersion,param
         has 2 subdicts, 'stack' and 'nostack'.
 
     '''
-    ndatad=200
+    ndatad=100
     ndatav=200
 
     numdis=dispersion_all['numdis']
@@ -299,7 +299,7 @@ def get_dispersion_mean(file,model,model_ref,dispersion_one,params_dispersion,pa
     outputs['stack']['dispersion_R_sq'][:,:numdis]+=np.multiply(dis_alt,alpha_alt)
 
     alpha_alt=np.tile(alpha,(params_dispersion['L']['ndatad'],1))
-    outputs['stack']['dispersion_L'][:,:numdis]+=np.multiply(dispersion_R_true_all,alpha_alt)
+    outputs['stack']['dispersion_L'][:,:numdis]+=np.multiply(dispersion_L_true_all,alpha_alt)
 
     dis_alt=np.transpose(np.tile(dispersion_L_model,(numdis,1)))-dispersion_L_true_all
     outputs['stack']['dispersion_L_shift'][:,:numdis]+=np.multiply(dis_alt,alpha_alt)

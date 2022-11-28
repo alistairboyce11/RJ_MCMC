@@ -24,10 +24,10 @@ program postprocess_binary_outputs
     ! Read binary files containing models and converts them into ascii for python to read
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-    widening_prop2=widening_start
-    do i_w=1,n_w
+    widening_prop2=1.
+    do i_w=1,10
         write(*,*)widening_prop2
-        do i=0,50
+        do i=0,1000
             write(filenamemax,"('/All_models_prepare_',I4.4,'_',f5.2,'.out')")i,widening_prop2
             write(*,*)dirname//filenamemax
             open(100,file=dirname//filenamemax,status='old',form='unformatted',access='stream',iostat=io_file)

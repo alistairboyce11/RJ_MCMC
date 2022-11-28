@@ -11,6 +11,9 @@ import time
 import warnings
 warnings.filterwarnings("error")
 
+class Probsum1(Exception):
+    pass
+
 def get_dispersion(directories,clusters,points=[],filename='dispersion_all.in'):
     '''
 
@@ -54,7 +57,7 @@ def get_dispersion(directories,clusters,points=[],filename='dispersion_all.in'):
         file=open(directories[ind_cluster]+'/'+filename,'r')
 
         numdis_tmp=int(file.readline())
-        if points=='all':
+        if type(points)==str and points=='all':
             numdis=numdis_tmp
         elif len(points)==0:
             numdis=0
@@ -93,14 +96,14 @@ def get_dispersion(directories,clusters,points=[],filename='dispersion_all.in'):
                     #print(line)
                     data=line.split()
                     #print(data)
-                    if points=='all':
+                    if type(points)==str and points=='all':
                         dispersion_R[j,l]=float(data[0])
                         error_R[j,l]=float(data[1])
                     else:
                         if l not in points:
                             pass
                         else:
-                            l_ind=points.index(l)
+                            l_ind=list(points).index(l)
                             dispersion_R[j,l_ind]=float(data[0])
                             error_R[j,l_ind]=float(data[1])
                 j+=1
@@ -150,14 +153,14 @@ def get_dispersion(directories,clusters,points=[],filename='dispersion_all.in'):
 
                 for l in range(numdis_tmp):
                     data=file.readline().split()
-                    if points=='all':
+                    if type(points)==str and points=='all':
                         dispersion_L[j,l]=float(data[0])
                         error_L[j,l]=float(data[1])
                     else:
                         if l not in points:
                             continue
                         else:
-                            l_ind=points.index(l)
+                            l_ind=list(points).index(l)
                             dispersion_L[j,l_ind]=float(data[0])
                             error_L[j,l_ind]=float(data[1])
 
@@ -267,7 +270,7 @@ def process_file_alphamax(file,cluster,params_dispersion,dispersion_ref,dispersi
 
     # reading the file
     f=open(file,'r')
-    print(file)
+    #print(file)
 
     numdis=dispersion_all['numdis']
     alpha_ref_max=np.ones((num_to_store))*float('-inf')
@@ -296,6 +299,8 @@ def process_file_alphamax(file,cluster,params_dispersion,dispersion_ref,dispersi
     while valid_model:
         valid_model,dispersion_one,model=read_model(f,widening,cluster)
         if not valid_model:
+            continue
+        elif len(dispersion_one.keys())==0:
             continue
 
         # calculate alpha
@@ -422,7 +427,7 @@ def process_file_alphamax_all(file,clusters,widenings,cluster,widening,params_di
 
     # reading the file
     f=open(file,'r')
-    print('computing alphamax for file ',file)
+
 
     num_model=0
 
@@ -439,10 +444,17 @@ def process_file_alphamax_all(file,clusters,widenings,cluster,widening,params_di
     # loop on all models
     valid_model=True
     cnt=0
+    #print(file)
     while valid_model:
         valid_model,dispersion_one,model=read_model(f,widening,cluster)
         if not valid_model:
             continue
+        elif len(dispersion_one.keys())==0:
+            continue
+        elif len(dispersion_one['R']['dispersion'])==0:
+            continue
+        #elif model['npt_true']<8:
+        #    continue
         cnt+=1
 
         #if num_model==999:
@@ -453,6 +465,7 @@ def process_file_alphamax_all(file,clusters,widenings,cluster,widening,params_di
 
         if maxpercent==0.:
             alpha_ref_max=max(alpha_ref,alpha_ref_max)
+            #print(alpha_max,np.atleast_2d(alpha))
             alpha_max=np.maximum.reduce([alpha_max,np.atleast_2d(alpha)])
 
         else:
@@ -467,8 +480,8 @@ def process_file_alphamax_all(file,clusters,widenings,cluster,widening,params_di
 
         num_model+=1
 
-        if (num_model%10000)==0:
-            print(num_model)
+        # if (num_model%10000)==0:
+        #     print(num_model)
 
     f.close()
 
@@ -514,8 +527,21 @@ def get_alpha_all(dispersion_one,clusters,widenings,params_dispersion,dispersion
     #error_L_sum=dispersion_all['L']['error_sum']
     numdis=dispersion_all['numdis']
 
-    like_alt=-np.sum(np.divide(np.square(dispersion_R-np.transpose(np.tile(dispersion_R_one,(numdis,1)))),2*Ad_R**2*np.square(error_R)),axis=0)
-    like_alt-=np.sum(np.divide(np.square(dispersion_L-np.transpose(np.tile(dispersion_L_one,(numdis,1)))),2*Ad_L**2*np.square(error_L)),axis=0)
+    like_alt=-np.sum(np.divide(
+        np.square(dispersion_R-np.transpose(np.tile(dispersion_R_one,(numdis,1)))),
+        2*Ad_R**2*
+        np.square(
+            np.multiply(
+                error_R,dispersion_R/100.)))
+        ,axis=0)
+    #print(len(dispersion_L),len(dispersion_L_one),len(error_L))
+    like_alt-=np.sum(np.divide(
+        np.square(dispersion_L-np.transpose(np.tile(dispersion_L_one,(numdis,1)))),
+        2*Ad_L**2*
+        np.square(
+            np.multiply(
+                error_L,dispersion_L/100.)))
+        ,axis=0)
     # static shift
     #like_alt-=error_R_sum
     #like_alt-=error_L_sum
@@ -524,48 +550,72 @@ def get_alpha_all(dispersion_one,clusters,widenings,params_dispersion,dispersion
 
     #print(numdis)
 
-    probsum=0
-    numprob=0
+
 
     # alpha=log(like_alt/sum(cluster,widening like_one) )
     # alpha=-log(sum(cluster,widening like_one/like_alt))
 
-    for i in range(len(clusters)):
-        for widening in widenings:
+    probsum=0.
+    shift=0
+    while probsum==0.:
+        try:
+            numprob=0.
+            probsum=0.
+            for i in range(len(clusters)):
+                for widening in widenings:
 
-            dispersion_R_ref=dispersion_ref['R']['dispersion'][i,:]
-            dispersion_L_ref=dispersion_ref['L']['dispersion'][i,:]
+                    dispersion_R_ref=dispersion_ref['R']['dispersion'][i,:]
+                    dispersion_L_ref=dispersion_ref['L']['dispersion'][i,:]
 
-            error_R_ref=dispersion_ref['R']['error'][i,:]
-            error_L_ref=dispersion_ref['L']['error'][i,:]
+                    error_R_ref=dispersion_ref['R']['error'][i,:]
+                    error_L_ref=dispersion_ref['L']['error'][i,:]
 
-            if np.shape(dispersion_R_ref)==(0,):
-                print('here')
-            if np.shape(dispersion_R_one)==(0,):
-                print('here2')
-                print(dispersion_R_one)
+                    if np.shape(dispersion_R_ref)==(0,):
+                        print('here')
+                    if np.shape(dispersion_R_one)==(0,):
+                        print('here2')
+                        print(dispersion_R_one)
 
-            like_one=-np.sum(np.divide(np.square(dispersion_R_ref-dispersion_R_one),2*Ad_R**2*np.square(error_R_ref)),axis=0)
-            like_one-=np.sum(np.divide(np.square(dispersion_L_ref-dispersion_L_one),2*Ad_L**2*np.square(error_L_ref)),axis=0)
-            like_one-=error_R_ref_sum[i] + 150 # static shift to avoid exponential explosion
-            like_one-=error_L_ref_sum[i] + 150 # static shift to avoid exponential explosion
-            like_one-=ndatad_R*np.log(Ad_R)
-            like_one-=ndatad_L*np.log(Ad_L)
-            like_one/=widening
+                    #print('new')
+                    like_one=-np.sum(np.divide(np.square(dispersion_R_ref-dispersion_R_one),2*Ad_R**2*np.square(np.multiply(error_R_ref/100.,dispersion_R_ref))),axis=0)
+                    #print(like_one)
+                    like_one-=np.sum(np.divide(np.square(dispersion_L_ref-dispersion_L_one),2*Ad_L**2*np.square(np.multiply(error_L_ref/100.,dispersion_L_ref))),axis=0)
+                    #print(like_one)
+                    like_one-=error_R_ref_sum[i] + 150 # static shift to avoid exponential explosion
+                    #print(like_one)
+                    like_one-=error_L_ref_sum[i] + 150 # static shift to avoid exponential explosion
+                    #print(like_one)
+                    like_one-=ndatad_R*np.log(Ad_R)
+                    #print(like_one)
+                    like_one-=ndatad_L*np.log(Ad_L)
+                    #print(like_one)
+                    like_one/=widening
+                    #print(like_one)
+                    #like_one+=1000
+                    #print(like_one)
 
-            try:
-                probsum+=np.exp(like_one)
-            except RuntimeWarning:
-                print(np.sum(np.divide(np.square(dispersion_R_ref-dispersion_R_one),2*Ad_R**2*np.square(error_R_ref)),axis=0),np.sum(np.divide(np.square(dispersion_L_ref-dispersion_L_one),2*Ad_L**2*np.square(error_L_ref)),axis=0),error_R_ref_sum[i],error_L_ref_sum[i],ndatad_R*Ad_R,ndatad_L*Ad_L,widening)
-                print((-np.sum(np.divide(np.square(dispersion_R_ref-dispersion_R_one),2*Ad_R**2*np.square(error_R_ref)),axis=0)-np.sum(np.divide(np.square(dispersion_L_ref-dispersion_L_one),2*Ad_L**2*np.square(error_L_ref)),axis=0)-(error_R_ref_sum[i])-(error_L_ref_sum[i])-ndatad_R*np.log(Ad_R)-ndatad_L*np.log(Ad_L))/widening)
-                print(np.exp(like_one))
-                print('overflow error: too high exponential')
+                    like_one+=shift
 
-                probsum=float('inf')
+                    probsum+=np.exp(like_one)
 
-            numprob+=1
+                    numprob+=1
+            #print(probsum)
+            if probsum==0.:
+                raise Probsum1
+        except RuntimeWarning:
+            probsum=0.
+            shift-=100
+            print('too big probsum')
+        except Probsum1:
+            probsum=0.
+            shift+=1000
+            #print('too small probsum')
+    #print('done')
     probsum/=numprob
-    alpha=like_alt-np.log(probsum)
+    # if probsum==0.:
+    #     alpha=np.ones_like(like_alt)*(-float('inf'))
+    # else:
+    alpha=like_alt-(np.log(probsum)-shift)
 
     alpha_ref=0.
 
@@ -612,12 +662,34 @@ def read_model(f,widening,cluster):
 
     model={}
 
+    #try:
+
     line=f.readline()
     if not line:
+        #print('file end')
         return False,{},{}
 
     data=line.split()
+    # if len(data)<3:
+    #     print(line)
+    #     print('not much data')
+    #     return False,{},{}
     npt_true=int(data[0])
+    if npt_true==0:
+        #print(line)
+        #print('no model')
+        f.readline()
+        f.readline()
+        f.readline()
+        f.readline()
+        f.readline()
+        f.readline()
+        f.readline()
+        f.readline()
+        f.readline()
+        f.readline()
+        return True,{},{}
+    #print(data)
     model['npt_true']=npt_true
     model['npt']=int(data[1])
     model['npt_ani']=int(data[2])
@@ -627,9 +699,8 @@ def read_model(f,widening,cluster):
     model['Ad_R']=dispersion_one['R']['Ad']
     model['Ad_L']=dispersion_one['L']['Ad']
 
-    if npt_true==0:
-        print('no model')
-        return False,{},{}
+
+
 
     # new output
     d=np.array(f.readline().split()).astype('float')
@@ -658,18 +729,29 @@ def read_model(f,widening,cluster):
     dispersion_one['widening']=widening
     dispersion_one['cluster']=cluster
 
-    f.readline()
+    len_R=int(f.readline())
     dispersion_R_one=np.array(f.readline().split()).astype('float')
     dispersion_one['R']['dispersion']=dispersion_R_one
 
-    f.readline()
+    len_L=int(f.readline())
     dispersion_L_one=np.array(f.readline().split()).astype('float')
 
     dispersion_one['L']['dispersion']=dispersion_L_one
 
-    return True,dispersion_one,model
+    if len(dispersion_L_one)<len_L or len(dispersion_R_one)<len_R or len(d)<npt_true or len(vsv)<npt_true or len(xi)<npt_true or len(vp)<npt_true:
+        return True,{},{}
 
-def get_model_ref(filename='Model_PREM_SIMPLE.in'):
+    if len(dispersion_L_one)==0 or len(dispersion_R_one)==0 or len(d)==0 or len(vsv)==0 or len(xi)==0 or len(vp)==0:
+        return True,{},{}
+
+    #print(len(dispersion_L_one),len_L)
+
+    return True,dispersion_one,model
+    # except:
+    #     print('file finished prematurely')
+    #     return False,{},{}
+
+def get_model_ref(filename='Modified_PREM_GLOBAL.in'):
     '''
     reads the reference model, puts into a dict
     contains:
@@ -757,7 +839,7 @@ def process_one_file(file,cluster,functions,params_dispersion,dispersion_ref,dis
 
     # read file
     f=open(file,'r')
-    print(file)
+    #print(file)
 
     params_inversion=read_header(f)
 
@@ -769,6 +851,8 @@ def process_one_file(file,cluster,functions,params_dispersion,dispersion_ref,dis
         t1=time.time()
         valid_model,dispersion_one,model=read_model(f,widening,cluster)
         if not valid_model:
+            continue
+        elif len(dispersion_one.keys())==0:
             continue
 
         t2=time.time()
@@ -839,7 +923,7 @@ def process_one_file_all(file,cluster,clusters_in,widenings_in,functions,params_
 
     # read file
     f=open(file,'r')
-    print(file)
+    #print(file)
 
     params_inversion=read_header(f)
     widening=params_inversion['widening']
@@ -854,6 +938,10 @@ def process_one_file_all(file,cluster,clusters_in,widenings_in,functions,params_
 #            valid_model=False
         if not valid_model:
             continue
+        elif len(dispersion_one.keys())==0:
+            continue
+       # elif model['npt_true']<8:
+       #     continue
 
         t2=time.time()
         time_read+=t2-t1
@@ -884,8 +972,8 @@ def process_one_file_all(file,cluster,clusters_in,widenings_in,functions,params_
 
         t2=time.time()
         time_apply+=t2-t1
-        if numtot%10000==0:
-            print(numtot)
+        #if numtot%10000==0:
+            #print(numtot)
 
         # testing
         # if numtot==10:

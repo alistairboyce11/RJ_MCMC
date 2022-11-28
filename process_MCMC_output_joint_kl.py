@@ -977,7 +977,7 @@ datadir='OUT_KL/Processing/'
 functions=[postprocess_functions.create_posterior,postprocess_functions.get_average,postprocess_functions.get_histograms,postprocess_functions.get_dispersion_mean,postprocess_functions.get_tradeoff] #create_posterior,get_average,get_histograms,,get_tradeoff
 
 print('start')
-params_dispersion, dispersion_ref, dispersion_all=get_dispersion(directories,clusters)
+params_dispersion, dispersion_ref, dispersion_all=postprocess_util.get_dispersion(directories,clusters)
 print('get dispersion')
 model_ref=postprocess_util.get_model_ref()
 print('get model ref')

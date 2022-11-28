@@ -1,9 +1,9 @@
 
     character (len=*), parameter :: dirname = 'OUT'
     character*8, parameter :: storename = 'STORFFC1'
-    integer, parameter :: burn_in = 100000! 55000 !Burn-in period
-    integer,parameter :: nsample_widening=200000! 50000!Post burn-in
-    integer,parameter :: burn_in_widening=00000! 50000!Post burn-in
+    integer, parameter :: burn_in = 50000! 55000 !Burn-in period
+    integer,parameter :: nsample_widening=1000000! 50000!Post burn-in
+    integer,parameter :: burn_in_widening=50000! 50000!Post burn-in
 
     integer, parameter :: thin = 25    !Thinning of the chain
 
@@ -19,20 +19,18 @@
     real, parameter :: d_min = 0   ! depth bounds
     real, parameter :: d_max = 700
 
-    real, parameter :: width = 0.4 ! width of the prior in vsv
+    real, parameter :: width = 0.2 ! width of the prior in vsv
 
     real, parameter :: vp_min = -0.4 ! bounds of the prior in vp/vs
     real, parameter :: vp_max = 0.4
-    real, parameter :: vpvsv_min=-0.4
-    real, parameter :: vpvsv_max=0.4
 
     real, parameter :: xi_min = 0.6 ! bounds of the prior in xi
     real, parameter :: xi_max = 1.4
 
-    double precision, parameter ::    Ad_R_max = 100 ! bounds of the prior in Ad_R - the error parameter for rayleigh wave velocity
+    double precision, parameter ::    Ad_R_max = 200 ! bounds of the prior in Ad_R - the error parameter for rayleigh wave velocity
     double precision, parameter ::    Ad_R_min = 0.001
 
-    double precision, parameter ::    Ad_L_max = 100 ! bounds of the prior in Ad_L
+    double precision, parameter ::    Ad_L_max = 200 ! bounds of the prior in Ad_L
     double precision, parameter ::    Ad_L_min = 0.001
 
     !-----------------------------------------

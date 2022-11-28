@@ -211,12 +211,12 @@ program RJ_MCMC
     if (testing) write(*,*)'testing with synthetic model'
 
     ra=rank ! seed for RNG
-    ran=rank
+    ran=rank+1000
 
     !************************************************************
     !                READ PREM
     !************************************************************
-    open(7,file="Model_PREM_DISC_20.in",status='old',form='formatted')
+    open(7,file="Modified_PREM_GLOBAL.in",status='old',form='formatted')
     !open(7,file="Model_PREM_SIMPLE.in",status='old',form='formatted')
     !  110 format(20a4)
     read(7,*) nptref,nic_ref,noc_ref
@@ -634,7 +634,7 @@ program RJ_MCMC
         !add errors
 
         IF (nbproc.gt.1) THEN
-            IF (ran==0) THEN
+            IF (rank==0) THEN
                 do i=1,ndatad_R
                     d_obsdcR(i)=d_obsdcR(i)+gasdev(ra)*err_level
                 end do
@@ -703,7 +703,7 @@ program RJ_MCMC
 
         write(*,*)'DONE INITIALIZING'
 
-    else ! real data , untested , unedited, will probably need a little work to get working
+    else ! real data
         ! GET SWD DATA ----------------------------------------------------------------
         nlims_cur=1
         open(65,file=dirname//'/dispersion_all.in',status='old')! 65: name of the opened file in memory (unit identifier)
@@ -788,17 +788,16 @@ program RJ_MCMC
 
     widening_prop=widening_start
 
-    pxi = 0.4             ! proposal for change in xi
+    pxi = 0.1             ! proposal for change in xi
     p_vp = 0.1           ! proposal for change in vp
     pd = 10!0.2         ! proposal on change in position
     pv = 0.1!0.04     ! proposal on velocity
     pAd_R = 5        ! proposal for change in R noise
     pAd_L = 5        ! proposal for change in L noise
-    sigmav=0.15         ! proposal for vsv when creating a new layer
-    sigmavp=0.15         ! proposal for vp when creating a new layer
+    sigmav=0.1         ! proposal for vsv when creating a new layer
+    !sigmavp=0.15         ! proposal for vp when creating a new layer
 
-    ra=rank !seed for RNG
-    ran=rank
+    ra=rank+1000 !seed for RNG
     inorout=0
     inorouts=0
 
@@ -824,34 +823,34 @@ program RJ_MCMC
         ! we want to use the real model as a starting model
         ! create a starting model randomly
         !npt = milay+ran3(ra)*(malay-milay)!(12-milay)!(maxlay-minlay)
-        npt=15 ! not too many or too few initial layers to avoid getting stuck right away
+        npt=malay/2 ! not too many or too few initial layers to avoid getting stuck right away
         if ((npt>malay).or.(npt<milay)) goto 150
         j=j+1 ! première couche à 0 km/1km qui ne change jamais ???
         write(*,*)'initialising model',j
 
         ! first layer always at 0
         voro(1,1)= 0.
-        voro(1,2)= (-0.1+2*0.1*ran3(ra)) ! have an initial model reasonably close to the reference
+        voro(1,2)= (-width/2+2*width/2*ran3(ra)) ! have an initial model reasonably close to the reference
           if (ran3(ra)<0.5) then
               voro(1,3)= 0.8+(1.2-0.8)*ran3(ra)
           else
               voro(1,3)= -1
           endif
         !voro(i,3)=-1
-        voro(1,4)= vp_min+(vp_max-vp_min)*ran3(ra)
+        voro(1,4)= vp_min/2+(vp_max/2-vp_min/2)*ran3(ra)
 
 
         do i=2,npt
 
             voro(i,1)= d_min+ran3(ra)*(d_max-d_min)
-            voro(i,2)= (-0.1+2*0.1*ran3(ra)) ! have an initial model reasonably close to the reference
+            voro(i,2)= (-width/2+2*width/2*ran3(ra)) ! have an initial model reasonably close to the reference
               if (ran3(ra)<0.5) then
                   voro(i,3)= 0.8+(1.2-0.8)*ran3(ra)
               else
                   voro(i,3)= -1
               endif
             !voro(i,3)=-1
-            voro(i,4)= vp_min+(vp_max-vp_min)*ran3(ra)
+            voro(i,4)= vp_min/2+(vp_max/2-vp_min/2)*ran3(ra)
         enddo
 
         write(*,*)'before combine_linear'
@@ -949,51 +948,36 @@ program RJ_MCMC
     lsd_L=0
     liked_R=0
     liked_L=0
+    write(*,*)d_obsdCR(:ndatad_R)
+    write(*,*)d_obsdCRe(:ndatad_R)
+    write(*,*)d_cR(:ndatad_R)
     do i=1,ndatad_R
         lsd_R=lsd_R+(d_obsdCR(i)-d_cR(i))**2
         liked_R=liked_R+(d_obsdCR(i)-d_cR(i))**2/(2*(Ad_R*d_obsdCRe(i)*(d_obsdCR(i)/100))**2) ! gaussian errors
+        write(*,*)liked_R
     enddo
+
+    write(*,*)d_obsdCL(:ndatad_L)
+    write(*,*)d_obsdCLe(:ndatad_L)
+    write(*,*)d_cL(:ndatad_L)
+
     do i=1,ndatad_L
         lsd_L=lsd_L+(d_obsdCL(i)-d_cL(i))**2
         liked_L=liked_L+(d_obsdCL(i)-d_cL(i))**2/(2*(Ad_L*d_obsdCLe(i)*(d_obsdCL(i)/100))**2)
+        write(*,*)liked_L
     enddo
     lsd_R_min=lsd_R
     lsd_L_min=lsd_L
 
+
     like= (liked_R + liked_L)
+    write(*,*)like
     like_w=like/widening_prop
 
-    if (ran==0) write(*,*)widening_prop
-    if (ran==0) write(*,*)like,like_w
+    if (rank==0) write(*,*)widening_prop
+    if (rank==0) write(*,*)like,like_w
 
-
-    sample=0
-    th=0
-    ount=0
-    PrP=0
-    PrV=0
-    PrB=0
-    PrD=0
-    PrBa=0
-    PrDa=0
-    AcP=0
-    AcV=0
-    AcB=0
-    AcD=0
-    AcBa=0
-    AcDa=0
-    Acnd_R=0
-    Prnd_R=0
-    Prxi=0
-    Acxi=0
-    Pr_vp=0
-    Ac_vp=0
-    Prnd_L=0
-    Acnd_L=0
-
-    sigmav_old=0
-    sigmavp_old=0
-    Ar_birth_old=0
+    th_all=0
 
     ncell_bi=0
     ncells_bi=0
@@ -1159,7 +1143,6 @@ program RJ_MCMC
 
     do i_w=1,n_w
 
-        ran=rank
         inorout=0
         inorouts=0
 
@@ -1330,7 +1313,7 @@ program RJ_MCMC
         Prnd_L=0
         Acnd_L=0
 
-        th_all=0
+
 
         sigmav_old=0
         Ar_birth_old=0
@@ -1451,110 +1434,117 @@ program RJ_MCMC
                 if ((Acp/(Prp+1))>0.54) pd=pd*(1+perturb) ! for depth
                 if ((Acp/(Prp+1))<0.34) pd=pd*(1-perturb)
 
-                ! UPDATE SIGMAV AND SIGMAVP
-                if ((abs((AcB/PrB)-Ar_birth_old)>2*abs((AcB/PrB)-(AcD/PrD))).and.&
-                    (AcB.ne.0)) then !special treatement for adding/removing layers
-
-                    sigma_count=sigma_count+1
-                    if ((AcB/PrB)>Ar_birth_old) then! Going in the right direction
-                        if (mod(int(sigma_count/switch_sigma),2)==0) then
-                            if (sigmav>sigmav_old) then !Going up
-                                sigmav_new=sigmav*(1+perturb)
-                            else !Going down
-                                sigmav_new=sigmav*(1-perturb)
-                            endif
-                            !sigmavp_new=sigmavp
-                            sigmav_old=sigmav
-                            sigmav=sigmav_new
-                        else
-                            ! sigmavp
-                            if (sigmavp>sigmavp_old) then !Going up
-                                sigmavp_new=sigmavp*(1+perturb)
-                            else !Going down
-                                sigmavp_new=sigmavp*(1-perturb)
-                            endif
-                            !sigmav_new=sigmav
-                            sigmavp_old=sigmavp
-                            sigmavp=sigmavp_new
-                        endif
-                    else ! Going in the wrong direction
-                        if (mod(int(sigma_count/switch_sigma),2)==0) then
-                            if (sigmav>sigmav_old) then !Going up
-                                sigmav_new=sigmav*(1-perturb)
-                            else
-                                sigmav_new=sigmav*(1+perturb)
-                            endif
-                            !sigmavp_new=sigmavp
-                            sigmav_old=sigmav
-                            sigmav=sigmav_new
-
-                        else
-                            ! sigmavp
-                            if (sigmavp>sigmavp_old) then !Going up
-                                sigmavp_new=sigmavp*(1-perturb)
-                            else
-                                sigmavp_new=sigmavp*(1+perturb)
-                            endif
-                            !sigmav_new=sigmav
-                            sigmavp_old=sigmavp
-                            sigmavp=sigmavp_new
-                        endif
-                    endif
-                    !write(*,*)sigmav_new
-                    !write(*,*)
-!                     sigmav_old=sigmav
-!                     sigmav=sigmav_new
-!                     sigmavp_old=sigmavp
-!                     sigmavp=sigmavp_new
-
-!                     if ((AcB/PrB)>Ar_birth_old) then! Going in the right direction
-!                         if (sigmav>sigmav_old) then !Going up
-!                             sigmav_new=sigmav*(1+perturb)
-!                         else !Going down
-!                             sigmav_new=sigmav*(1-perturb)
-!                         endif
-!                         sigmav_old=sigmav
-!                         sigmav=sigmav_new
-!                     else ! Going in the wrong direction
-!                         if (sigmav>sigmav_old) then !Going up
-!                             sigmav_new=sigmav*(1-perturb)
-!                         else
-!                             sigmav_new=sigmav*(1+perturb)
-!                         endif
-!                         sigmav_old=sigmav
-!                         sigmav=sigmav_new
+! =============================================================================
+!                 ! UPDATE SIGMAV AND SIGMAVP
+!                 if ((abs((AcB/PrB)-Ar_birth_old)>2*abs((AcB/PrB)-(AcD/PrD))).and.&
+!                     (AcB.ne.0)) then !special treatement for adding/removing layers
 !
+!                     sigma_count=sigma_count+1
+!                     if ((AcB/PrB)>Ar_birth_old) then! Going in the right direction
+!                         if (mod(int(sigma_count/switch_sigma),2)==0) then
+!                             if (sigmav>sigmav_old) then !Going up
+!                                 sigmav_new=sigmav*(1+perturb)
+!                             else !Going down
+!                                 sigmav_new=sigmav*(1-perturb)
+!                             endif
+!                             !sigmavp_new=sigmavp
+!                             sigmav_old=sigmav
+!                             sigmav=sigmav_new
+!                         else
+!                             ! sigmavp
+!                             if (sigmavp>sigmavp_old) then !Going up
+!                                 sigmavp_new=sigmavp*(1+perturb)
+!                             else !Going down
+!                                 sigmavp_new=sigmavp*(1-perturb)
+!                             endif
+!                             !sigmav_new=sigmav
+!                             sigmavp_old=sigmavp
+!                             sigmavp=sigmavp_new
+!                         endif
+!                     else ! Going in the wrong direction
+!                         if (mod(int(sigma_count/switch_sigma),2)==0) then
+!                             if (sigmav>sigmav_old) then !Going up
+!                                 sigmav_new=sigmav*(1-perturb)
+!                             else
+!                                 sigmav_new=sigmav*(1+perturb)
+!                             endif
+!                             !sigmavp_new=sigmavp
+!                             sigmav_old=sigmav
+!                             sigmav=sigmav_new
+!
+!                         else
+!                             ! sigmavp
+!                             if (sigmavp>sigmavp_old) then !Going up
+!                                 sigmavp_new=sigmavp*(1-perturb)
+!                             else
+!                                 sigmavp_new=sigmavp*(1+perturb)
+!                             endif
+!                             !sigmav_new=sigmav
+!                             sigmavp_old=sigmavp
+!                             sigmavp=sigmavp_new
+!                         endif
 !                     endif
-                    !write(*,*)sigmav_new
-                    !write(*,*)
-!                     sigmav_old=sigmav
-!                     sigmav=sigmav_new
-!                     sigmavp_old=sigmavp
-!                     sigmavp=sigmavp_new
+!                     !write(*,*)sigmav_new
+!                     !write(*,*)
+! !                     sigmav_old=sigmav
+! !                     sigmav=sigmav_new
+! !                     sigmavp_old=sigmavp
+! !                     sigmavp=sigmavp_new
+!
+! !                     if ((AcB/PrB)>Ar_birth_old) then! Going in the right direction
+! !                         if (sigmav>sigmav_old) then !Going up
+! !                             sigmav_new=sigmav*(1+perturb)
+! !                         else !Going down
+! !                             sigmav_new=sigmav*(1-perturb)
+! !                         endif
+! !                         sigmav_old=sigmav
+! !                         sigmav=sigmav_new
+! !                     else ! Going in the wrong direction
+! !                         if (sigmav>sigmav_old) then !Going up
+! !                             sigmav_new=sigmav*(1-perturb)
+! !                         else
+! !                             sigmav_new=sigmav*(1+perturb)
+! !                         endif
+! !                         sigmav_old=sigmav
+! !                         sigmav=sigmav_new
+! !
+! !                     endif
+!                     !write(*,*)sigmav_new
+!                     !write(*,*)
+! !                     sigmav_old=sigmav
+! !                     sigmav=sigmav_new
+! !                     sigmavp_old=sigmavp
+! !                     sigmavp=sigmavp_new
+!
+!                     Ar_birth_old=AcB/PrB
+!                     PrB=0
+!                     PrD=0
+!                     AcB=0
+!                     AcD=0
+!                 endif
+! =============================================================================
 
-                    Ar_birth_old=AcB/PrB
-                    PrB=0
-                    PrD=0
-                    AcB=0
-                    AcD=0
-                endif
-
+                PrB=0
+                PrD=0
+                AcB=0
+                AcD=0
                 PrP=0
                 PrV=0
                 PrBa=0
                 PrDa=0
-                AcP=0
-                AcV=0
                 AcBa=0
                 AcDa=0
+                AcP=0
+                AcV=0
                 Acnd_R=0
                 Prnd_R=0
+                Prnd_L=0
+                Acnd_L=0
                 Acxi=0
                 Prxi=0
                 Ac_vp=0
                 Pr_vp=0
-                Prnd_L=0
-                Acnd_L=0
+
             endif
 
             isoflag_prop=isoflag
@@ -1562,10 +1552,7 @@ program RJ_MCMC
             like_prop=like
             liked_R_prop=liked_R
             liked_L_prop=liked_L
-
-
             npt_prop = npt
-
             lsd_R_prop = lsd_R
             lsd_L_prop = lsd_L
             Ad_R_prop = Ad_R
@@ -1610,7 +1597,6 @@ program RJ_MCMC
                 Prxi=Prxi+1
                 ani=.true.
                 if (npt_ani.ne.0) then
-                    ani=.true.
                     ! Choose randomly an anisotropic cell among the npt_ani possibilities
                     ind2 = ceiling(ran3(ra)*(npt_ani))
                     if (ind2==0) ind2=1 !number of the anisotropic cell
@@ -1624,7 +1610,7 @@ program RJ_MCMC
                         endif
                     enddo
 
-                     !increase counter to calculate acceptance rates
+                    !increase counter to calculate acceptance rates
                     if (ind>npt) stop "684"
                     if (voro(ind,3)==-1) stop "874"
                     voro_prop(ind,3)=voro(ind,3)+gasdev(ra)*pxi
@@ -1709,7 +1695,6 @@ program RJ_MCMC
                     out=0
                 endif
 
-
             elseif (u<0.7) then !Birth of an isotropic cell -------------------------------------
                 birth = .true.
                 PrB = PrB + 1
@@ -1722,12 +1707,12 @@ program RJ_MCMC
 
                     voro_prop(npt_prop,2) = voro(ind,2)+gasdev(ra)*sigmav ! sigmav: special width for new layers
                     voro_prop(npt_prop,3) = -1
-                    !voro(i,4)= vp_min+(vp_max-vp_min)*ran3(ra)
-                    voro_prop(npt_prop,4) = voro(ind,4)+gasdev(ra)*sigmavp ! sigmavpvs: special width for new layers
+                    voro(i,4)= vp_min+(vp_max-vp_min)*ran3(ra)
+                    !voro_prop(npt_prop,4) = voro(ind,4)+gasdev(ra)*sigmavp ! sigmavpvs: special width for new layers
                     isoflag_prop(npt_prop) = .true.
 
                     logprob_vsv=log(1/(sigmav*sqrt(2*pi)))-((voro(ind,2)-voro_prop(npt_prop,2))**2)/(2*sigmav**2) ! correct acceptance rates because transdimensional
-                    logprob_vp=log(1/(sigmavp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(npt_prop,4))**2)/(2*sigmavp**2)
+                    !logprob_vp=log(1/(sigmavp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(npt_prop,4))**2)/(2*sigmavp**2)
 
                     !Check bounds
                     if ((voro_prop(npt_prop,2)<=-width).or.(voro_prop(npt_prop,2)>=width)) then
@@ -1769,7 +1754,7 @@ program RJ_MCMC
 
                     call whichcell_d(voro(ind,1),voro_prop,npt_prop,ind2)
                     logprob_vsv=log(1/(sigmav*sqrt(2*pi)))-((voro(ind,2)-voro_prop(ind2,2))**2)/(2*sigmav**2) ! same as for birth
-                    logprob_vp=log(1/(sigmavp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(ind2,4))**2)/(2*sigmavp**2)
+                    !logprob_vp=log(1/(sigmavp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(ind2,4))**2)/(2*sigmavp**2)
 
                 endif
             elseif (u<0.9) then !Birth an anisotropic layer----------------------------------------
@@ -1799,7 +1784,7 @@ program RJ_MCMC
                 endif
 
             !else
-            elseif (u<1.1) then !death of an anisotropic layer!---------------------------------------
+            elseif (u<1.) then !death of an anisotropic layer!---------------------------------------
                 deatha = .true.
                 PrDa = PrDa + 1
                 if (npt_ani==0) then
@@ -1938,7 +1923,7 @@ program RJ_MCMC
             if (birth) then!------------------------------------------------------------------
 
                 if (log(ran3(ra))<log(out) + log(real(npt)+1)-log(real(npt_prop)+1)&
-                    -log(2*width)-logprob_vsv-log(vp_max-vp_min)-logprob_vp&
+                    -log(2*width)-logprob_vsv&!-log(vp_max-vp_min)-logprob_vp&
                     -like_prop_w+like_w) then ! transdimensional case
 
                     accept=.true.
@@ -1949,7 +1934,7 @@ program RJ_MCMC
 
                 if (log(ran3(ra))<log(out) + log(real(npt)+1)&
                     -log(real(npt_prop)+1) + &
-                    log(2*width)+logprob_vsv+log(vp_max-vp_min)+logprob_vp&
+                    log(2*width)+logprob_vsv&!+log(vp_max-vp_min)+logprob_vp&
                     -like_prop_w+like_w) then! transdimensional case
 
                     accept=.true.
@@ -2035,14 +2020,14 @@ program RJ_MCMC
 
                 IF ((mod(ount,display).EQ.0)) THEN !.and.(mod(ran,50).EQ.0)
 
-                    write(*,*)'processor number',ran+1,'/',nbproc
+                    write(*,*)'processor number',rank+1,'/',nbproc
                     write(*,*)'widening step:','burn-in'
                     write(*,*)'sample:',ount,'/',burn_in
                     write(*,*)'number of cells:',npt
                     write(*,*)'Ad_R',Ad_R,'Ad_L',Ad_L
                     write(*,*)'Acceptance rates'
-                    write(*,*)'AR_move',100*AcP/PrP
-                    write(*,*)'AR_value',100*AcV/PrV
+                    write(*,*)'AR_move',100*AcP/PrP,'pd',pd
+                    write(*,*)'AR_value',100*AcV/PrV,'pvsv',pv
 
                     write(*,*)'AR_Birth',100*AcB/PrB,'AR_Death',100*AcD/PrD
                     write(*,*)'sigmav',sigmav,'sigmavp',sigmavp
@@ -2208,7 +2193,7 @@ program RJ_MCMC
                         open(54,file=dirname//filenametmp,status='replace')
                         write(54,*)burn_in,n_w,burn_in_widening,nsample_widening
                         do i=1,burn_in
-                            write(54,*)convdp(i)
+                            write(54,*)convdp_bi(i)
                         enddo
                         close(54)
 
@@ -2216,7 +2201,7 @@ program RJ_MCMC
                         open(54,file=dirname//filenametmp,status='replace')
                         write(54,*)burn_in,n_w,burn_in_widening,nsample_widening
                         do i=1,burn_in
-                            write(54,*)convxi(i)
+                            write(54,*)convxi_bi(i)
                         enddo
                         close(54)
 
@@ -2304,7 +2289,7 @@ program RJ_MCMC
                         open(54,file=dirname//filenametmp,status='replace')
                         write(54,*)burn_in,n_w,burn_in_widening,nsample_widening
                         do i=1,burn_in
-                            write(54,*)convdps(i)
+                            write(54,*)convxis_bi(i)
                         enddo
                         close(54)
 
@@ -2312,7 +2297,7 @@ program RJ_MCMC
                         open(54,file=dirname//filenametmp,status='replace')
                         write(54,*)burn_in,n_w,burn_in_widening,nsample_widening
                         do i=1,burn_in
-                            write(54,*)convxis(i)
+                            write(54,*)convxis_bi(i)
                         enddo
                         close(54)
 
@@ -2401,7 +2386,7 @@ program RJ_MCMC
                         open(54,file=dirname//filenametmp,status='replace')
                         write(54,*)burn_in,n_w,burn_in_widening,nsample_widening
                         do i=1,burn_in
-                            write(54,*)convdp(i)
+                            write(54,*)convdp_bi(i)
                         enddo
                         close(54)
 
@@ -2409,7 +2394,7 @@ program RJ_MCMC
                         open(54,file=dirname//filenametmp,status='replace')
                         write(54,*)burn_in,n_w,burn_in_widening,nsample_widening
                         do i=1,burn_in
-                            write(54,*)convxi(i)
+                            write(54,*)convxi_bi(i)
                         enddo
                         close(54)
 
@@ -2549,7 +2534,7 @@ program RJ_MCMC
                     num_file=num_file_new
 
                     write(*,*)num_file,widening_prop
-                    write(filenamemax,"('/All_models_prepare_',I3.3,'_',f5.2,'.out')")num_file,widening_prop
+                    write(filenamemax,"('/All_models_prepare_',I4.4,'_',f5.2,'.out')")num_file,widening_prop
                     write(*,*)filenamemax
 
                     call MPI_FILE_OPEN(MPI_COMM_WORLD,dirname//filenamemax,MPI_MODE_WRONLY + MPI_MODE_CREATE, &
@@ -2718,7 +2703,7 @@ program RJ_MCMC
 
             IF ((mod(ount,display).EQ.0)) THEN !.and.(mod(ran,50).EQ.0
 
-                write(*,*)'processor number',ran+1,'/',nbproc
+                write(*,*)'processor number',rank+1,'/',nbproc
                 write(*,*)'widening step:',i_w,'/',n_w
                 if (mod(ount,burn_in_widening+nsample_widening)<burn_in_widening) then
                     write(*,*)'transition burn-in'
@@ -2729,8 +2714,8 @@ program RJ_MCMC
                 write(*,*)'number of cells:',npt
                 write(*,*)'Ad_R',Ad_R,'Ad_L',Ad_L
                 write(*,*)'Acceptance rates'
-                write(*,*)'AR_move',100*AcP/PrP
-                write(*,*)'AR_value',100*AcV/PrV
+                write(*,*)'AR_move',100*AcP/PrP,'pd',pd
+                write(*,*)'AR_value',100*AcV/PrV,'pvsv',pv
 
                 write(*,*)'AR_Birth',100*AcB/PrB,'AR_Death',100*AcD/PrD
                 write(*,*)'sigmav',sigmav,'sigmavp',sigmavp
@@ -2774,7 +2759,7 @@ program RJ_MCMC
             endif
         enddo
 
-        IF (ran==members(1)) THEN
+        IF (rank==members(1)) THEN
             write(*,*)'New widening tested: '
             write(*,*)i_w,widening_prop,widening
         endif
@@ -2785,15 +2770,11 @@ program RJ_MCMC
         ! Collect information from all the chains and average everything
 
         !***************************************************************************
-        flag=0
-        do i=1,j
-            if (ran==members(i)) flag=1
-        enddo
 
-        call MPI_Group_incl(group_world, j, members, good_group, ierror)
-        call MPI_Comm_create(MPI_COMM_WORLD, good_group, MPI_COMM_small, ierror)
 
-        if (flag==1) then
+        !call MPI_Group_incl(group_world, j, members, good_group, ierror)
+        !call MPI_Comm_create(MPI_COMM_WORLD, good_group, MPI_COMM_small, ierror)
+
 
 
         call MPI_REDUCE(convBa,convBas,(burn_in_widening+nsample_widening),&
@@ -2845,10 +2826,10 @@ program RJ_MCMC
             convsigmavps=convsigmavps/nbproc
             ncells=ncells/nbproc
         endif
-        endif
 
-        call MPI_Group_free(good_group, ierror)
-        call MPI_Comm_free(MPI_COMM_small, ierror)
+
+        !call MPI_Group_free(good_group, ierror)
+        !call MPI_Comm_free(MPI_COMM_small, ierror)
         call MPI_BARRIER(MPI_COMM_WORLD, ierror)
 
         write(*,*)'writing outputs of widening tests'
@@ -3153,8 +3134,8 @@ program RJ_MCMC
 
 
     CALL cpu_time(t2)
-    if (ran==0) write(*,*)'time taken by the code was',t2-t1,'seconds'
-    if (ran==0) write(*,*)'time taken by the code was',(t2-t1)/3600,'hours'
+    if (rank==0) write(*,*)'time taken by the code was',t2-t1,'seconds'
+    if (rank==0) write(*,*)'time taken by the code was',(t2-t1)/3600,'hours'
 
     call MPI_FINALIZE(ierror)! Terminate the parralelization
 
