@@ -392,7 +392,7 @@ c*** find roots by spline interpolation ***
 c     ------ Al Edits ------
       integer :: count, count_max
       logical :: error_flag
-      parameter (count_max=250000)
+      parameter (count_max=500000)
       data tol/1.d-9/,itmax/15/,kchar/' s',' t',' s',' c'/
       real*8    :: start_time, cur_time, run_time
       parameter (run_lim=5.0)
@@ -490,6 +490,19 @@ c***  print *, "rotspl: POS: 014"
       x(2)=x(iup)
       det(1)=det(idn)
       det(2)=det(iup)
+      call cpu_time(cur_time)
+      run_time=cur_time-start_time
+      if (run_time.gt.run_lim) then
+c***          print *, run_time
+            error_flag = .true.
+            return
+      end if
+      count = count + 1
+      if (count.gt.count_max) then
+c***    print *, count
+        error_flag = .true.
+        return
+      end if
 c***  print *, "rotspl: POS: 015"
       goto 10
 
