@@ -302,6 +302,7 @@ c***  print *,'wtable: POS: 001'
 c***  if(wtry.ne.0.d0) print *,'wtable: POS: 008', wtry
       if(wtry.ne.0.d0) we(2)=wtry
       call detqn(we(1),ke(1),de(1),0,start_time,error_flag)
+      if(error_flag) return
 c***  if(ke(1).gt.ndn) print *,'wtable: POS: 002'
       if(ke(1).gt.ndn) goto 10
 c***  Al Check statement -- start --
@@ -317,6 +318,7 @@ c       Uncomment next two lines.
       else
         ! error_flag = .false.
         call detqn(we(2),ke(2),de(2),0,start_time,error_flag)
+        if(error_flag) return
       end if
 c     Al Check statement -- end --
 c     Original line
@@ -324,6 +326,7 @@ c     call detqn(we(2),ke(2),de(2),0,start_time,error_flag)
       if(ke(2).lt.nup) then
          we(2)=wt(2)
          call detqn(we(2),ke(2),de(2),0,start_time,error_flag)
+         if(error_flag) return
 c***    if(ke(2).lt.nup) print *,'wtable: POS: 003'
          if(ke(2).lt.nup) goto 50
       end if
@@ -337,6 +340,7 @@ c***  if(ke(1).eq.ndn.and.ke(2).eq.nup) print *,'wtable: POS: 005'
 c***  if(ktry.gt.50) print *,'wtable: POS: 006'
       if(ktry.gt.50) goto 10
       call detqn(wx,kx,dx,0,start_time,error_flag)
+      
 c***  print *, 'kx = ',kx
       if(kx.le.ndn) then
         we(1)=wx
@@ -350,6 +354,7 @@ c***  print *, 'kx = ',kx
       wx=0.5d0*(we(1)+we(2))
 
       call cpu_time(cur_time)
+      if(error_flag) return
       run_time=cur_time-start_time
       if (run_time.gt.run_lim) then
             error_flag = .true.
@@ -424,6 +429,7 @@ c***  print *, "rotspl: POS: 001"
       if(dabs(b-c).lt.t) goto 65
 c***  print *, "rotspl: POS: 002: call detqn",b,knt,fb,0,start_time
       call detqn(b,knt,fb,0,start_time,error_flag)
+      if(error_flag) return
 c***  print *, "rotspl: POS: 003"
       ind=1
       do 20 m=2,ntry
@@ -466,15 +472,6 @@ c***  print *, "rotspl: POS: 011: tol, del*delx", tol, del*delx
 c***  print *, "rotspl: POS: 012: goto 50: count = ", count
 c***  print *, "- - - - - - - - - - - - - - - - - - - - - - - - -"
 
-      call cpu_time(cur_time)
-      run_time=cur_time-start_time
-      if (run_time.gt.run_lim) then
-c***          print *, run_time
-            error_flag = .true.
-            return
-      end if
-
-
       count = count + 1
       if (count.gt.count_max) then
 c***    print *, count
@@ -484,6 +481,13 @@ c***    print *, count
       goto 50
    55 b=c+delx
 c***  print *, "rotspl: POS: 013"
+      count = count + 1
+      if (count.gt.count_max) then
+c***    print *, count
+        error_flag = .true.
+        return
+      end if
+      
       if(b.ge.x(idn).and.b.le.x(iup)) goto 15
    60 x(1)=x(idn)
 c***  print *, "rotspl: POS: 014"
@@ -492,11 +496,7 @@ c***  print *, "rotspl: POS: 014"
       det(2)=det(iup)
       call cpu_time(cur_time)
       run_time=cur_time-start_time
-      if (run_time.gt.run_lim) then
-c***          print *, run_time
-            error_flag = .true.
-            return
-      end if
+      
       count = count + 1
       if (count.gt.count_max) then
 c***    print *, count
@@ -843,7 +843,7 @@ c***    print *,'detqn:  POS: 004'
 c*** propagate through inner core ***
 c***    print *,'detqn:  POS: 005'
         call spsm(ls,nvesm,ass)
-        call sprpmn(ls,nic,ass,vf,nvesm,iexp)
+        call sprpmn(ls,nic,ass,vf,nvesm,iexp,error_flag)
         r(1)=0.d0
         g(1)=0.d0
         call sfbm(ass,kg,iback)
@@ -860,7 +860,7 @@ c***    print *,'detqn:  POS: 006'
       if(is.eq.ls) call spsm(ls,nvesm,ass)
 c*** propagate through mantle ***
 c***  print *,'detqn:  POS: 007'
-      call sprpmn(is,nsl,ass,vf,nvesm,iexp)
+      call sprpmn(is,nsl,ass,vf,nvesm,iexp,error_flag)
       if(nsl.eq.n) then
 c***    print *,'detqn:  POS: 008'
         dnorm=a(1,nsl)*a(1,nsl)
@@ -922,7 +922,7 @@ c*** this does eigenfunction calculation for spheroidal modes ***
         if(asi2.gt.asi1) ass(2)=dsign(1.d0,a(2,n))
       end if
       nto=max(ls,nocp1)
-      call sprpmn(nsl,nto,ass,vf,nbaks,jexp)
+      call sprpmn(nsl,nto,ass,vf,nbaks,jexp,error_flag)
       if(nto.eq.ls) goto 90
       call sfbm(ass,kg,iback)
       nto=max(ls,nicp1)
@@ -930,7 +930,7 @@ c*** this does eigenfunction calculation for spheroidal modes ***
       if(nto.eq.ls) goto 90
       call fsbm(ass,kg,iback)
       nto=max(ls,2)
-      call sprpmn(nic,nto,ass,vf,nbaks,jexp)
+      call sprpmn(nic,nto,ass,vf,nbaks,jexp,error_flag)
    90 if(dabs(det).gt.1.d-4.and.ls.le.noc) call remedy(ls)
       call eifout(ls)
       return
@@ -988,7 +988,8 @@ c*** toroidal modes ***
         if(jcom.ne.4) then
           if(l.ne.1) then
             knt=knt+1
-            irem=mod(knt,2)
+            irem=mod(knt,2
+      logical :: error_flag)
             if(irem.eq.0.and.det.gt.0.d0) knt=knt+1
             if(irem.ne.0.and.det.lt.0.d0) knt=knt+1
           end if
@@ -1023,7 +1024,7 @@ c*** toroidal modes ***
       return
       end subroutine detqn
 
-      subroutine sprpmn(jf,jl,f,h,nvesm,iexp)
+      subroutine sprpmn(jf,jl,f,h,nvesm,iexp,error_flag)
 c*** propagate a minor vector in a solid region from level jf to jl ***
       implicit real*8(a-h,o-z)
       parameter (mk=350)
@@ -1039,6 +1040,13 @@ c*** propagate a minor vector in a solid region from level jf to jl ***
       common/shanks/b(46),c(10),dx,step(8),stepf,maxo,in
       dimension f(*),h(nvesm,*),s(14),fp(14),rne(6)
       data econst/1048576.d0/
+      
+c     ------ Dorian Edits ------
+      parameter (count_max=1000)
+      logical :: error_flag
+      integer :: count
+      count=0
+c     ------ Dorian Edits ------
       maxo1=maxo-1
       jud=1
       if(jl.lt.jf) jud=-1
@@ -1081,6 +1089,16 @@ c*** propagate a minor vector in a solid region from level jf to jl ***
           call zknt(s,h,f,fp,x,y,1)
         end if
         x=y
+        
+        call cpu_time(cur_time)
+      run_time=cur_time-start_time
+      count=count+1
+      if (count.gt.count_max) then
+c***          print *, run_time
+            error_flag = .true.
+            return
+      end if
+        
         if(y.ne.r(i)) goto 15
    45 size=abs(f(1))
       do j=2,nvesm
@@ -1092,6 +1110,14 @@ c*** propagate a minor vector in a solid region from level jf to jl ***
       enddo
       size=size/econst
       iexp=iexp+20
+      
+      ! Dorian
+      count=count+1
+      if (count.gt.count_max) then
+c***          print *, run_time
+            error_flag = .true.
+            return
+      end if
       goto 55
    65 if(iback.ne.0) then
         inorm(i)=inorm(i)+iexp
@@ -1208,6 +1234,7 @@ c*** propagate the minor vector in a fluid region from level jf to jl ***
       enddo
       size=size/econst
       iexp=iexp+20
+      
       goto 55
    65 if(iback.ne.0) then
         inorm(i)=inorm(i)+iexp
