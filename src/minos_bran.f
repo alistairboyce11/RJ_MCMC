@@ -120,7 +120,7 @@ c     ------ Al Edits ------
       subroutine minos_bran(ifanis2,tref2,N2,nic2,noc2,r2,rho2,vpv2,
      &vph2,vsv2,vsh2,qkappa2,qshear2,eta2,eps2,wgrav2,jcom2,lmin2,
      &lmax2,wmin2,wmax2,nmin2,nmax2,nmodes_max,i_mode,n_mode,l_mode,
-     &c_ph,period,raylquo,error_flag)
+     &c_ph,period,raylquo,error_flag2)
 
 
 c      implicit none
@@ -129,7 +129,7 @@ c      integer,parameter:  Nmax=350 !max number of layers
 c      integer,intent(in): if_anis,N,nic,noc,jcom,lmin,lmax,wmin,wmax,nmin,nmax
 c      real,intent(in):    tref,eps,wgrav
 c      real,intent(in):    r(Nmax),rho(Nmax),vpv(Nmax),vph(Nmax),vsv(Nmax),vsh(Nmax),qkappa(Nmax),qshear(Nmax),eta(Nmax)
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       integer,intent(in) :: nmodes_max
       integer,intent(out) :: i_mode
       integer,dimension(nmodes_max),intent(out) :: n_mode,l_mode
@@ -142,11 +142,12 @@ c      real,intent(in):    r(Nmax),rho(Nmax),vpv(Nmax),vph(Nmax),vsv(Nmax),vsh(N
      &vph2,vsv2,vsh2,qkappa2,qshear2,eta2
       real,intent(in) :: tref2,eps2,wgrav2
       real,intent(in)::wmin2,wmax2
+      logical,intent(out)::error_flag2
       real::wmin,wmax
       save
-      integer*4 :: ititle(20)
+      integer(kind=4) :: ititle(20)
       integer :: ifreq
-      real*8 lcon,ncon,lspl,nspl
+      real(kind=8) lcon,ncon,lspl,nspl
       common r(mk),fmu(mk),flam(mk),qshear(mk),qkappa(mk),
      + xa2(mk),xlam(mk),rho(mk),qro(3,mk),g(mk),qg(3,mk),
      + fcon(mk),fspl(3,mk),lcon(mk),lspl(3,mk),ncon(mk),
@@ -155,10 +156,14 @@ c      real,intent(in):    r(Nmax),rho(Nmax),vpv(Nmax),vph(Nmax),vsv(Nmax),vsh(N
      +  fl1,fl2,fl3,sfl3,jcom,nord,l,kg,kount,knsw,ifanis,iback
       common/eifx/vpv(mk),vph(mk),vsv(mk),vsh(mk),eta(mk),wrk(mk*10)
       common/rindx/nic,noc,nsl,nicp1,nocp1,nslp1,n
-c     ------ Al Edits ------
+
       logical :: error_flag
-      real*8    :: start_time, cur_time, run_time
-      parameter (run_lim=5.0)
+      real(kind=8)    :: start_time, cur_time, run_time, run_lim
+      !parameter (run_lim=5.0)
+      common/error/start_time,cur_time,run_time,run_lim,error_flag
+
+      run_lim=0.5
+      
       error_flag = .false.
       call cpu_time(start_time)
 
@@ -190,18 +195,13 @@ c     ------ Al Edits ------
       wgrav=wgrav2
       call model(ifdeck)
 
-
-
       ifreq=1
-c     print *,'model done'
-c     call wtable(ifreq,nmodes_max,i_mode,n_mode,l_mode,c_ph,period,
-c    +raylquo,wmin,wmax,lmin,lmax,nmin,nmax)
-c     ------ Al Edits ------
       call wtable(ifreq,nmodes_max,i_mode,n_mode,l_mode,c_ph,period,
-     +raylquo,wmin,wmax,lmin,lmax,nmin,nmax,error_flag,start_time)
+     +raylquo,wmin,wmax,lmin,lmax,nmin,nmax)
 c***  if (error_flag) then
 c***    print *,'minos_bran: POS: 001: error_flag:', error_flag
 c***  end if
+      error_flag2=error_flag
       return
       end subroutine minos_bran
 
@@ -209,10 +209,9 @@ c     subroutine wtable(ifreq,nmodes_max,i_mode,n_mode,l_mode,c_ph,
 c    +period,raylquo,wmin,wmax,lmin,lmax,normin,normax)
 c     ------ Al Edits ------
       subroutine wtable(ifreq,nmodes_max,i_mode,n_mode,l_mode,c_ph,
-     +period,raylquo,wmin,wmax,lmin,lmax,normin,normax,error_flag,
-     +start_time)
+     +period,raylquo,wmin,wmax,lmin,lmax,normin,normax)
 c*** makes up table of frequencies ***
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       integer,intent(in) :: nmodes_max
       integer,intent(inout) :: lmin,lmax,normin,normax
       real,intent(inout) :: wmin,wmax
@@ -221,51 +220,31 @@ c*** makes up table of frequencies ***
       integer,dimension(nmodes_max),intent(out) :: n_mode,l_mode
       real,dimension(nmodes_max),intent(out) :: c_ph,period,raylquo
 c     ------ Al Edits ------
-      logical :: error_flag
-      real*8    :: start_time, cur_time, run_time
-      parameter (run_lim=5.0)
       common/bits/pi,rn,vn,wn,w,wsq,wray,qinv,cg,wgrav,tref,fct,eps,fl,
      +  fl1,fl2,fl3,sfl3,jcom,nord,l,kg,kount,knsw,ifanis,iback
       common/shanks/b(46),c(10),dx,step(8),stepf,maxo,in
       common/mtab/we(2),de(2),ke(2),wtry,bm
       dimension wt(2)
       data inss/5/
-c     ------ Al Edits ------ 
-      ! error_flag = .false.
+      logical error_flag
+      common/error/start_time,cur_time,run_time,run_lim,error_flag
 
       cmhz=pi/500.d0
       stepf=1.d0
-c      print *,'enter eps and wgrav'
-c      read(*,*) eps,wgrav
       eps=max(eps,1.d-12)
       eps1=eps
       eps2=eps
       i_mode=0
       wgrav=wgrav*cmhz
-c      write(iout,100) eps,eps1,wgrav
-c  100 format(/,'integration precision =',g12.4,'  root precision =',
-c     +   g12.4,'  gravity cut off =',g12.4,' rad/s',///,6x,'mode',
-c     +   8x,'phs vel',7x,'w(mhz)',10x,'t(secs)',6x,'grp vel(km/s)',
-c     +   8x,'q',13x,'raylquo',/)
       call steps(eps)
-c     print *,eps
 
-c      print *,'enter jcom (1=rad;2=tor;3=sph;4=ictor)'
-c      read(*,*) jcom
-cc MB added one line below
-c      print *,jcom
-c      if(jcom.lt.1.or.jcom.gt.4) jcom=3
-c      print *,'enter lmin,lmax,wmin,wmax,nmin,nmax'
-c      read(*,*) lmin,lmax,wmin,wmax,normin,normax
-cc MB added one line below
-c      print *,lmin,lmax,wmin,wmax,normin,normax
       wmin=max(wmin,0.1d0)
       wmin=wmin*cmhz
       wmax=wmax*cmhz
-      if (lmin.le.0) then
+      if (lmin<=0) then
       lmin=1
       endif
-      if(jcom.eq.1) then
+      if(jcom==1) then
         lmin=0
         lmax=0
       end if
@@ -273,19 +252,16 @@ c      print *,lmin,lmax,wmin,wmax,normin,normax
       normax=max(normax,normin)
       ncall = 0
       do 50 nor=normin,normax
-c***  print *,'wtable: POS: 009' !!! Confusing stuff
-c***  print *, normin,normax,nor !!! Confusing stuff
       wt(1)=wmin
       wt(2)=wmax
       wtry=0.d0
       bm=0.d0
       do 10 l=lmin,lmax
-c***  print *, lmin, lmax, l !!! This is printing mode numbers set in RJ_MCMC.f
-      if(wt(1).ge.wmax) goto 50
+      if(wt(1)>=wmax) goto 50
       nord=nor
       nup=nor
       ndn=nor-1
-      if(l.eq.1) then
+      if(l==1) then
         nup=ndn
         ndn=ndn-1
       end if
@@ -298,51 +274,33 @@ c***  print *, lmin, lmax, l !!! This is printing mode numbers set in RJ_MCMC.f
       sfl3=sqrt(fl3)
       we(1)=wt(1)
       we(2)=wt(2)
-c***  print *,'wtable: POS: 001'
-c***  if(wtry.ne.0.d0) print *,'wtable: POS: 008', wtry
-      if(wtry.ne.0.d0) we(2)=wtry
-      call detqn(we(1),ke(1),de(1),0,start_time,error_flag)
+      call detqn(we(1),ke(1),de(1),0)
       if(error_flag) return
-c***  if(ke(1).gt.ndn) print *,'wtable: POS: 002'
-      if(ke(1).gt.ndn) goto 10
-c***  Al Check statement -- start --
-      if(we(2).lt.0) then
-c***    print *,'wtable: CALL detqn: we(2).lt.0'
-c***    print *, 'we(2),ke(2),de(2),0'
-c***    print *, we(2),ke(2),de(2),0
-c       Comment next line
-c       call detqn(we(2),ke(2),de(2),0,start_time,error_flag)
-c       Uncomment next two lines.
+      if(ke(1)>ndn) goto 10
+      if(we(2)<0) then
         error_flag = .true.
         return
       else
-        ! error_flag = .false.
-        call detqn(we(2),ke(2),de(2),0,start_time,error_flag)
+        call detqn(we(2),ke(2),de(2),0)
         if(error_flag) return
       end if
-c     Al Check statement -- end --
-c     Original line
-c     call detqn(we(2),ke(2),de(2),0,start_time,error_flag)
-      if(ke(2).lt.nup) then
+
+      if(ke(2)<nup) then
          we(2)=wt(2)
-         call detqn(we(2),ke(2),de(2),0,start_time,error_flag)
+         call detqn(we(2),ke(2),de(2),0)
          if(error_flag) return
-c***    if(ke(2).lt.nup) print *,'wtable: POS: 003'
-         if(ke(2).lt.nup) goto 50
+         if(ke(2)<nup) goto 50
       end if
-c***  print *,'wtable: POS: 004'
 c*** bracket this mode ***
       wx=0.5d0*(we(1)+we(2))
       ktry=0
-c***  if(ke(1).eq.ndn.and.ke(2).eq.nup) print *,'wtable: POS: 005'
-   15 if(ke(1).eq.ndn.and.ke(2).eq.nup) goto 40
+   15 if(ke(1)==ndn.and.ke(2)==nup) goto 40
       ktry=ktry+1
-c***  if(ktry.gt.50) print *,'wtable: POS: 006'
-      if(ktry.gt.50) goto 10
-      call detqn(wx,kx,dx,0,start_time,error_flag)
-      
-c***  print *, 'kx = ',kx
-      if(kx.le.ndn) then
+      if(ktry>50) goto 10
+      call detqn(wx,kx,dx,0)
+      if(error_flag) return
+
+      if(kx<=ndn) then
         we(1)=wx
         ke(1)=kx
         de(1)=dx
@@ -354,15 +312,14 @@ c***  print *, 'kx = ',kx
       wx=0.5d0*(we(1)+we(2))
 
       call cpu_time(cur_time)
-      if(error_flag) return
       run_time=cur_time-start_time
-      if (run_time.gt.run_lim) then
-            error_flag = .true.
-            return
+      if (run_time>run_lim) then
+        !print *,'failed wtable'
+        error_flag = .true.
+        return
       end if
 
       goto 15
-c*** print *,'wtable: POS: 007'
 
 c*** find roots ***
    40 knsw=0
@@ -370,20 +327,17 @@ c*** find roots ***
 c		added argument for number of times called (mhr)
       ncall = ncall + 1
       call rotspl(eps1,wt,ifreq,ncall,nmodes_max,i_mode,n_mode,l_mode,
-     &c_ph,period,raylquo,error_flag,start_time)
-      if (error_flag) then
-c***    print *,'wtable: POS: 008: error_flag:', error_flag
-        return
-      end if
+     &c_ph,period,raylquo)
+      if (error_flag) return
    10 continue
    50 continue
       return
       end subroutine wtable
 
       subroutine rotspl(eps1,wt,ifreq,ncall,nmodes_max,i_mode,n_mode,
-     &l_mode,c_ph,period,raylquo,error_flag,start_time)
+     &l_mode,c_ph,period,raylquo)
 c*** find roots by spline interpolation ***
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       integer,intent(in) :: nmodes_max
       integer,intent(inout) :: i_mode
       integer,dimension(nmodes_max),intent(inout) :: n_mode,l_mode
@@ -394,55 +348,43 @@ c*** find roots by spline interpolation ***
       dimension x(20),det(20),qx(3,20),wrk(60),wt(*),kchar(4)
       character*2 kchar
 
+      logical error_flag
+      common/error/start_time,cur_time,run_time,run_lim,error_flag
+
 c     ------ Al Edits ------
       integer :: count, count_max
-      logical :: error_flag
-      parameter (count_max=500000)
+      parameter (count_max=50000)
       data tol/1.d-9/,itmax/15/,kchar/' s',' t',' s',' c'/
-      real*8    :: start_time, cur_time, run_time
-      parameter (run_lim=5.0)
 c     ------ Al Edits ------
       count = 1
-      ! error_flag = .false.
-
-      call cpu_time(cur_time)
-      run_time=cur_time-start_time
-      if (run_time.gt.run_lim) then
-            error_flag = .true.
-            return
-      end if
 
 c***  print *, "rotspl: POS: 001"
-      if(de(1)*de(2).gt.0.d0) return
+      if(de(1)*de(2)>0.d0) return
       nord=ke(2)
-      if(l.eq.1) nord=nord+1
+      if(l==1) nord=nord+1
       det(1)=de(1)
       det(2)=de(2)
       x(1)=we(1)
       x(2)=we(2)
-    5 c=x(1)
-      if(dabs(det(1)).gt.dabs(det(2))) c=x(2)
+      c=x(1)
+      if(dabs(det(1))>dabs(det(2))) c=x(2)
    10 ntry=2
       grad=(x(1)-x(2))/(det(1)-det(2))
       b=x(1)-det(1)*grad
    15 t=dabs(b*eps1)
-      if(dabs(b-c).lt.t) goto 65
-c***  print *, "rotspl: POS: 002: call detqn",b,knt,fb,0,start_time
-      call detqn(b,knt,fb,0,start_time,error_flag)
+      if(dabs(b-c)<t) goto 65
+      call detqn(b,knt,fb,0)
       if(error_flag) return
-c***  print *, "rotspl: POS: 003"
       ind=1
       do 20 m=2,ntry
       ind=ind+1
-c***  print *, "rotspl: POS: 004: b<x(m)", b, x(m)
-   20 if(b.lt.x(m)) goto 25
+   20 if(b<x(m)) goto 25
    25 ntry=ntry+1
       j2=ntry
    30 j1=j2-1
       x(j2)=x(j1)
       det(j2)=det(j1)
-c***  print *, "rotspl: POS: 005: j1=ind", j1, ind
-      if(j1.eq.ind) goto 35
+      if(j1==ind) goto 35
       j2=j2-1
       goto 30
    35 x(ind)=b
@@ -451,30 +393,22 @@ c***  print *, "rotspl: POS: 005: j1=ind", j1, ind
       do 40 m=2,ntry
       idn=idn+1
       iup=idn+1
-c***  print *, "rotspl: POS: 006"
-   40 if(det(idn)*det(iup).le.0.d0) goto 45
+   40 if(det(idn)*det(iup)<=0.d0) goto 45
    45 ind=iup
-c***  print *, "rotspl: POS: 007: dabs(det(idn)) < dabs(det(iup))"
-      if(dabs(det(idn)).lt.dabs(det(iup))) ind=idn
+      if(dabs(det(idn))<dabs(det(iup))) ind=idn
       c=x(ind)
-      if(ntry.ge.itmax) goto 60
-c***  print *, "rotspl: POS: 008: call dsplin"
+      if(ntry>=itmax) goto 60
       call dsplin(ntry,x,det,qx,wrk)
-c***  print *, "rotspl: POS: 009"
       del=-det(ind)/qx(1,ind)
    50 delx=-det(ind)/(qx(1,ind)+del*qx(2,ind))
-c***  print *, "rotspl: POS: 010: del", del
-c***  print *, "rotspl: POS: 011: tol, del*delx", tol, del*delx
 
-      if(dabs(delx-del).lt.tol) goto 55
-      if(del*delx.lt.0.d0) goto 60
+      if(dabs(delx-del)<tol) goto 55
+      if(del*delx<0.d0) goto 60
       del=delx
-c***  print *, "rotspl: POS: 012: goto 50: count = ", count
-c***  print *, "- - - - - - - - - - - - - - - - - - - - - - - - -"
 
       count = count + 1
-      if (count.gt.count_max) then
-c***    print *, count
+      if (count>count_max) then
+        !print *,'failed rotspl'
         error_flag = .true.
         return
       end if
@@ -482,23 +416,22 @@ c***    print *, count
    55 b=c+delx
 c***  print *, "rotspl: POS: 013"
       count = count + 1
-      if (count.gt.count_max) then
-c***    print *, count
+      if (count>count_max) then
+        !print *,'failed rotspl'
         error_flag = .true.
         return
       end if
       
-      if(b.ge.x(idn).and.b.le.x(iup)) goto 15
+      if(b>=x(idn).and.b<=x(iup)) goto 15
    60 x(1)=x(idn)
 c***  print *, "rotspl: POS: 014"
       x(2)=x(iup)
       det(1)=det(idn)
       det(2)=det(iup)
-      call cpu_time(cur_time)
-      run_time=cur_time-start_time
-      
+
       count = count + 1
-      if (count.gt.count_max) then
+      if (count>count_max) then
+        !print *,'failed rotspl'
 c***    print *, count
         error_flag = .true.
         return
@@ -508,25 +441,21 @@ c***  print *, "rotspl: POS: 015"
 
 c*** write out frequencies ***
 c***  print *, "rotspl: POS: 016"
-   65 call detqn(b,knt,fb,ifreq,start_time,error_flag)
+   65 call detqn(b,knt,fb,ifreq)
+      if(error_flag) return
 c***  print *, "rotspl: POS: 017"
       tcom=2.d0*pi/b
       wmhz=1000.d0/tcom
       cvel=b*rn/(l+0.5)/1000.
-      if(ifreq.eq.1) then
+      if(ifreq==1) then
 c***    print *, "rotspl: POS: 003"
         wdiff=(b-wray*wn)/b
         gcom=vn*cg/1000.d0
         qmod=0.d0
-        if(qinv.gt.0.d0) qmod=1.d0/qinv
-c		remove writing resulting to stnd output (mhr)
-c       print 200,nord,kchar(jcom),l,cvel,wmhz,tcom,gcom,qmod,wdiff
-c        write(iout,200) nord,kchar(jcom),l,cvel,wmhz,tcom,gcom,qmod,
-c     +      wdiff
-c  200   format(i5,a2,i5,6g16.7)
+        if(qinv>0.d0) qmod=1.d0/qinv
         i_mode=i_mode+1
-        if (i_mode.gt.nmodes_max) then
-          print *,'too many modes'
+        if (i_mode>nmodes_max) then
+          !print *,'too many modes'
           return
         end if
         n_mode(i_mode)=nord
@@ -539,15 +468,11 @@ c  200   format(i5,a2,i5,6g16.7)
 c***    print *, "rotspl: POS: 004"
         cg=5000./vn
 c*** we estimate group velocity using previous frequencies
-        if(bm.ne.0.d0) cg=(b-bm)/wn
+        if(bm/=0.d0) cg=(b-bm)/wn
         gcom=vn*cg/1000.d0
-c		added print of gcom. qmod & wdiff not computed w/o egnfcns. (mhr)
-c		remove writing resulting to stnd output (mhr)
-c        print 200,nord,kchar(jcom),l,cvel,wmhz,tcom,gcom
-c        write(iout,200) nord,kchar(jcom),l,cvel,wmhz,tcom,gcom
         i_mode=i_mode+1
-        if (i_mode.gt.nmodes_max) then
-          print *,'too many modes'
+        if (i_mode>nmodes_max) then
+          !print *,'too many modes'
           return
         end if
         n_mode(i_mode)=nord
@@ -560,13 +485,14 @@ c        write(iout,200) nord,kchar(jcom),l,cvel,wmhz,tcom,gcom
 c***  print *, "rotspl: POS: 005", wtry, b, cg, wn
       wt(1)=b
       bm=b
+      !print *, 'rotspl count:',count
       return
       end subroutine rotspl
 
       subroutine modout(wcom,qmod,gcom,ncall)
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       parameter (mk=350)
-      real*4 abuf,buf,ww,qq,gc
+      real(kind=4) abuf,buf,ww,qq,gc
       common/bits/pi,rn,vn,wn,w,wsq,wray,qinv,cg,wgrav,tref,fct,eps,fl,
      +  fl1,fl2,fl3,sfl3,jcom,nord,l,kg,kount,knsw,ifanis,iback
       common/rindx/nic,noc,nsl,nicp1,nocp1,nslp1,n
@@ -580,7 +506,7 @@ c		common block name changes from buf$ to c_buf (mhr)
       ww=wcom
       qq=qmod
       gc=gcom
-      if(jcom.eq.3) then
+      if(jcom==3) then
         nvec=6*n+5
         do i=1,n
           buf(i)=a(1,i)
@@ -592,7 +518,7 @@ c		common block name changes from buf$ to c_buf (mhr)
         enddo
       else
         nvec=2*n+5
-        if(jcom.eq.2) then
+        if(jcom==2) then
           do i=1,noc
             a(1,i)=0.d0
             a(2,i)=0.d0
@@ -611,11 +537,11 @@ c      write(ioeig) (abuf(i),i=1,nvec)
       subroutine model(ifdeck)
       ! iin: input file
       ! iout: output text file
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       parameter (mk=350)
       save
-      integer*4 ititle(20)
-      real*8 lcon,ncon,lspl,nspl
+      integer(kind=4) ititle(20)
+      real(kind=8) lcon,ncon,lspl,nspl
       common r(mk),fmu(mk),flam(mk),qshear(mk),qkappa(mk),
      + xa2(mk),xlam(mk),rho(mk),qro(3,mk),g(mk),qg(3,mk),
      + fcon(mk),fspl(3,mk),lcon(mk),lspl(3,mk),ncon(mk),
@@ -626,85 +552,14 @@ c      write(ioeig) (abuf(i),i=1,nvec)
       common/rindx/nic,noc,nsl,nicp1,nocp1,nslp1,n
       data bigg,tau/6.6723d-11,1.d3/,rhobar/5515.d0/
       pi=3.14159265358979d0
-!      read(iin,100) (ititle(i),i=1,20)
-!  100 format(20a4)
-!      read(iin,*) ifanis,tref,ifdeck
-!      if(ifdeck.eq.0) go to 1000 ! skip polynomial model
-c*** card deck model ***
-!      read(iin,*) n,nic,noc
-!      read(iin,*) (r(i),rho(i),vpv(i),vsv(i),
-!     +     qkappa(i),qshear(i),vph(i),vsh(i),eta(i),i=1,n)
-!  105 format(f8.0, 3f9.2, 2f9.1, 2f9.2, f9.5)
-cc 105    format(f10.1,3f10.3,2f10.1,2f10.3,f10.5)
-      go to 2000
-!c*** polynomial model ***
-! 1000 read(iin,*) nreg,nic,noc,rx
-!      rx=rx*tau
-!      n=0
-!      knt=0
-!      jj=5
-!      if(ifanis.ne.0) jj=8
-!      do nn=1,nreg
-!        read(iin,*) nlay,r1,r2
-!        r1=r1*tau
-!        r2=r2*tau
-!        dr=(r2-r1)/float(nlay-1)
-!        do i=1,nlay
-!          n=n+1
-!          r(n)=r1+dr*float(i-1)
-!        enddo
-!        do j=1,jj
-!          read(iin,110) (wrk(i),i=1,5)
-!  110     format(5f9.5)
-!          if(ifanis.eq.2) then
-!            do i=1,nlay
-!              ind=knt+i
-!              rt=r(ind)/rx
-!              val=wrk(1)+rt*(wrk(2)+rt*(wrk(3)+rt*(wrk(4)+rt*wrk(5))))
-!              if(j.eq.1) rho(ind)=val*tau
-!              if(j.eq.2) vph(ind)=val*tau
-!              if(j.eq.3) vsv(ind)=val*tau
-!              if(j.eq.4) qkappa(ind)=val
-!              if(j.eq.5) qshear(ind)=val
-!              if(j.eq.6) vpv(ind)=sqrt(val)*vph(ind)
-!              if(j.eq.7) vsh(ind)=sqrt(val)*vsv(ind)
-!              if(j.eq.8) eta(ind)=val
-!            enddo
-!          else
-!            do i=1,nlay
-!              ind=knt+i
-!              rt=r(ind)/rx
-!              val=wrk(1)+rt*(wrk(2)+rt*(wrk(3)+rt*(wrk(4)+rt*wrk(5))))
-!              if(j.eq.1) rho(ind)=val*tau
-!              if(j.eq.2) vpv(ind)=val*tau
-!              if(j.eq.3) vsv(ind)=val*tau
-!              if(j.eq.4) qkappa(ind)=val
-!              if(j.eq.5) qshear(ind)=val
-!              if(j.eq.6) vph(ind)=val*tau
-!              if(j.eq.7) vsh(ind)=val*tau
-!              if(j.eq.8) eta(ind)=val
-!            enddo
-!          end if
-!        enddo
-!        knt=knt+nlay
-!      enddo
- 2000 if(ifanis.eq.0) then
+
+      if(ifanis==0) then
       do i=1,n
         vph(i)=vpv(i)
         vsh(i)=vsv(i)
         eta(i)=1.d0
       enddo
       end if
-!      if(iout.ge.0) then
-!c*** write out model ***
-!        write(iout,900) (ititle(k),k=1,20),tref
-!  900   format(1x,20a4,' ref per =',f6.1,' secs',///,2x,'level',
-!     1   4x,'radius',8x,'rho',9x,'vpv',9x,'vph',9x,'vsv',
-!     2   9x,'vsh',9x,'eta',9x,'qmu ',8x,'qkap',/)
-!        write(iout,905) (i,r(i),rho(i),vpv(i),vph(i),vsv(i),vsh(i),
-!     1   eta(i),qshear(i),qkappa(i),i=1,n)
-!  905   format(3x,i3,f12.1,5f12.2,f12.5,2f12.2)
-!      end if
 c*** normalise and spline ***
       rn=r(n)
       gn=pi*bigg*rhobar*rn
@@ -713,11 +568,11 @@ c*** normalise and spline ***
       wn=vn/rn
       do i=1,n
         r(i)=r(i)/rn
-        if((i.gt.1)) then
-        if(dabs(r(i)-r(i-1)).lt.1.d-7) r(i)=r(i-1)
+        if((i>1)) then
+        if(dabs(r(i)-r(i-1))<1.d-7) r(i)=r(i-1)
         endif
-        if(qshear(i).gt.0.d0) qshear(i)=1.d0/qshear(i)
-        if(qkappa(i).gt.0.d0) qkappa(i)=1.d0/qkappa(i)
+        if(qshear(i)>0.d0) qshear(i)=1.d0/qshear(i)
+        if(qkappa(i)>0.d0) qkappa(i)=1.d0/qkappa(i)
         rho(i)=rho(i)/rhobar
         acon(i)=rho(i)*vph(i)*vph(i)/vn2
         ccon(i)=rho(i)*vpv(i)*vpv(i)/vn2
@@ -738,14 +593,14 @@ c*** normalise and spline ***
       call drspln(1,n,r,g,qg,wrk)
       call drspln(1,n,r,fcon,fspl,wrk)
       call drspln(1,n,r,lcon,lspl,wrk)
-      if(ifanis.ne.0) then
+      if(ifanis/=0) then
         call drspln(1,n,r,acon,aspl,wrk)
         call drspln(1,n,r,ccon,cspl,wrk)
         call drspln(1,n,r,ncon,nspl,wrk)
       end if
       nsl=n+1
    65 nsl=nsl-1
-      if(vsv(nsl).le.0.d0) go to 65
+      if(vsv(nsl)<=0.d0) go to 65
       nicp1=nic+1
       nocp1=noc+1
       nslp1=nsl+1
@@ -753,13 +608,13 @@ c*** normalise and spline ***
       return
       end subroutine model
 
-      subroutine detqn(wdim,knt,det,ifeif,start_time,error_flag)
+      subroutine detqn(wdim,knt,det,ifeif)
 c**** supevises the integration of the equations,it returns the value
 c**** of the secular determinant as det and the count of zero crossings.
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       parameter (mk=350)
       save
-      real*8 lcon,ncon,lspl,nspl
+      real(kind=8) lcon,ncon,lspl,nspl
       common r(mk),fmu(mk),flam(mk),qshear(mk),qkappa(mk),
      + xa2(mk),xlam(mk),rho(mk),qro(3,mk),g(mk),qg(3,mk),
      + fcon(mk),fspl(3,mk),lcon(mk),lspl(3,mk),ncon(mk),
@@ -769,21 +624,11 @@ c**** of the secular determinant as det and the count of zero crossings.
       common/eifx/a(14,mk),dum(mk)
       common/rindx/nic,noc,nsl,nicp1,nocp1,nslp1,n
       dimension ass(14),vf(mk),zi(4)
-c     ------ Al Edits ------ 
-      logical :: error_flag
-      real*8    :: start_time, cur_time, run_time
-      parameter (run_lim=5.0)
+c     ------ Al Edits ------
+      logical error_flag
+      common/error/start_time,cur_time,run_time,run_lim,error_flag
       parameter (cg_lim=1000000)
-c     ------ Al Edits ------ 
-      ! error_flag = .false.
-
-      call cpu_time(cur_time)
-      run_time=cur_time-start_time
-      if (run_time.gt.run_lim) then
-            error_flag = .true.
-            return
-      end if
-
+c     ------ Al Edits ------
 
       iback=0
       w=wdim/wn
@@ -793,75 +638,62 @@ c     ------ Al Edits ------
       kg=0
       fct=0.d0
 
-
-      ! print *, "cg, cg_norm, cg_norm_ref, vn",cg*vn,cg,5000./vn,vn
-
 c***  Al Check statement    
-      if(wdim.lt.0) then
-c       print *, 'wdim -ve'
-c       print *, 'wdim, knt, det, ifeif, wn, w'
-c       print *, wdim,knt,det,ifeif,wn,w
-c       print *, "Exiting..."
+      if(wdim<0) then
+        !print *,'failed detqn'
         error_flag=.true.
         return
-      else if (cg*vn.gt.cg_lim) then
-c       print *, 'cg*vn > cg_lim'
-c       print *, "cg*vn, cg_lim, cg, cg_ref, vn"
-c       print *, cg*vn,cg_lim,cg,5000./vn,vn
-c       print *, 'wdim, knt, det, ifeif, wn, w'
-c       print *, wdim,knt,det,ifeif,wn,w
-c       print *, "Exiting..."
+      else if (cg*vn>cg_lim) then
+        !print *,'failed detqn'
         error_flag=.true.
         return
-      ! else
-      !   print *, 'wdim SMALL +ve'
-      !   print *, 'wdim, knt, det, ifeif, wn, w'
-      !   print *, wdim,knt,det,ifeif,wn,w
       end if
 
 
 
-      if(tref.gt.0.d0) fct=2.d0*dlog(tref*wdim)/pi
-c***  print *, "jcom=",jcom
+      if(tref>0.d0) fct=2.d0*dlog(tref*wdim)/pi
       goto (2,3,1,3),jcom
-    1 if(wdim.le.wgrav) kg=1
+    1 if(wdim<=wgrav) kg=1
 c***  print *,'detqn:  POS: 002: wdim,ls',wdim,ls
       nvefm=2+kg*3
       nvesm=5+kg*9
       call sdepth(wdim,ls)
 c***  print *,'detqn:  POS: 003: wdim,ls',wdim,ls
-      if(ls.le.2) then
+      if(ls<=2) then
 c***    print *,'detqn:  POS: 004'
         r10=4.5d-4*(fl+.5d0)/wdim
-        if(r10.lt.r(2)) then
+        if(r10<r(2)) then
           r(1)=r10
           g(1)=rho(1)*r(1)*1.333333333333333d0
           ls=1
         end if
       end if
-      if(ls.le.nic) then
+      if(ls<=nic) then
 c*** propagate through inner core ***
 c***    print *,'detqn:  POS: 005'
         call spsm(ls,nvesm,ass)
-        call sprpmn(ls,nic,ass,vf,nvesm,iexp,error_flag)
+        call sprpmn(ls,nic,ass,vf,nvesm,iexp)
+        if(error_flag) return
         r(1)=0.d0
         g(1)=0.d0
         call sfbm(ass,kg,iback)
       end if
-      if(ls.le.noc) then
+      if(ls<=noc) then
 c*** propagate through outer core ***
 c***    print *,'detqn:  POS: 006'
         is=max(ls,nicp1)
-        if(is.eq.ls) call fpsm(ls,nvefm,ass)
+        if(is==ls) call fpsm(ls,nvefm,ass)
         call fprpmn(is,noc,ass,vf,nvefm,iexp)
+        if(error_flag) return
         call fsbm(ass,kg,iback)
       end if
       is=max(ls,nocp1)
-      if(is.eq.ls) call spsm(ls,nvesm,ass)
+      if(is==ls) call spsm(ls,nvesm,ass)
 c*** propagate through mantle ***
 c***  print *,'detqn:  POS: 007'
-      call sprpmn(is,nsl,ass,vf,nvesm,iexp,error_flag)
-      if(nsl.eq.n) then
+      call sprpmn(is,nsl,ass,vf,nvesm,iexp)
+      if(error_flag) return
+      if(nsl==n) then
 c***    print *,'detqn:  POS: 008'
         dnorm=a(1,nsl)*a(1,nsl)
         do i=2,nvesm
@@ -873,7 +705,8 @@ c***    print *,'detqn:  POS: 009'
         call sfbm(ass,kg,iback)
 c*** propagate through ocean ***
         call fprpmn(nslp1,n,ass,vf,nvefm,iexp)
-        if(kg.eq.0) then
+        if(error_flag) return
+        if(kg==0) then
            det=a(2,n)/sqrt(a(1,n)*a(1,n)+a(2,n)*a(2,n))
         else
           det=a(5,n)/sqrt(a(1,n)**2+a(2,n)**2+a(3,n)**2+
@@ -881,17 +714,17 @@ c*** propagate through ocean ***
         end if
       end if
 c***  print *,'detqn:  POS: 010'
-      if(ls.gt.noc) det=-det
-      if(knsw.eq.1) then
-        if(ls.gt.noc) kount=kount-2
+      if(ls>noc) det=-det
+      if(knsw==1) then
+        if(ls>noc) kount=kount-2
         irem=mod(kount,2)
-        if(irem.eq.0.and.det.lt.0.d0) kount=kount+1
-        if(irem.ne.0.and.det.gt.0.d0) kount=kount+1
+        if(irem==0.and.det<0.d0) kount=kount+1
+        if(irem/=0.and.det>0.d0) kount=kount+1
         knt=kount
       end if
 c***  print *,'detqn:  POS: 011'
 c***  if(ifeif.eq.0) print *,'detqn:  POS: 012: returning'
-      if(ifeif.eq.0) return
+      if(ifeif==0) return
 c*** this does eigenfunction calculation for spheroidal modes ***
       iback=1
       jexp=0
@@ -900,47 +733,53 @@ c*** this does eigenfunction calculation for spheroidal modes ***
       do i=1,nbaks
         ass(i)=0.d0
       enddo
-      if(n.ne.nsl) then
-        if(kg.eq.0) then
+      if(n/=nsl) then
+        if(kg==0) then
           ass(1)=dsign(1.d0,a(1,n))
         else
           asi1=a(3,n)*a(3,n)
           asi2=a(4,n)*a(4,n)
-          if(asi2.le.asi1) ass(1)=dsign(1.d0,a(3,n))
-          if(asi2.gt.asi1) ass(2)=dsign(1.d0,a(2,n))
+          if(asi2<=asi1) ass(1)=dsign(1.d0,a(3,n))
+          if(asi2>asi1) ass(2)=dsign(1.d0,a(2,n))
         end if
         call fprpmn(n,nslp1,ass,vf,nbakf,jexp)
+        if(error_flag) return
         call fsbm(ass,kg,iback)
       else
         asi1=a(3,n)*a(3,n)
         asi2=a(4,n)*a(4,n)
-        if(kg.ne.0) then
+        if(kg/=0) then
           asi1=asi1+a(12,n)*a(12,n)
           asi2=asi2+a(11,n)*a(11,n)
         end if
-        if(asi2.le.asi1) ass(1)=dsign(1.d0,a(3,n))
-        if(asi2.gt.asi1) ass(2)=dsign(1.d0,a(2,n))
+        if(asi2<=asi1) ass(1)=dsign(1.d0,a(3,n))
+        if(asi2>asi1) ass(2)=dsign(1.d0,a(2,n))
       end if
       nto=max(ls,nocp1)
-      call sprpmn(nsl,nto,ass,vf,nbaks,jexp,error_flag)
-      if(nto.eq.ls) goto 90
+      call sprpmn(nsl,nto,ass,vf,nbaks,jexp)
+      if(error_flag) return
+      if(nto==ls) goto 90
       call sfbm(ass,kg,iback)
       nto=max(ls,nicp1)
       call fprpmn(noc,nto,ass,vf,nbakf,jexp)
-      if(nto.eq.ls) goto 90
+      if(error_flag) return
+      if(nto==ls) goto 90
       call fsbm(ass,kg,iback)
       nto=max(ls,2)
-      call sprpmn(nic,nto,ass,vf,nbaks,jexp,error_flag)
-   90 if(dabs(det).gt.1.d-4.and.ls.le.noc) call remedy(ls)
+      call sprpmn(nic,nto,ass,vf,nbaks,jexp)
+      if(error_flag) return
+   90 if(dabs(det)>1.d-4.and.ls<=noc) call remedy(ls)
+      if(error_flag) return
       call eifout(ls)
       return
 c*** radial modes ***
     2 ls=2
       call rps(ls,ass)
       call rprop(ls,n,ass)
+      if(error_flag) return
       det=a(2,n)/dsqrt(a(1,n)*a(1,n)+a(2,n)*a(2,n))
       knt=kount-1
-      if(ifeif.eq.0) return
+      if(ifeif==0) return
       a(1,1)=0.d0
       a(2,1)=0.d0
       do i=ls,n
@@ -953,7 +792,7 @@ c*** radial modes ***
       zi(3)=0.d0
       do i=ls,n
         im=i-1
-        if(r(i).ne.r(im)) call gauslv(r(im),r(i),im,zi,3)
+        if(r(i)/=r(im)) call gauslv(r(im),r(i),im,zi,3)
       enddo
       rnrm=1.d0/(w*dsqrt(zi(1)))
       cg=0.d0
@@ -966,7 +805,7 @@ c*** radial modes ***
       enddo
       return
 c*** toroidal modes ***
-    3 if(jcom.eq.2) then
+    3 if(jcom==2) then
         nb=nocp1
         n2=nsl
         ass(1)=1.d0
@@ -980,26 +819,26 @@ c*** toroidal modes ***
       q=0.d0
       ls=nb
       call startl(ls,n2,fmu,ls,q)
-      if(ls.ne.nocp1) call tps(ls,ass)
+      if(ls/=nocp1) call tps(ls,ass)
       call tprop(ls,n2,ass)
+      if(error_flag) return
       det=a(2,n2)/dsqrt(a(1,n2)*a(1,n2)+a(2,n2)*a(2,n2))
-      if(knsw.eq.1) then
+      if(knsw==1) then
         knt=kount-2
-        if(jcom.ne.4) then
-          if(l.ne.1) then
+        if(jcom/=4) then
+          if(l/=1) then
             knt=knt+1
-            irem=mod(knt,2
-      logical :: error_flag)
-            if(irem.eq.0.and.det.gt.0.d0) knt=knt+1
-            if(irem.ne.0.and.det.lt.0.d0) knt=knt+1
+            irem=mod(knt,2)
+            if(irem==0.and.det>0.d0) knt=knt+1
+            if(irem/=0.and.det<0.d0) knt=knt+1
           end if
         end if
       end if
-      if(ifeif.eq.0) return
+      if(ifeif==0) return
       do i=ls,n2
         a(2,i)=a(1,i)/r(i)+a(2,i)/(lcon(i)*(1.d0+qshear(i)*fct))
       enddo
-      if(ls.ne.nb) then
+      if(ls/=nb) then
         do i=nb,ls-1
           a(1,i)=0.d0
           a(2,i)=0.d0
@@ -1010,7 +849,7 @@ c*** toroidal modes ***
       enddo
       do i=ls,n2
         im=i-1
-        if(r(i).ne.r(im)) call gauslv(r(im),r(i),im,zi,4)
+        if(r(i)/=r(im)) call gauslv(r(im),r(i),im,zi,4)
       enddo
       rnrm=1.d0/(w*dsqrt(zi(1)))
       cg=(fl+0.5d0)*zi(2)/(w*zi(1))
@@ -1024,12 +863,12 @@ c*** toroidal modes ***
       return
       end subroutine detqn
 
-      subroutine sprpmn(jf,jl,f,h,nvesm,iexp,error_flag)
+      subroutine sprpmn(jf,jl,f,h,nvesm,iexp)
 c*** propagate a minor vector in a solid region from level jf to jl ***
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       parameter (mk=350)
       save
-      real*8 lcon,ncon,lspl,nspl
+      real(kind=8) lcon,ncon,lspl,nspl
       common r(mk),fmu(mk),flam(mk),qshear(mk),qkappa(mk),
      + xa2(mk),xlam(mk),rho(mk),qro(3,mk),g(mk),qg(3,mk),
      + fcon(mk),fspl(3,mk),lcon(mk),lspl(3,mk),ncon(mk),
@@ -1042,20 +881,21 @@ c*** propagate a minor vector in a solid region from level jf to jl ***
       data econst/1048576.d0/
       
 c     ------ Dorian Edits ------
-      parameter (count_max=1000)
-      logical :: error_flag
+      logical error_flag
+      common/error/start_time,cur_time,run_time,run_lim,error_flag
+      parameter (count_max=10000)
       integer :: count
       count=0
 c     ------ Dorian Edits ------
       maxo1=maxo-1
       jud=1
-      if(jl.lt.jf) jud=-1
+      if(jl<jf) jud=-1
       y=r(jf)
       i=jf
       go to 45
    10 x=y
       y=r(i)
-      if(y.eq.x) goto 45
+      if(y==x) goto 45
       iq=min(i,i-jud)
       qff=1.d0+xlam(iq)*fct
       qll=1.d0+qshear(iq)*fct
@@ -1072,9 +912,9 @@ c     ------ Dorian Edits ------
       del=float(jud)*step(maxo)/q
       dxs=0.d0
    15   y=x+del
-        if(float(jud)*(y-r(i)).gt.0.d0) y=r(i)
+        if(float(jud)*(y-r(i))>0.d0) y=r(i)
         dx=y-x
-        if(dx.ne.dxs) call baylis(q,maxo1)
+        if(dx/=dxs) call baylis(q,maxo1)
         dxs=dx
         do j=1,nvesm
           s(j)=f(j)
@@ -1084,44 +924,41 @@ c     ------ Dorian Edits ------
           call derms(iq,z,f,h(1,ni),0,qff,qll,qaa)
           call rkdot(f,s,h,nvesm,ni)
         enddo
-        if(knsw.eq.1) then
+        if(knsw==1) then
           call derms(iq,y,f,fp,1,qff,qll,qaa)
           call zknt(s,h,f,fp,x,y,1)
         end if
         x=y
         
-        call cpu_time(cur_time)
-      run_time=cur_time-start_time
       count=count+1
-      if (count.gt.count_max) then
-c***          print *, run_time
-            error_flag = .true.
-            return
+      if (count>count_max) then
+          !print *,'failed sprpmn'
+          error_flag = .true.
+          return
       end if
         
-        if(y.ne.r(i)) goto 15
+        if(y/=r(i)) goto 15
    45 size=abs(f(1))
       do j=2,nvesm
         size=max(size,dabs(f(j)))
       enddo
-   55 if(size.lt.1024.d0) goto 65
+   55 if(size<1024.d0) goto 65
       do j=1,nvesm
         f(j)=f(j)/econst
       enddo
       size=size/econst
       iexp=iexp+20
       
-      ! Dorian
       count=count+1
-      if (count.gt.count_max) then
-c***          print *, run_time
-            error_flag = .true.
-            return
+      if (count>count_max) then
+          !print *,'failed sprpmn'
+          error_flag = .true.
+          return
       end if
       goto 55
-   65 if(iback.ne.0) then
+   65 if(iback/=0) then
         inorm(i)=inorm(i)+iexp
-        if(kg.ne.0) then
+        if(kg/=0) then
           t1=f(4)+f(8)
           t2=t1+f(4)
           t1=t1+f(8)
@@ -1159,17 +996,20 @@ c***          print *, run_time
           ar(j,i)=f(j)
         enddo
       end if
-      if(i.eq.jl) return
+      if(i==jl) then
+        !print *, 'sprpmn count',count
+        return
+      endif
       i=i+jud
       go to 10
       end subroutine sprpmn
 
       subroutine fprpmn(jf,jl,f,h,nvefm,iexp)
 c*** propagate the minor vector in a fluid region from level jf to jl ***
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       parameter (mk=350)
       save
-      real*8 lcon,ncon,lspl,nspl
+      real(kind=8) lcon,ncon,lspl,nspl
       common r(mk),fmu(mk),flam(mk),qshear(mk),qkappa(mk),
      + xa2(mk),xlam(mk),rho(mk),qro(3,mk),g(mk),qg(3,mk),
      + fcon(mk),fspl(3,mk),lcon(mk),lspl(3,mk),ncon(mk),
@@ -1180,7 +1020,16 @@ c*** propagate the minor vector in a fluid region from level jf to jl ***
       common/shanks/b(46),c(10),dx,step(8),stepf,maxo,in
       dimension f(*),h(nvefm,1),s(5),fp(5)
       data econst/1048576.d0/
-      if(nvefm.eq.1) then
+
+c     ------ Dorian Edits ------
+      logical error_flag
+      common/error/start_time,cur_time,run_time,run_lim,error_flag
+      parameter (count_max=200)
+      integer :: count
+      count=0
+c     ------ Dorian Edits ------
+
+      if(nvefm==1) then
         do i=jl,jf
           inorm(i)=inorm(i)+iexp
           do j=1,2
@@ -1191,13 +1040,13 @@ c*** propagate the minor vector in a fluid region from level jf to jl ***
       end if
       maxo1=maxo-1
       jud=1
-      if(jl.lt.jf) jud=-1
+      if(jl<jf) jud=-1
       y=r(jf)
       i=jf
       go to 45
    10 x=y
       y=r(i)
-      if(y.eq.x) goto 45
+      if(y==x) goto 45
       iq=min(i,i-jud)
       qff=1.d0+xlam(iq)*fct
       xi=g(i)/y
@@ -1206,9 +1055,9 @@ c*** propagate the minor vector in a fluid region from level jf to jl ***
       del=float(jud)*step(maxo)/q
       dxs=0.d0
    15   y=x+del
-        if(float(jud)*(y-r(i)).gt.0.d0) y=r(i)
+        if(float(jud)*(y-r(i))>0.d0) y=r(i)
         dx=y-x
-        if(dx.ne.dxs) call baylis(q,maxo1)
+        if(dx/=dxs) call baylis(q,maxo1)
         dxs=dx
         do j=1,nvefm
           s(j)=f(j)
@@ -1218,25 +1067,42 @@ c*** propagate the minor vector in a fluid region from level jf to jl ***
           call dermf(iq,z,f,h(1,ni),0,qff)
           call rkdot(f,s,h,nvefm,ni)
         enddo
-        if(knsw.eq.1) then
+        if(knsw==1) then
           call dermf(iq,y,f,fp,1,qff)
           call zknt(s,h,f,fp,x,y,0)
         end if
         x=y
-        if(y.ne.r(i)) go to 15
+
+        ! Dorian
+        count=count+1
+        if (count>count_max) then
+          !print *,'failed fprpmn'
+          error_flag = .true.
+          return
+        end if
+
+        if(y/=r(i)) go to 15
    45 size=dabs(f(1))
       do j=2,nvefm
         size=dmax1(size,dabs(f(j)))
       enddo
-   55 if(size.lt.1024.d0) goto 65
+   55 if(size<1024.d0) goto 65
       do j=1,nvefm
         f(j)=f(j)/econst
       enddo
       size=size/econst
       iexp=iexp+20
-      
+
+      ! Dorian
+        count=count+1
+        if (count>count_max) then
+          !print *,'failed fprpmn'
+          error_flag = .true.
+          return
+        end if
+
       goto 55
-   65 if(iback.ne.0) then
+   65 if(iback/=0) then
         inorm(i)=inorm(i)+iexp
         rne2   =-ar(1,i)*f(4)+ar(4,i)*f(2)+ar(2,i)*f(1)
         ar(1,i)=-ar(1,i)*f(3)+ar(2,i)*f(2)-ar(3,i)*f(1)
@@ -1250,17 +1116,21 @@ c*** propagate the minor vector in a fluid region from level jf to jl ***
           ar(j,i)=f(j)
         enddo
       end if
-      if(i.eq.jl) return
+      if(i==jl) then
+        !print *, 'fprpmn count',count
+        return
+      endif
       i=i+jud
+
       go to 10
       end
 
       subroutine derms(iq,z,f,fp,iknt,qff,qll,qaa)
 c*** calculates minor vector derivative (fp) in a solid ***
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       parameter (mk=350)
       save
-      real*8 nn,ll,lcon,ncon,lspl,nspl
+      real(kind=8) nn,ll,lcon,ncon,lspl,nspl
       common r(mk),fmu(mk),flam(mk),qshear(mk),qkappa(mk),
      + xa2(mk),xlam(mk),rho(mk),qro(3,mk),g(mk),qg(3,mk),
      + fcon(mk),fspl(3,mk),lcon(mk),lspl(3,mk),ncon(mk),
@@ -1268,8 +1138,8 @@ c*** calculates minor vector derivative (fp) in a solid ***
       common/bits/pi,rn,vn,wn,w,wsq,wray,qinv,cg,wgrav,tref,fct,eps,fl,
      +  fl1,fl2,fl3,sfl3,jcom,nord,l,kg,kount,knsw,ifanis,iback
       dimension f(*),fp(*)
-      if(iknt.ne.0) then
-        if(kg.eq.0) then
+      if(iknt/=0) then
+        if(kg==0) then
           fp(3)=s22*f(1)-2.d0*t12*f(2)+b33*f(3)+c11*f(5)
           fp(4)=-s11*f(1)+2.d0*t21*f(2)-b33*f(4)-c22*f(5)
           fp(5)=-2.d0*s12*f(2)+s11*f(3)-s22*f(4)-b11*f(5)
@@ -1282,7 +1152,7 @@ c*** calculates minor vector derivative (fp) in a solid ***
         return
       end if
       t=z-r(iq)
-      if(t.eq.0.d0) then
+      if(t==0.d0) then
         ro=rho(iq)
         gr=g(iq)
         ff=fcon(iq)*qff
@@ -1295,7 +1165,7 @@ c*** calculates minor vector derivative (fp) in a solid ***
         gr=g(iq)+t*(qg(1,iq)+t*(qg(2,iq)+t*qg(3,iq)))
         ff=(fcon(iq)+t*(fspl(1,iq)+t*(fspl(2,iq)+t*fspl(3,iq))))*qff
         ll=(lcon(iq)+t*(lspl(1,iq)+t*(lspl(2,iq)+t*lspl(3,iq))))*qll
-        if(ifanis.eq.0) then
+        if(ifanis==0) then
           nn=ll
           cc=ff+ll+ll
           aa=cc
@@ -1320,9 +1190,9 @@ c*** calculates minor vector derivative (fp) in a solid ***
       s11=s22+4.d0*zr*(zdmg-rogr)
       s22=s22+zr*zr*(fl3*(dmg+nn)-nn-nn)
       s12=sfl3z*(rogr-zdmg-zdmg)
-      if(kg.eq.0) then
+      if(kg==0) then
         s11=s11+4.d0*ro*ro
-        if(iback.eq.0) then
+        if(iback==0) then
           b11=t11+t22
           b33=t11-t22
           fp(1)=b11*f(1)+c22*f(3)-c11*f(4)
@@ -1341,7 +1211,7 @@ c*** calculates minor vector derivative (fp) in a solid ***
         t33=-fl*zr
         s13=-fl1*zr*ro
         s23=ro*sfl3z
-        if(iback.eq.0) then
+        if(iback==0) then
           b11=t11+t22-t33
           b33=t11-t22-t33
           b44=t22-t11-t33
@@ -1404,10 +1274,10 @@ c*** calculates minor vector derivative (fp) in a solid ***
 
       subroutine dermf(iq,z,f,fp,iknt,qff)
 c*** calculates minor vector derivative (fp) in a fluid ***
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       parameter (mk=350)
       save
-      real*8 lcon,ncon,lspl,nspl
+      real(kind=8) lcon,ncon,lspl,nspl
       common r(mk),fmu(mk),flam(mk),qshear(mk),qkappa(mk),
      + xa2(mk),xlam(mk),rho(mk),qro(3,mk),g(mk),qg(3,mk),
      + fcon(mk),fspl(3,mk),lcon(mk),lspl(3,mk),ncon(mk),
@@ -1415,8 +1285,8 @@ c*** calculates minor vector derivative (fp) in a fluid ***
       common/bits/pi,rn,vn,wn,w,wsq,wray,qinv,cg,wgrav,tref,fct,eps,fl,
      +  fl1,fl2,fl3,sfl3,jcom,nord,l,kg,kount,knsw,ifanis,iback
       dimension f(*),fp(*)
-      if(iknt.ne.0) then
-        if(kg.eq.0) then
+      if(iknt/=0) then
+        if(kg==0) then
           fp(1)=t11*f(1)+c11*f(2)
           fp(2)=(s11-t21*ro)*f(1)-t11*f(2)
         else
@@ -1427,7 +1297,7 @@ c*** calculates minor vector derivative (fp) in a fluid ***
         return
       end if
       t=z-r(iq)
-      if(t.eq.0.d0) then
+      if(t==0.d0) then
         ro=rho(iq)
         flu=fcon(iq)*qff
         gr=g(iq)
@@ -1442,7 +1312,7 @@ c*** calculates minor vector derivative (fp) in a fluid ***
       t11=gr*t12-zr
       s11=ro*(gr*gr*t12-wsq)+t21*gr*zr
       c11=-t12/ro+1.d0/flu
-      if(kg.eq.0) then
+      if(kg==0) then
         fp(1)=t11*f(1)+c11*f(2)
         fp(2)=(s11-t21*ro)*f(1)-t11*f(2)
       else
@@ -1450,7 +1320,7 @@ c*** calculates minor vector derivative (fp) in a fluid ***
         s22=ro*t12
         b11=t11+t22
         s12=ro*b11
-        if(iback.eq.0) then
+        if(iback==0) then
           b33=t11-t22
           fp(1)=b11*f(1)+4.d0*f(3)-c11*f(4)
           fp(2)=s12*f(1)-t21*f(3)+t12*f(4)
@@ -1469,10 +1339,10 @@ c*** calculates minor vector derivative (fp) in a fluid ***
 
       subroutine eifout(lsmin)
 c*** massages spheroidal mode eigenfunctions before output ***
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       parameter (mk=350)
       save
-      real*8 ll,lcon,ncon,lspl,nspl
+      real(kind=8) ll,lcon,ncon,lspl,nspl
       common r(mk),fmu(mk),flam(mk),qshear(mk),qkappa(mk),
      + xa2(mk),xlam(mk),rho(mk),qro(3,mk),g(mk),qg(3,mk),
      + fcon(mk),fspl(3,mk),lcon(mk),lspl(3,mk),ncon(mk),
@@ -1484,7 +1354,7 @@ c*** massages spheroidal mode eigenfunctions before output ***
       dimension zi(4)
       i1=min0(nic,max0(2,lsmin))
       i2=nic
-    5 if(i1.eq.i2) goto 20
+    5 if(i1==i2) goto 20
       do iq=i1,i2
         ff=fcon(iq)*(1.d0+xlam(iq)*fct)
         ll=lcon(iq)*(1.d0+qshear(iq)*fct)
@@ -1492,7 +1362,7 @@ c*** massages spheroidal mode eigenfunctions before output ***
         sfl3z=sfl3*zr
         d=1.d0/(ccon(iq)*(1.d0+xa2(iq)*fct))
         v=a(2,iq)
-        if(kg.eq.0) then
+        if(kg==0) then
           a(2,iq)=(zr-2.d0*ff*d*zr)*a(1,iq)+sfl3z*ff*d*v+d*a(3,iq)
           a(4,iq)=-sfl3z*a(1,iq)+(zr+zr)*v+a(4,iq)/ll
           a(5,iq)=0.d0
@@ -1505,18 +1375,18 @@ c*** massages spheroidal mode eigenfunctions before output ***
         end if
         a(3,iq)=v
       enddo
-   20 if(i2.eq.nsl) goto 25
+   20 if(i2==nsl) goto 25
       i1=min(nsl,max(lsmin,nocp1))
       i2=nsl
       goto 5
    25 i1=min(noc,max(lsmin,nicp1))
       i2=noc
-   30 if(i1.eq.i2) goto 50
+   30 if(i1==i2) goto 50
       do iq=i1,i2
         zr=1.d0/r(iq)
         sfl3z=sfl3*zr
         ffi=1.d0/(flam(iq)*(1.d0+xlam(iq)*fct))
-        if(kg.eq.0) then
+        if(kg==0) then
           p=a(2,iq)
           a(5,iq)=0.d0
           a(6,iq)=0.d0
@@ -1529,7 +1399,7 @@ c*** massages spheroidal mode eigenfunctions before output ***
         a(2,iq)=sfl3z*a(3,iq)-a(1,iq)*zr+p*ffi
         a(4,iq)=sfl3z*(a(1,iq)+p*(qro(1,iq)/(rho(iq)**2)+g(iq)*ffi)/wsq)
       enddo
-   50 if(n.eq.nsl.or.i2.eq.n) goto 55
+   50 if(n==nsl.or.i2==n) goto 55
       i1=nslp1
       i2=n
       goto 30
@@ -1540,7 +1410,7 @@ c*** massages spheroidal mode eigenfunctions before output ***
       do iq=lsmin,n
         iexp=inorm(iq)-imax
         al=0.d0
-        if(iexp.ge.-80) al=2.d0**iexp
+        if(iexp>=-80) al=2.d0**iexp
         do j=1,6
           a(j,iq)=a(j,iq)*al
         enddo
@@ -1551,7 +1421,7 @@ c*** massages spheroidal mode eigenfunctions before output ***
           a(j,i)=0.d0
         enddo
       enddo
-      if(l.gt.1.or.lsmin.gt.2) goto 75
+      if(l>1.or.lsmin>2) goto 75
       a(2,1)=1.5d0*a(1,2)/r(2)-.5d0*a(2,2)
       a(4,1)=1.5d0*a(3,2)/r(2)-.5d0*a(4,2)
    75 do j=1,4
@@ -1560,7 +1430,7 @@ c*** massages spheroidal mode eigenfunctions before output ***
       i1=max0(lsmin,2)
       do iq=i1,n
         ip=iq-1
-        if(r(iq).ne.r(ip)) call gauslv(r(ip),r(iq),ip,zi,4)
+        if(r(iq)/=r(ip)) call gauslv(r(ip),r(iq),ip,zi,4)
       enddo
       cg=zi(2)/(w*zi(1))
       wray=dsqrt(2.d0*zi(4)/zi(1))
@@ -1581,8 +1451,8 @@ c*** massages spheroidal mode eigenfunctions before output ***
         a(5,iq)=a(5,iq)*rnorm
         a(6,iq)=a(6,iq)*rnorm
       enddo
-      if(lsmin.gt.2.or.l.gt.2) return
-      if(l.eq.1) then
+      if(lsmin>2.or.l>2) return
+      if(l==1) then
         a(1,1)=a(1,2)-.5d0*a(2,2)*r(2)
         a(2,1)=0.d0
         a(3,1)=a(3,2)-.5d0*a(4,2)*r(2)
@@ -1597,7 +1467,7 @@ c*** massages spheroidal mode eigenfunctions before output ***
 
       subroutine gauslv(r1,r2,iq,fint,nint)
 c*** fifth order gauss-legendre integration ***
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       save
       dimension fint(*),vals(4),vals1(4),sum(4),w(2),x(2)
       data w,x/.478628670499366d0,.236926885056189d0,
@@ -1624,10 +1494,10 @@ c*** fifth order gauss-legendre integration ***
 
       subroutine sdepth(wdim,ls)
 c*** finds starting level,ls, for a given l and w ***
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       parameter (mk=350)
       save
-      real*8 lcon,ncon,lspl,nspl
+      real(kind=8) lcon,ncon,lspl,nspl
       common r(mk),fmu(mk),flam(mk),qshear(mk),qkappa(mk),
      + xa2(mk),xlam(mk),rho(mk),qro(3,mk),g(mk),qg(3,mk),
      + fcon(mk),fspl(3,mk),lcon(mk),lspl(3,mk),ncon(mk),
@@ -1639,31 +1509,31 @@ c*** finds starting level,ls, for a given l and w ***
       q=0.d0
       w=wdim/wn
       wsoc=aw+dw*fl
-      if(wdim.gt.wsoc) goto 10
+      if(wdim>wsoc) goto 10
       call startl(nocp1,nsl,fmu,ls,q)
-      if(ls.eq.nsl) ls=ls-1
-      if(ls.gt.nocp1) return
+      if(ls==nsl) ls=ls-1
+      if(ls>nocp1) return
    10 wsic=aw+bw*fl
-      if(wdim.gt.wsic) goto 20
+      if(wdim>wsic) goto 20
       call startl(nicp1,noc,flam,ls,q)
-      if(ls.eq.noc) ls=ls-1
-      if(ls.gt.nicp1) return
+      if(ls==noc) ls=ls-1
+      if(ls>nicp1) return
    20 call startl(2,nic,fmu,ls,q)
-      if(ls.eq.nic) ls=ls-1
+      if(ls==nic) ls=ls-1
       return
       end
 
       subroutine sfbm(ass,kg,iback)
 c*** convert minor vector at a solid/fluid boundary ***
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       save
       dimension ass(14),as(14)
       do j=1,14
         as(j)=ass(j)
         ass(j)=0.d0
       enddo
-      if(iback.ne.1) then
-        if(kg.eq.0) then
+      if(iback/=1) then
+        if(kg==0) then
           ass(1)=as(3)
           ass(2)=as(5)
         else
@@ -1674,7 +1544,7 @@ c*** convert minor vector at a solid/fluid boundary ***
           ass(5)=as(5)
         end if
       else
-        if(kg.eq.0) then
+        if(kg==0) then
           ass(1)=-as(3)
         else
           ass(1)=as(7)
@@ -1688,15 +1558,15 @@ c*** convert minor vector at a solid/fluid boundary ***
 
       subroutine fsbm(ass,kg,iback)
 c*** convert minor vector at a fluid/solid boundary ***
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       save
       dimension ass(14),as(14)
       do j=1,14
         as(j)=ass(j)
         ass(j)=0.d0
       end do
-      if(iback.ne.1) then
-        if(kg.eq.0) then
+      if(iback/=1) then
+        if(kg==0) then
           ass(1)=as(1)
           ass(4)=-as(2)
         else
@@ -1707,7 +1577,7 @@ c*** convert minor vector at a fluid/solid boundary ***
           ass(4)=-as(5)
         end if
       else
-        if(kg.eq.0) then
+        if(kg==0) then
           ass(1)=-as(1)
         else
           ass(1)=-as(1)
@@ -1721,12 +1591,12 @@ c*** convert minor vector at a fluid/solid boundary ***
 
       subroutine zknt(s,sp,f,fp,x,y,ifsol)
 c*** given minor vector and derivs,constructs mode count ***
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       save
       common/bits/pi,rn,vn,wn,w,wsq,wray,qinv,cg,wgrav,tref,fct,eps,fl,
      +  fl1,fl2,fl3,sfl3,jcom,nord,l,kg,kount,knsw,ifanis,iback
       dimension s(*),sp(*),f(*),fp(*),xs(4),val(4)
-      if(ifsol.eq.0.and.kg.eq.0) goto 5
+      if(ifsol==0.and.kg==0) goto 5
       y1=s(5)
       y2=f(5)
       y1p=sp(5)
@@ -1746,7 +1616,7 @@ c*** given minor vector and derivs,constructs mode count ***
       t2p=fp(1)
    10 h=y-x
       ns=0
-      if(kount.ne.0) goto 15
+      if(kount/=0) goto 15
       a1=y2-y1
       a2=0.d0
       a3=0.d0
@@ -1758,31 +1628,31 @@ c*** given minor vector and derivs,constructs mode count ***
       a3=h*(y1p+y2p)-2.d0*(y2-y1)
       a33=3.d0*a3
       a22=2.d0*a2
-      if(a3.ne.0.d0) goto 20
-      if(a2.eq.0.d0) goto 50
+      if(a3/=0.d0) goto 20
+      if(a2==0.d0) goto 50
       xs(2)=-a1/a22
-      if(xs(2).ge.0.d0.and.xs(2).le.1.d0) ns=1
+      if(xs(2)>=0.d0.and.xs(2)<=1.d0) ns=1
       goto 50
    20 disc=a2*a2-a1*a33
       if(disc) 50,25,30
    25 xs(2)=-a2/a33
-      if(xs(2).ge.0.d0.and.xs(2).le.1.d0) ns=1
+      if(xs(2)>=0.d0.and.xs(2)<=1.d0) ns=1
       goto 50
    30 disc=dsqrt(disc)
       tr1=(-a2+disc)/a33
       tr2=(-a2-disc)/a33
-      if(dabs(a33).gt.dabs(a1)) goto 35
+      if(dabs(a33)>dabs(a1)) goto 35
       fac=a1/a33
       tr1=fac/tr1
       tr2=fac/tr2
-   35 if(tr1.lt.0.d0.or.tr1.gt.1.d0) goto 40
+   35 if(tr1<0.d0.or.tr1>1.d0) goto 40
       xs(2)=tr1
       ns=1
-   40 if(tr2.lt.0.d0.or.tr2.gt.1.d0) goto 50
+   40 if(tr2<0.d0.or.tr2>1.d0) goto 50
       ns=ns+1
       xs(ns+1)=tr2
-      if(ns.lt.2) goto 50
-      if(tr2.ge.tr1) goto 50
+      if(ns<2) goto 50
+      if(tr2>=tr1) goto 50
       xs(2)=tr2
       xs(3)=tr1
    50 val(1)=y1
@@ -1790,15 +1660,15 @@ c*** given minor vector and derivs,constructs mode count ***
       ns2=ns+2
       val(ns2)=y2
       xs(ns2)=1.d0
-      if(ns.eq.0) goto 60
+      if(ns==0) goto 60
       ns1=ns+1
       do 55 j=2,ns1
       t=xs(j)
    55 val(j)=y1+t*(a1+t*(a2+t*a3))
    60 ift=0
       do 100 j=2,ns2
-      if(val(j-1)*val(j).gt.0.d0) goto 100
-      if(val(j-1).ne.0.d0) goto 65
+      if(val(j-1)*val(j)>0.d0) goto 100
+      if(val(j-1)/=0.d0) goto 65
       tes=t1*a1
       goto 90
    65 rt1=0.5d0*(xs(j-1)+xs(j))
@@ -1808,13 +1678,13 @@ c*** given minor vector and derivs,constructs mode count ***
       vp=a1+rt*(a22+rt*a33)
       add=-v/vp
       rt=rt+add
-      if(dabs(add).lt.1.d-5) goto 75
-      if(dabs(rt-rt1).le..5d0) goto 70
+      if(dabs(add)<1.d-5) goto 75
+      if(dabs(rt-rt1)<=.5d0) goto 70
       rt=rt1
       goto 75
    70 continue
-   75 if(ift.ne.0) goto 85
-      if(kount.ne.0) goto 80
+   75 if(ift/=0) goto 85
+      if(kount/=0) goto 80
       b1=t2-t1
       b2=0.d0
       b3=0.d0
@@ -1826,8 +1696,8 @@ c*** given minor vector and derivs,constructs mode count ***
    85 tes=t1+rt*(b1+rt*(b2+rt*b3))
       vp=a1+rt*(a22+rt*a33)
       tes=tes*vp
-   90 if(tes.lt.0.d0) kount=1+kount
-      if(tes.gt.0.d0) kount=kount-1
+   90 if(tes<0.d0) kount=1+kount
+      if(tes>0.d0) kount=kount-1
   100 continue
       return
       end
@@ -1838,12 +1708,12 @@ c    see e. baylis shanks(1966 a. m. s.) and references therein for the
 c    coefficients. the eight runge-kutta-shanks formulae are (1-1) (2-2)
 c    (3-3) (4-4) (5-5) (6-6) (7-7) (8-10). for orders greater than 4 the
 c    formulae are approximate rather than exact so incurring less roundoff.
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       save
       common/shanks/b(46),c(10),dx,step(8),stepf,maxo,i
       ds=q*dabs(dx)
       do 10 j=1,maxo1
-      if(ds.gt.step(j)) go to 10
+      if(ds>step(j)) go to 10
       i=j
       go to 15
    10 continue
@@ -2022,7 +1892,7 @@ c    formulae are approximate rather than exact so incurring less roundoff.
 
       subroutine grav(g,rho,qro,r,n)
 c*** given rho and spline coeffs,computes gravity ***
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       save
       dimension g(*),rho(*),qro(3,1),r(*)
       g(1)=0.d0
@@ -2047,10 +1917,10 @@ c*** finds start level between jf and jl using velocityv and ang. ord. l.
 c*** upon entry q is the value of the exponent at r(jf) or at the turning
 c*** point(q=0) depending on previous calls to startl. upon exit q is the
 c*** value of the exponent at the starting level ls.
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       parameter (mk=350)
       save
-      real*8 lcon,ncon,lspl,nspl
+      real(kind=8) lcon,ncon,lspl,nspl
       common r(mk),fmu(mk),flam(mk),qshear(mk),qkappa(mk),
      + xa2(mk),xlam(mk),rho(mk),qro(3,mk),g(mk),qg(3,mk),
      + fcon(mk),fspl(3,mk),lcon(mk),lspl(3,mk),ncon(mk),
@@ -2060,7 +1930,7 @@ c*** value of the exponent at the starting level ls.
       common/rindx/nic,noc,nsl,nicp1,nocp1,nslp1,n
       dimension rrlog(mk),p(mk),v(*)
       data ifirst/1/
-      if(ifirst.eq.1) then
+      if(ifirst==1) then
         ifirst=0
         vertno=-dlog(eps)
         do i=3,n
@@ -2069,15 +1939,15 @@ c*** value of the exponent at the starting level ls.
       end if
       do j=jf,jl
         pp=fl3-wsq*r(j)*r(j)*rho(j)/v(j)
-        if(pp.le.0.d0) goto 15
+        if(pp<=0.d0) goto 15
         p(j)=dsqrt(pp)
       enddo
    15 p(j)=0.d0
    20 k=j
       j=j-1
-      if(j.le.jf) go to 25
+      if(j<=jf) go to 25
       q=q+rrlog(k)*(p(j)+p(k))
-      if(q.lt.vertno) go to 20
+      if(q<vertno) go to 20
       ls=j
       return
    25 ls=jf
@@ -2086,7 +1956,7 @@ c*** value of the exponent at the starting level ls.
 
       subroutine steps(eps)
 c*** computes 8 dimensionless step sizes for rks integration
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       save
       common/shanks/b(46),c(10),dx,step(8),stepf,maxo,in
       ps=dlog(eps)
@@ -2106,7 +1976,7 @@ c*** computes 8 dimensionless step sizes for rks integration
       end
 
       subroutine drspln(i1,i2,x,y,q,f)
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       save
 c   rspln computes cubic spline interpolation coefficients
 c   for y(x) between grid points i1 and i2 saving them in q.  the
@@ -2216,7 +2086,7 @@ c   fini.
       end
 
       subroutine dsplin(n,x,y,q,f)
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       save
       dimension x(*),y(*),q(3,1),f(3,1),yy(3)
       equivalence (yy(1),y0)
@@ -2275,10 +2145,10 @@ c   fini.
 
       subroutine rprop(jf,jl,f)
 c*** propagates soln ,f, for radial modes from jf to jl ***
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       parameter (mk=350)
       save
-      real*8 lcon,ncon,lspl,nspl,nn
+      real(kind=8) lcon,ncon,lspl,nspl,nn
       common r(mk),fmu(mk),flam(mk),qshear(mk),qkappa(mk),
      + xa2(mk),xlam(mk),rho(mk),qro(3,mk),g(mk),qg(3,mk),
      + fcon(mk),fspl(3,mk),lcon(mk),lspl(3,mk),ncon(mk),
@@ -2287,6 +2157,8 @@ c*** propagates soln ,f, for radial modes from jf to jl ***
      +  fl1,fl2,fl3,sfl3,jcom,nord,l,kg,kount,knsw,ifanis,iback
       common/eifx/a(14,mk),dum(mk)
       common/shanks/b(46),c(10),dx,step(8),stepf,maxo,in
+      logical error_flag
+      common/error/start_time,cur_time,run_time,run_lim,error_flag
       dimension h(2,10),s(2),f(2)
       maxo1=maxo-1
       y=r(jf)
@@ -2294,12 +2166,12 @@ c*** propagates soln ,f, for radial modes from jf to jl ***
       i=jf
    10 a(1,i)=f(1)
       a(2,i)=f(2)
-      if(i.eq.jl) return
+      if(i==jl) return
       iq=i
       i=i+1
       x=y
       y=r(i)
-      if(y.eq.x) goto 10
+      if(y==x) goto 10
       qff=1.d0+xlam(iq)*fct
       qll=1.d0+qshear(iq)*fct
       qaa=1.d0+xa2(iq)*fct
@@ -2307,11 +2179,16 @@ c*** propagates soln ,f, for radial modes from jf to jl ***
       vy=sqrt((flam(i)+2.d0*fmu(i))/rho(i))
       q=max(w/vx+1.d0/x,w/vy+1.d0/y)
       del=step(maxo)/q
+      if(del<=0) then
+        !print *,'failed rprop'
+        error_flag=.true.
+        return
+      endif
       dxs=0.d0
    15   y=x+del
-        if(y.gt.r(i)) y=r(i)
+        if(y>r(i)) y=r(i)
         dx=y-x
-        if(dx.ne.dxs) call baylis(q,maxo1)
+        if(dx/=dxs) call baylis(q,maxo1)
         dxs=dx
         s(1)=f(1)
         s(2)=f(2)
@@ -2321,7 +2198,7 @@ c*** propagates soln ,f, for radial modes from jf to jl ***
           ro=rho(iq)+t*(qro(1,iq)+t*(qro(2,iq)+t*qro(3,iq)))
           gr=g(iq)+t*(qg(1,iq)+t*(qg(2,iq)+t*qg(3,iq)))
           ff=(fcon(iq)+t*(fspl(1,iq)+t*(fspl(2,iq)+t*fspl(3,iq))))*qff
-          if(ifanis.eq.0) then
+          if(ifanis==0) then
            nn=(lcon(iq)+t*(lspl(1,iq)+t*(lspl(2,iq)+t*lspl(3,iq))))*qll
            cc=ff+nn+nn
            aa=cc
@@ -2336,28 +2213,28 @@ c*** propagates soln ,f, for radial modes from jf to jl ***
           h(2,ni)=a21*f(1)+2.d0*z*f(2)*(ff/cc-1.d0)
           call rkdot(f,s,h,2,ni)
         enddo
-        if(knsw.eq.1) then
-          if(s(2)*f(2).le.0.d0) then
-            if(f(2).eq.0.d0) then
+        if(knsw==1) then
+          if(s(2)*f(2)<=0.d0) then
+            if(f(2)==0.d0) then
               tes=-s(2)*s(1)
             else
               tes=f(2)*s(1)-s(2)*f(1)
             endif
-            if(tes.lt.0.d0) kount=kount+1
-            if(tes.gt.0.d0) kount=kount-1
+            if(tes<0.d0) kount=kount+1
+            if(tes>0.d0) kount=kount-1
           end if
         end if
         x=y
-        if(y.ne.r(i)) go to 15
+        if(y/=r(i)) go to 15
       go to 10
       end
 
       subroutine tprop(jf,jl,f)
 c*** propagates f from jf to jl - toroidal modes ***
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       parameter (mk=350)
       save
-      real*8 lcon,ncon,lspl,nspl,nn,ll
+      real(kind=8) lcon,ncon,lspl,nspl,nn,ll
       common r(mk),fmu(mk),flam(mk),qshear(mk),qkappa(mk),
      + xa2(mk),xlam(mk),rho(mk),qro(3,mk),g(mk),qg(3,mk),
      + fcon(mk),fspl(3,mk),lcon(mk),lspl(3,mk),ncon(mk),
@@ -2366,30 +2243,42 @@ c*** propagates f from jf to jl - toroidal modes ***
      +  fl1,fl2,fl3,sfl3,jcom,nord,l,kg,kount,knsw,ifanis,iback
       common/eifx/a(14,mk),dum(mk)
       common/shanks/b(46),c(10),dx,step(8),stepf,maxo,in
+      logical error_flag
+      common/error/start_time,cur_time,run_time,run_lim,error_flag
       dimension h(2,10),s(2),f(2)
       fl3m2=fl3-2.d0
       maxo1=maxo-1
       y=r(jf)
       qy=1.d0/y+sqrt(abs(rho(jf)*wsq/fmu(jf)-fl3/(y*y)))
       i=jf
+      if(jf>jl) then
+        !print *,'failed tprop'
+        error_flag=.true.
+        return
+      endif
    10 a(1,i)=f(1)
       a(2,i)=f(2)
-      if(i.eq.jl) return
+      if(i==jl) return
       iq=i
       i=i+1
       x=y
       y=r(i)
-      if(y.eq.x) goto 10
+      if(y==x) goto 10
       qll=1.d0+qshear(iq)*fct
       qx=qy
       qy=1.d0/y+sqrt(abs(rho(i)*wsq/fmu(i)-fl3/(y*y)))
       q=max(qx,qy)
       del=step(maxo)/q
+      if(del<=0) then
+        !print *,'failed tprop'
+        error_flag=.true.
+        return
+      endif
       dxs=0.d0
    15   y=x+del
-        if(y.gt.r(i)) y=r(i)
+        if(y>r(i)) y=r(i)
         dx=y-x
-        if(dx.ne.dxs) call baylis(q,maxo1)
+        if(dx/=dxs) call baylis(q,maxo1)
         dxs=dx
         s(1)=f(1)
         s(2)=f(2)
@@ -2399,32 +2288,32 @@ c*** propagates f from jf to jl - toroidal modes ***
           ro=rho(iq)+t*(qro(1,iq)+t*(qro(2,iq)+t*qro(3,iq)))
           ll=(lcon(iq)+t*(lspl(1,iq)+t*(lspl(2,iq)+t*lspl(3,iq))))*qll
           nn=ll
-          if(ifanis.ne.0) nn=(ncon(iq)+
+          if(ifanis/=0) nn=(ncon(iq)+
      +        t*(nspl(1,iq)+t*(nspl(2,iq)+t*nspl(3,iq))))*qll
           z=1.d0/z
           h(1,ni)=z*f(1)+f(2)/ll
           h(2,ni)=(nn*fl3m2*z*z-ro*wsq)*f(1)-3.d0*z*f(2)
           call rkdot(f,s,h,2,ni)
         enddo
-        if(knsw.eq.1) then
-          if(s(2)*f(2).le.0.d0) then
-            if(f(2).eq.0.d0) then
+        if(knsw==1) then
+          if(s(2)*f(2)<=0.d0) then
+            if(f(2)==0.d0) then
               tes=-s(2)*s(1)
             else
               tes=f(2)*s(1)-s(2)*f(1)
             endif
-            if(tes.lt.0.d0) kount=kount+1
-            if(tes.gt.0.d0) kount=kount-1
+            if(tes<0.d0) kount=kount+1
+            if(tes>0.d0) kount=kount-1
           end if
         end if
         x=y
-        if(y.ne.r(i)) goto 15
+        if(y/=r(i)) goto 15
       go to 10
       end
 
       subroutine rkdot(f,s,h,nvec,ni)
 c*** performs dot product with rks coefficients ***
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       save
       common/shanks/b(46),c(10),dx,step(8),stepf,maxo,in
       dimension s(*),f(*),h(nvec,*)
@@ -2469,10 +2358,10 @@ c*** performs dot product with rks coefficients ***
 
       subroutine intgds(rr,iq,vals)
 c*** interpolates integrands for normalisation,cg,q etc..for use with gauslv.
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       parameter (mk=350)
       save
-      real*8 lcon,ncon,lspl,nspl,nn,ll
+      real(kind=8) lcon,ncon,lspl,nspl,nn,ll
       common r(mk),fmu(mk),flam(mk),qshear(mk),qkappa(mk),
      + xa2(mk),xlam(mk),rho(mk),qro(3,mk),g(mk),qg(3,mk),
      + fcon(mk),fspl(3,mk),lcon(mk),lspl(3,mk),ncon(mk),
@@ -2491,7 +2380,7 @@ c*** interpolates integrands for normalisation,cg,q etc..for use with gauslv.
       qll=1.d0+qshear(iq)*fct
       iq1=iq+1
       ifun=3
-      if(jcom.ne.3) ifun=1
+      if(jcom/=3) ifun=1
       do 10 i=1,ifun
       i2=2*i
       i1=i2-1
@@ -2503,7 +2392,7 @@ c*** interpolates integrands for normalisation,cg,q etc..for use with gauslv.
       gr=g(iq)+t*(qg(1,iq)+t*(qg(2,iq)+t*qg(3,iq)))
       ff=(fcon(iq)+t*(fspl(1,iq)+t*(fspl(2,iq)+t*fspl(3,iq))))*qff
       ll=(lcon(iq)+t*(lspl(1,iq)+t*(lspl(2,iq)+t*lspl(3,iq))))*qll
-      if(ifanis.ne.0) goto 15
+      if(ifanis/=0) goto 15
       nn=ll
       cc=ff+ll+ll
       aa=cc
@@ -2516,7 +2405,7 @@ c*** interpolates integrands for normalisation,cg,q etc..for use with gauslv.
      1     *(qkappa(iq)+t*hn*(qkappa(iq1)-qkappa(iq)))
       qrmu=d2*(aa+cc-2.d0*ff+5.d0*nn+6.d0*ll)
      1     *(qshear(iq)+t*hn*(qshear(iq1)-qshear(iq)))
-      if(jcom.ne.3) goto 25
+      if(jcom/=3) goto 25
       q1sq=q(1)*q(1)
       q2sq=q(2)*q(2)
       vals(1)=rr*rro*(q1sq+q2sq)
@@ -2540,7 +2429,7 @@ c*** interpolates integrands for normalisation,cg,q etc..for use with gauslv.
       return
    25 q(1)=q(1)*rr
       vals(1)=rr*rro*q(1)*q(1)
-      if(jcom.eq.1) goto 30
+      if(jcom==1) goto 30
       vals(2)=nn*q(1)*q(1)
       t1=(rr*qp(1)-q(1))**2
       t2=(fl3-2.d0)*q(1)*q(1)
@@ -2557,10 +2446,10 @@ c*** interpolates integrands for normalisation,cg,q etc..for use with gauslv.
 
       subroutine fpsm(ls,nvefm,ass)
 c*** spheroidal mode start solution in a fluid region using sph. bessel fns.
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       parameter (mk=350)
       save
-      real*8 lcon,ncon,lspl,nspl
+      real(kind=8) lcon,ncon,lspl,nspl
       common r(mk),fmu(mk),flam(mk),qshear(mk),qkappa(mk),
      + xa2(mk),xlam(mk),rho(mk),qro(3,mk),g(mk),qg(3,mk),
      + fcon(mk),fspl(3,mk),lcon(mk),lspl(3,mk),ncon(mk),
@@ -2575,7 +2464,7 @@ c*** spheroidal mode start solution in a fluid region using sph. bessel fns.
       qsq=(wsq+float(kg)*4.d0*rho(ls)+xi-fl3*xi*xi/wsq)/vpsq
       zsq=qsq*x*x
       call bfs(l,zsq,eps,fp)
-      if(kg.ne.0) then
+      if(kg/=0) then
         u=(fl-fp)/qsq
         c1=fl*g(ls)-wsq*x
         c2=fl2*c1*0.25d0/x-rho(ls)*fl
@@ -2593,7 +2482,7 @@ c*** spheroidal mode start solution in a fluid region using sph. bessel fns.
         sum=sum+ass(i)*ass(i)
       enddo
       sum=1.d0/dsqrt(sum)
-      if(ass(nvefm).lt.0.d0) sum=-sum
+      if(ass(nvefm)<0.d0) sum=-sum
       do i=1,nvefm
         ass(i)=ass(i)*sum
       enddo
@@ -2602,10 +2491,10 @@ c*** spheroidal mode start solution in a fluid region using sph. bessel fns.
 
       subroutine spsm(ls,nvesm,ass)
 c*** spheroidal mode start solution in a solid region using sph. bessel fns.
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       parameter (mk=350)
       save
-      real*8 lcon,ncon,lspl,nspl
+      real(kind=8) lcon,ncon,lspl,nspl
       common r(mk),fmu(mk),flam(mk),qshear(mk),qkappa(mk),
      + xa2(mk),xlam(mk),rho(mk),qro(3,mk),g(mk),qg(3,mk),
      + fcon(mk),fspl(3,mk),lcon(mk),lspl(3,mk),ncon(mk),
@@ -2627,7 +2516,7 @@ c*** spheroidal mode start solution in a solid region using sph. bessel fns.
       fksq=.5d0*(alfsq+betasq+delsq)
       qsq=fksq-delsq
       do k=1,2
-        if(k.eq.1) then
+        if(k==1) then
           zsq=qsq*x*x
           b=xi/(vssq*(betasq-qsq))
         else
@@ -2652,7 +2541,7 @@ c*** spheroidal mode start solution in a solid region using sph. bessel fns.
           e(ll)=a(i,1)*a(j,2)-a(j,1)*a(i,2)
         enddo
       enddo
-      if(kg.eq.0) then
+      if(kg==0) then
         ass(1)=x*x*e(1)
         ass(2)=fu*x*sfl3*(2.d0*e(1)-e(5))
         ass(3)=fu*x*(e(3)-2.d0*e(1))
@@ -2684,7 +2573,7 @@ c*** spheroidal mode start solution in a solid region using sph. bessel fns.
         sum=sum+ass(i)*ass(i)
       enddo
       sum=1.d0/dsqrt(sum)
-      if(ass(5).lt.0.d0) sum=-sum
+      if(ass(5)<0.d0) sum=-sum
       do i=1,nvesm
         ass(i)=ass(i)*sum
       enddo
@@ -2693,10 +2582,10 @@ c*** spheroidal mode start solution in a solid region using sph. bessel fns.
 
       subroutine rps(i,a)
 c*** radial mode start soln using sph bessel fns.
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       parameter (mk=350)
       save
-      real*8 lcon,ncon,lspl,nspl
+      real(kind=8) lcon,ncon,lspl,nspl
       common r(mk),fmu(mk),flam(mk),qshear(mk),qkappa(mk),
      + xa2(mk),xlam(mk),rho(mk),qro(3,mk),g(mk),qg(3,mk),
      + fcon(mk),fspl(3,mk),lcon(mk),lspl(3,mk),ncon(mk),
@@ -2715,10 +2604,10 @@ c*** radial mode start soln using sph bessel fns.
 
       subroutine tps(i,a)
 c*** toroidal mode start soln using sph bessel fns.
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       parameter (mk=350)
       save
-      real*8 lcon,ncon,lspl,nspl
+      real(kind=8) lcon,ncon,lspl,nspl
       common r(mk),fmu(mk),flam(mk),qshear(mk),qkappa(mk),
      + xa2(mk),xlam(mk),rho(mk),qro(3,mk),g(mk),qg(3,mk),
      + fcon(mk),fspl(3,mk),lcon(mk),lspl(3,mk),ncon(mk),
@@ -2740,11 +2629,11 @@ c  fp is equivalent to (r*dj/dr)/j
 c  where r is radius and j is the sbf of order l and argument x=k*r
 c  the technique employs the continued fraction approach
 c  described in w. lentz's article in applied optics, vol.15, #3, 1976
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       save
-      real*8 numer,nu
+      real(kind=8) numer,nu
 c*** positive argument uses continued fraction
-      if(xsq.gt.0.d0) then
+      if(xsq>0.d0) then
         x=sqrt(xsq)
         lp1=l+1
         rx=2.0d0/x
@@ -2762,7 +2651,7 @@ c*** positive argument uses continued fraction
           numer=a3+1.d0/numer
           ratio=numer/denom
           rj=rj*ratio
-          if(abs(abs(ratio)-1.d0).gt.eps) goto 5
+          if(abs(abs(ratio)-1.d0)>eps) goto 5
         fp=rj*x-lp1
       else
 c  series solution
@@ -2775,7 +2664,7 @@ c  series solution
    15     a=-a*xsq/(c*(b+c))
           f=f+a
           fp=fp+a*d
-          if(abs(a*d).lt.eps) goto 20
+          if(abs(a*d)<eps) goto 20
           c=c+2.d0
           d=d+2.d0
           goto 15
@@ -2787,7 +2676,7 @@ c  series solution
       subroutine remedy(ls)
 c    obtains the eigenfunction of an awkward spheroidal mode by
 c    integrating to the icb or the mcb.
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       parameter (mk=350)
       save
       common/bits/pi,rn,vn,wn,w,wsq,wray,qinv,cg,wgrav,tref,fct,eps,fl,
@@ -2796,6 +2685,8 @@ c    integrating to the icb or the mcb.
       common/arem/a(6,3,mk)
       common/rindx/nic,noc,nsl,nicp1,nocp1,nslp1,n
       dimension af(4,2),as(6,3),afr(4)
+      logical error_flag
+      common/error/start_time,cur_time,run_time,run_lim,error_flag
 c MB commented two next lines
 cx    print 900,ls
 cx900 format('in remedy with start level : ',i4)
@@ -2806,8 +2697,8 @@ cx900 format('in remedy with start level : ',i4)
         enddo
       enddo
       af(1,1)=1.d0
-      if(kg.eq.1) af(2,2)=1.d0
-      if(nsl.ne.n) then
+      if(kg==1) af(2,2)=1.d0
+      if(nsl/=n) then
         do i=nslp1,n
           do k=1,3
             do j=1,6
@@ -2816,6 +2707,7 @@ cx900 format('in remedy with start level : ',i4)
           enddo
         enddo
         call fprop(n,nslp1,af,iexp)
+        if(error_flag) return
       end if
       call fsbdry(af,as,kg)
       do k=1,3
@@ -2823,20 +2715,22 @@ cx900 format('in remedy with start level : ',i4)
           a(j,k,nsl)=as(j,k)
         enddo
       enddo
-      if(n.ne.nsl) call ortho(n,nsl,as,kg)
+      if(n/=nsl) call ortho(n,nsl,as,kg)
 c*** now we are at the bottom of the ocean
       call sprop(n,nsl,nocp1,as,iexp)
+      if(error_flag) return
       call sfbdry(n,nocp1,as,af,kg)
       imtch=noc
       do i=1,4
         afr(i)=ar(i,noc)
       enddo
 c*** now we are at the cmb -- test to see if we might have to go to the icb
-      if(ls.le.nic) then
+      if(ls<=nic) then
         icomp=0
         call match(n,noc,kg,af,afr,icomp)
-        if(icomp.eq.0) return
+        if(icomp==0) return
         call fprop(noc,nicp1,af,iexp)
+        if(error_flag) return
         imtch=nic
         do i=1,4
           afr(i)=ar(i,nicp1)
@@ -2849,10 +2743,10 @@ c*** now we are at the cmb -- test to see if we might have to go to the icb
 
       subroutine fprop(jf,jl,f,iexp)
 c    fprop propagates the fundamental matrix f from jf to jl (a fluid region)
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       parameter (mk=350)
       save
-      real*8 lcon,ncon,lspl,nspl
+      real(kind=8) lcon,ncon,lspl,nspl
       common r(mk),fmu(mk),flam(mk),qshear(mk),qkappa(mk),
      + xa2(mk),xlam(mk),rho(mk),qro(3,mk),g(mk),qg(3,mk),
      + fcon(mk),fspl(3,mk),lcon(mk),lspl(3,mk),ncon(mk),
@@ -2863,18 +2757,20 @@ c    fprop propagates the fundamental matrix f from jf to jl (a fluid region)
       common/arem/a(6,3,mk)
       common/rindx/nic,noc,nsl,nicp1,nocp1,nslp1,n
       common/shanks/b(46),c(10),dx,step(8),sdum,idum,in
+      logical error_flag
+      common/error/start_time,cur_time,run_time,run_lim,error_flag
       dimension f(4,2),s(4,2),h(4,2,10)
       data econst/1048576.d0/
       kk=kg+1
       jj=2*kk
       jud=1
-      if(jl.lt.jf) jud=-1
+      if(jl<jf) jud=-1
       y=r(jf)
       i=jf
       go to 80
    10 x=y
       y=r(i)
-      if(y.eq.x) goto 80
+      if(y==x) goto 80
       iq=min(i,i-jud)
       qff=1.d0+xlam(iq)*fct
       xi=g(i)/y
@@ -2882,10 +2778,15 @@ c    fprop propagates the fundamental matrix f from jf to jl (a fluid region)
       q=max(sfl3/x,sqrt(abs(alfsq-fl3/(x*x)))+1.d0/r(iq))
       del=jud*step(8)/q
       dxs=0.d0
+      if(del*jud<0) then
+        !print *,'failed fprop'
+        error_flag=.true.
+        return
+      endif
    15 y=x+del
-      if(float(jud)*(y-r(i)).gt.0.d0) y=r(i)
+      if(float(jud)*(y-r(i))>0.d0) y=r(i)
       dx=y-x
-      if(dx.ne.dxs) call baylis(q,7)
+      if(dx/=dxs) call baylis(q,7)
       dxs=dx
       do k=1,kk
         do j=1,jj
@@ -2905,7 +2806,7 @@ c    fprop propagates the fundamental matrix f from jf to jl (a fluid region)
       t11=(gr*d-1.d0)*zr
       s11=-ro*(wsq+4.d0*gr-gr*gr*d)
       c11=-t12/ro+1.d0/flu
-      if(kg.eq.0) then
+      if(kg==0) then
         s11=s11-t21*ro
       else
         t22=-fl*zr
@@ -2913,7 +2814,7 @@ c    fprop propagates the fundamental matrix f from jf to jl (a fluid region)
         s12=ro*(t11+t22)
       end if
       do 70 k=1,kk
-      if(kg.eq.0) then
+      if(kg==0) then
         h(1,k,ni)=t11*f(1,k)+c11*f(2,k)
         h(2,k,ni)=s11*f(1,k)-t11*f(2,k)
       else
@@ -2954,14 +2855,14 @@ c    fprop propagates the fundamental matrix f from jf to jl (a fluid region)
    70 continue
    40 continue
       x=y
-      if(y.ne.r(i)) go to 15
+      if(y/=r(i)) go to 15
    80 size=0.d0
       do k=1,kk
         do j=1,jj
           size=max(size,abs(f(j,k)))
         enddo
       enddo
-   82 if(size.lt.1024.d0) goto 84
+   82 if(size<1024.d0) goto 84
       do k=1,kk
         do j=1,jj
           f(j,k)=f(j,k)/econst
@@ -2976,7 +2877,7 @@ c    fprop propagates the fundamental matrix f from jf to jl (a fluid region)
           a(j,k,i)=f(j,k)
         enddo
       enddo
-      if(i.eq.jl) return
+      if(i==jl) return
       i=i+jud
       go to 10
       end
@@ -2985,10 +2886,10 @@ c    fprop propagates the fundamental matrix f from jf to jl (a fluid region)
 c    sprop propagates the fundamental matrix f from jf to jl (a solid region)
 c    if jorth=1 the columns of f are orthogonalized at each level
 c    except in regions of oscillatory p and s.
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       parameter (mk=350)
       save
-      real*8 lcon,ncon,lspl,nspl,nn,ll
+      real(kind=8) lcon,ncon,lspl,nspl,nn,ll
       common r(mk),fmu(mk),flam(mk),qshear(mk),qkappa(mk),
      + xa2(mk),xlam(mk),rho(mk),qro(3,mk),g(mk),qg(3,mk),
      + fcon(mk),fspl(3,mk),lcon(mk),lspl(3,mk),ncon(mk),
@@ -2999,18 +2900,20 @@ c    except in regions of oscillatory p and s.
       common/arem/a(6,3,mk)
       common/rindx/nic,noc,nsl,nicp1,nocp1,nslp1,n
       common/shanks/b(46),c(10),dx,step(8),sdum,idum,in
+      logical error_flag
+      common/error/start_time,cur_time,run_time,run_lim,error_flag
       dimension f(6,3),s(6,3),h(6,3,10)
       data econst/1048576.d0/
       kk=kg+2
       jj=2*kk
       jud=1
-      if(jl.lt.jf) jud=-1
+      if(jl<jf) jud=-1
       y=r(jf)
       i=jf
       go to 80
    10 x=y
       y=r(i)
-      if(x.eq.y) goto 80
+      if(x==y) goto 80
       iq=min0(i,i-jud)
       qff=1.d0+xlam(iq)*fct
       qll=1.d0+qshear(iq)*fct
@@ -3025,16 +2928,21 @@ c    except in regions of oscillatory p and s.
       al=fl3/(x*x)
       jorth=1
       aq=fksq-delsq-al
-      if(aq.gt.0.d0) jorth=0
+      if(aq>0.d0) jorth=0
       qs=sqrt(abs(fksq-al))+1.d0/r(iq)
       qf=sqrt(abs(aq))+1.d0/r(iq)
       q=max(sfl3/x,qs,qf)
       del=jud*step(8)/q
+      if(del*jud<0) then
+        !print *,'failed sprop'
+        error_flag=.true.
+        return
+      endif
       dxs=0.d0
    15 y=x+del
-      if(float(jud)*(y-r(i)).gt.0.d0) y=r(i)
+      if(float(jud)*(y-r(i))>0.d0) y=r(i)
       dx=y-x
-      if(dx.ne.dxs) call baylis(q,7)
+      if(dx/=dxs) call baylis(q,7)
       dxs=dx
       do k=1,kk
         do j=1,jj
@@ -3048,7 +2956,7 @@ c    except in regions of oscillatory p and s.
       gr=g(iq)+t*(qg(1,iq)+t*(qg(2,iq)+t*qg(3,iq)))
       ff=(fcon(iq)+t*(fspl(1,iq)+t*(fspl(2,iq)+t*fspl(3,iq))))*qff
       ll=(lcon(iq)+t*(lspl(1,iq)+t*(lspl(2,iq)+t*lspl(3,iq))))*qll
-      if(ifanis.eq.0) then
+      if(ifanis==0) then
         nn=ll
         cc=ff+ll+ll
         aa=cc
@@ -3072,7 +2980,7 @@ c    except in regions of oscillatory p and s.
       s11=s22+4.d0*zr*(zdmg-rogr)
       s22=s22+zr*zr*(fl3*(dmg+nn)-nn-nn)
       s12=sfl3z*(rogr-zdmg-zdmg)
-      if(kg.eq.0)  then
+      if(kg==0)  then
         s11=s11+4.d0*ro*ro
       else
         t31=-4.d0*ro
@@ -3081,7 +2989,7 @@ c    except in regions of oscillatory p and s.
         s23=ro*sfl3z
       end if
       do 70 k=1,kk
-      if(kg.eq.0) then
+      if(kg==0) then
         h(1,k,ni)=t11*f(1,k)+t12*f(2,k)+c11*f(3,k)
         h(2,k,ni)=t21*f(1,k)+t22*f(2,k)+c22*f(4,k)
         h(3,k,ni)=s11*f(1,k)+s12*f(2,k)-t11*f(3,k)-t21*f(4,k)
@@ -3127,14 +3035,14 @@ c    except in regions of oscillatory p and s.
    70 continue
    50 continue
       x=y
-      if(y.ne.r(i)) go to 15
+      if(y/=r(i)) go to 15
    80 size=0.d0
       do k=1,kk
         do j=1,jj
           size=max(size,abs(f(j,k)))
         enddo
       enddo
-   82 if(size.lt.1024.d0) goto 84
+   82 if(size<1024.d0) goto 84
       do k=1,kk
         do j=1,jj
           f(j,k)=f(j,k)/econst
@@ -3149,8 +3057,8 @@ c    except in regions of oscillatory p and s.
           a(j,k,i)=f(j,k)
         enddo
       enddo
-      if(jorth.eq.1) call ortho(li,i,f,kg)
-      if(i.eq.jl) return
+      if(jorth==1) call ortho(li,i,f,kg)
+      if(i==jl) return
       i=i+jud
       go to 10
       end
@@ -3159,15 +3067,15 @@ c    except in regions of oscillatory p and s.
 c*** The tangential traction scalar is forced to vanish at the solid
 c*** side of a s/f boundary(level jl). a(j,3,i) is elliminated for
 c*** i=jf...jl and af is loaded from a at level jl.
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       parameter (mk=350)
       save
       common/arem/a(6,3,mk)
       dimension as(6,*),af(4,*)
       n1=min(jf,jl)
       n2=max(jf,jl)
-      if(kg.eq.0) then
-        if(abs(as(4,2)).gt.abs(as(4,1))) then
+      if(kg==0) then
+        if(abs(as(4,2))>abs(as(4,1))) then
           i1=1
           i2=2
         else
@@ -3185,7 +3093,7 @@ c*** i=jf...jl and af is loaded from a at level jl.
       else
         ab53=abs(as(5,3))
         do k=1,2
-          if(ab53.gt.dabs(as(5,k))) then
+          if(ab53>dabs(as(5,k))) then
             i1=k
             i2=3
           else
@@ -3210,7 +3118,7 @@ c*** i=jf...jl and af is loaded from a at level jl.
       subroutine fsbdry(af,as,kg)
 c    fsbdry creates solid fundamental matrix as from fluid fundamental matrix
 c    af. It is presumed that fsbdry is used to cross a f/s boundary.
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       save
       dimension af(4,*),as(6,*)
       do i=1,3
@@ -3218,7 +3126,7 @@ c    af. It is presumed that fsbdry is used to cross a f/s boundary.
           as(j,i)=0.d0
         enddo
       enddo
-      if(kg.eq.0) then
+      if(kg==0) then
         as(1,1)=af(1,1)
         as(3,1)=af(2,1)
         as(2,2)=1.d0
@@ -3237,7 +3145,7 @@ c    af. It is presumed that fsbdry is used to cross a f/s boundary.
       subroutine match(n,j,kg,af,afr,icomp)
 c*** matches boundary conditions during downward integration --
 c*** first try is at cmb, second try is at icb.
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       parameter (mk=350)
       save
       common/eifx/ar(14,mk),inorm(mk),jjj(mk)
@@ -3246,7 +3154,7 @@ c*** first try is at cmb, second try is at icb.
       k=j+2
       rms=0.d0
       fnor=0.d0
-      if(kg.eq.0) then
+      if(kg==0) then
         c=(af(1,1)*afr(1)+af(2,1)*afr(2))/(af(1,1)**2+af(2,1)**2)
         do i=1,2
           afi(i)=af(i,1)*c
@@ -3254,8 +3162,8 @@ c*** first try is at cmb, second try is at icb.
           fnor=fnor+afr(i)*afr(i)
         enddo
         rms=sqrt(rms/fnor)
-        if(icomp.ge.0) then
-          if(rms.ge.1.d-3) then
+        if(icomp>=0) then
+          if(rms>=1.d-3) then
             icomp=1
             return
           end if
@@ -3279,8 +3187,8 @@ c*** first try is at cmb, second try is at icb.
           fnor=fnor+afr(i)*afr(i)
         enddo
         rms=sqrt(rms/fnor)
-        if(icomp.ge.0) then
-          if(rms.ge.1.d-3) then
+        if(icomp>=0) then
+          if(rms>=1.d-3) then
             icomp=1
             return
           end if
@@ -3303,7 +3211,7 @@ c   the array a is replaced by a*v for levels li - lc. Array b is replaced
 c   by b*v and is then ready for entry to sprop at level lc.This is intended
 c   to diminish the onset of degeneracy caused by rapid exponential growth
 c   in the mantle for modes with deeply turning S and shallowly turning P.
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       parameter (mk=350)
       save
       common/arem/a(6,3,mk)
@@ -3341,7 +3249,7 @@ c    section i chapter 10 wilkenson and reinsch (1971 ,springer).
 c    the matrix a is overwritten with v(ncol,ncol), the right side orthogonal
 c    matrix in the svd decomposition. for use only in eos subs as ,to reduce
 c    branching points, i have used the fact that ncol is lt mrow.
-      implicit real*8(a-h,o-z)
+      implicit real(kind=8)(a-h,o-z)
       save
       dimension a(6,*),e(3),q(3)
       eps=1.5d-14
@@ -3355,14 +3263,14 @@ c    branching points, i have used the fact that ncol is lt mrow.
       do j=i,mrow
         s=s+a(j,i)*a(j,i)
       enddo
-      if(s.le.tol) then
+      if(s<=tol) then
         q(i)=0.d0
-        if(l.gt.ncol) goto 60
+        if(l>ncol) goto 60
       else
         q(i)=dsign(sqrt(s),-a(i,i))
         h=a(i,i)*q(i)-s
         a(i,i)=a(i,i)-q(i)
-        if(l.gt.ncol) go to 60
+        if(l>ncol) go to 60
         do j=l,ncol
           s=0.d0
           do k=i,mrow
@@ -3378,7 +3286,7 @@ c    branching points, i have used the fact that ncol is lt mrow.
       do j=l,ncol
         s=s+a(i,j)*a(i,j)
       enddo
-      if(s.lt.tol) then
+      if(s<tol) then
         g=0.d0
       else
         g=dsign(dsqrt(s),-a(i,l))
@@ -3399,7 +3307,7 @@ c    branching points, i have used the fact that ncol is lt mrow.
       end if
    60 x=dmax1(dabs(q(i))+dabs(e(i)),x)
       goto 100
-   75 if(g.ne.0.d0) then
+   75 if(g/=0.d0) then
         h=a(i,l)*g
         do j=l,ncol
           a(j,i)=a(i,j)/h
@@ -3422,20 +3330,20 @@ c    branching points, i have used the fact that ncol is lt mrow.
       g=e(i)
       l=i
       i=i-1
-      if(i.ge.1)go to 75
+      if(i>=1)go to 75
       ep=eps*x
       k=ncol
   105 l=k
-  110 if(dabs(e(l)).le.ep)go to 125
-      if(dabs(q(l-1)).le.ep) go to 115
+  110 if(dabs(e(l))<=ep)go to 125
+      if(dabs(q(l-1))<=ep) go to 115
       l=l-1
-      if(l.ge.1)go to 110
+      if(l>=1)go to 110
   115 c=0.d0
       s=1.d0
       do i=l,k
         f=s*e(i)
         e(i)=c*e(i)
-        if(abs(f).le.ep)go to 125
+        if(abs(f)<=ep)go to 125
         g=q(i)
         h=sqrt(f*f+g*g)
         c=g/h
@@ -3443,7 +3351,7 @@ c    branching points, i have used the fact that ncol is lt mrow.
         q(i)=h
       enddo
   125 z=q(k)
-      if(l.ne.k) then
+      if(l/=k) then
         x=q(l)
         y=q(k-1)
         g=e(k-1)
@@ -3486,14 +3394,14 @@ c    branching points, i have used the fact that ncol is lt mrow.
         q(k)=x
         go to 105
       end if
-      if(z.lt.0.d0) then
+      if(z<0.d0) then
         q(k)=-z
         do j=1,ncol
           a(j,k)=-a(j,k)
         enddo
       end if
       k=k-1
-      if(k.ge.1)go to 105
+      if(k>=1)go to 105
       return
       end
 
