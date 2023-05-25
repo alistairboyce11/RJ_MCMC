@@ -2,10 +2,10 @@
     character (len=*), parameter :: dirname = 'OUT'
     character*8, parameter :: storename = 'STORFFC1'
     integer, parameter :: burn_in = 50000! 55000 !Burn-in period
-    integer,parameter :: nsample_widening=1000000! 50000!Post burn-in
-    integer,parameter :: burn_in_widening=50000! 50000!Post burn-in
+    integer,parameter :: nsample_widening=400000! 50000!Post burn-in
+    integer,parameter :: burn_in_widening=100000! 50000!Post burn-in
 
-    integer, parameter :: thin = 25    !Thinning of the chain
+    integer, parameter :: thin = 250    !Thinning of the chain
 
     integer, parameter :: Scratch = 1     ! 0: Start from Stored model 1: Start from scratch
     integer, parameter :: store = 99999999    !Store models every "store" iteration.
@@ -17,7 +17,7 @@
 
     !depth
     real, parameter :: d_min = 0   ! depth bounds
-    real, parameter :: d_max = 700
+    real, parameter :: d_max = 800
 
     real, parameter :: width = 0.2 ! width of the prior in vsv
 
@@ -27,7 +27,7 @@
     real, parameter :: xi_min = 0.6 ! bounds of the prior in xi
     real, parameter :: xi_max = 1.4
 
-    double precision, parameter ::    Ad_R_max = 200 ! bounds of the prior in Ad_R - the error parameter for rayleigh wave velocity
+    double precision, parameter ::    Ad_R_max = 100 ! bounds of the prior in Ad_R - the error parameter for rayleigh wave velocity
     double precision, parameter ::    Ad_R_min = 0.001
 
     double precision, parameter ::    Ad_L_max = 200 ! bounds of the prior in Ad_L
@@ -58,7 +58,7 @@
     ! Parameters for Displaying results
     !--------------------------------------------
 
-    integer, parameter :: display = 1000 ! display results in OUT/mpi.out
+    integer, parameter :: display = 10000 ! display results in OUT/mpi.out
     !every display samples
 
     !parameters for minos
@@ -74,9 +74,9 @@
     real, parameter :: logalpha_min=-100
     real, parameter :: logalpha_max=5
     integer, parameter :: num_logalpha=200
-    real, parameter :: widening_start=1.
-    integer, parameter :: n_w=1
-    real,parameter :: widening_step=1.
+    real, parameter :: widening_start=4.
+    integer, parameter :: n_w=4
+    real,parameter :: widening_step=-1.
 
     integer,parameter :: everyall=10000
 
