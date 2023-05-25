@@ -123,7 +123,7 @@ subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
 
                 xi(k)=xi(k+1)
                 vp_data(k)=vp_data(k+1)
-                vs_data(k)==vs_data(k+1)
+                vs_data(k)=vs_data(k+1)
 
                 k=k-1
 
