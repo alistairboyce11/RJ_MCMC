@@ -273,8 +273,6 @@ def get_dispersion_mean(file,model,model_ref,dispersion_one,params_dispersion,pa
         outputs['stack']={}
         outputs['nostack']={}
 
-        outputs['nostack']['clusters']=params_dispersion['clusters']
-
         outputs['nostack']['ndata_R']=params_dispersion['R']['ndatad']
         outputs['nostack']['ndata_L']=params_dispersion['L']['ndatad']
 

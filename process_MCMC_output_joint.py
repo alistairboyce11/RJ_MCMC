@@ -17,19 +17,12 @@ import postprocess_functions
 import subprocess
 
 
-def process_alphamax(comm, maxpercent, alphafile, dispersion_ref, dispersion_all, outdir_ref, points, clusters, widenings):
+def process_alphamax(comm, maxpercent, alphafile, dispersion_ref, dispersion_all, outdir_ref, points, widenings):
     size = comm.Get_size()
     rank = comm.Get_rank()
 
     if maxpercent == 0.:
         return False
-
-    # if os.path.isfile(alphafile):
-    #     file = open(alphafile, 'r')
-    #     dispersion_ref['alpha_max'] = 0.
-    #     dispersion_all['alpha_max'] = np.array(file.readline().split()).astype('float')
-    #     file.close()
-    #     return False
 
     alpha_max = []
 
@@ -55,6 +48,7 @@ def process_alphamax(comm, maxpercent, alphafile, dispersion_ref, dispersion_all
 
     # If I have all the files I need
     # get total amount of models
+    clusters = params_dispersion['clusterlist']
     num_model_all = 0
     for cluster in clusters:
         for widening in widenings:
@@ -114,7 +108,7 @@ def process_alphamax(comm, maxpercent, alphafile, dispersion_ref, dispersion_all
 
 
 def get_alpha_max(comm, directories, widenings_in, clusters_in, params_dispersion, dispersion_ref, dispersion_all,
-                  alphafile='OUT_KL/Processing/alpha_max.txt', outdir_ref='', maxpercent=0.):
+                  alphafile='OUT_KL/Processing/alpha_max.txt', outdir_ref='', maxpercent=0., thin_target=None):
     '''
     gets the maximum of alpha (ratios)
     Code runs in parallel, computes alpha_max for each file independently
@@ -156,15 +150,16 @@ def get_alpha_max(comm, directories, widenings_in, clusters_in, params_dispersio
 
     files_all = []
 
+    clusters_in = params_dispersion['clusterlist']
+
     # initiate stuff
-    for i_dir in range(len(directories)):
-        directory = directories[i_dir]
-        cluster_cur = clusters_in[i_dir]
-        for widening_alpha in widenings_in:
-            # list files
-            files_all_tmp = glob.glob(directory + '/All_models_processed_prepare_*%4.2f.out' % widening_alpha)
-            files_all_tmp.sort()
-            files_all.extend(files_all_tmp)
+    for cluster_cur in clusters_in:
+        for directory in params_dispersion['directories'][cluster_cur]:
+            for widening_alpha in widenings_in:
+                # list files
+                files_all_tmp = glob.glob(directory + '/All_models_processed_prepare_*%4.2f.out' % widening_alpha)
+                files_all_tmp.sort()
+                files_all.extend(files_all_tmp)
 
     # create array for max alpha, potentially more than one if maxpercent is bigger than zero
     num_models_all = 0
@@ -194,12 +189,11 @@ def get_alpha_max(comm, directories, widenings_in, clusters_in, params_dispersio
     for i in range(len(files_all)):
         whodoeswhat[files_all[i]] = i % size_alpha
 
-    for i_dir in range(len(directories)):
-        directory = directories[i_dir]
-        cluster = clusters_in[i_dir]
+    for cluster in clusters_in:
         for widening_alpha in widenings_in:
-
-            files_all_tmp = glob.glob(directory + '/All_models_processed_prepare_*%4.2f.out' % widening_alpha)
+            files_all_tmp = []
+            for directory in params_dispersion['directories'][cluster]:
+                files_all_tmp.extend(glob.glob(directory + '/All_models_processed_prepare_*%4.2f.out' % widening_alpha))
             files_all_tmp.sort()
             files = []
             for i in range(len(files_all_tmp)):
@@ -235,14 +229,14 @@ def get_alpha_max(comm, directories, widenings_in, clusters_in, params_dispersio
 
                 # process one file
                 print('computing alphamax for file', file, 'rank', rank_alpha, 'cluster', cluster, 'widening',widening_alpha)
-                alpha_max_prop, num_models_prop = postprocess_util.process_file_alphamax_all(file, clusters_in,
-                                                                                             widenings_in, cluster,
-                                                                                             widening_alpha,
-                                                                                             params_dispersion,
-                                                                                             dispersion_ref,
-                                                                                             dispersion_all, maxpercent,
-                                                                                             num_to_store,
-                                                                                             num_models_cur, file_probsum=file_probsum)
+                alpha_max_prop, num_models_prop = postprocess_util.process_file_alphamax_all(file, 
+                                                                                            widenings_in, cluster,
+                                                                                            widening_alpha,
+                                                                                            params_dispersion,
+                                                                                            dispersion_ref,
+                                                                                            dispersion_all, maxpercent,
+                                                                                            num_to_store,
+                                                                                            num_models_cur, file_probsum=file_probsum, thin_target=thin_target)
 
                 # merge results on one core
                 alpha_max_tmp = np.append(alpha_max_tmp, alpha_max_prop, axis=0)
@@ -256,6 +250,7 @@ def get_alpha_max(comm, directories, widenings_in, clusters_in, params_dispersio
                 print('sent', rank_alpha)
             if rank_alpha == 0:
                 # recieve and merge data from all other cores
+                print('recieving data for cluster '+str(cluster)+', widening '+str(widening_alpha))
                 for i in np.unique(computing):
                     print('recieving', i)
                     alpha_max_prop = np.zeros_like(alpha_max_tmp)
@@ -310,7 +305,7 @@ def get_alpha_max(comm, directories, widenings_in, clusters_in, params_dispersio
 
 
 def apply_stuff(comm, directories, widenings_in, clusters_in, functions, params_dispersion, dispersion_ref,
-                dispersion_all, model_ref, outdir_ref=''):
+                dispersion_all, model_ref, outdir_ref='', thin_target=None):
     '''
     Takes a list of functions, reads all models, applies each function to all of the models and stacks the results
 
@@ -397,15 +392,16 @@ def apply_stuff(comm, directories, widenings_in, clusters_in, functions, params_
     clusters_all = []
     widenings_all = []
 
-    for i_dir in range(len(directories)):
-        directory = directories[i_dir]
-        cluster_cur = clusters_in[i_dir]
-        for widening_process in widenings_in:
-            # list files
-            files_all.extend(glob.glob(directory + '/All_models_processed_prepare_*%4.2f.out' % widening_process))
-            numfiles = len(glob.glob(directory + '/All_models_processed_prepare_*%4.2f.out' % widening_process))
-            clusters_all += numfiles * [cluster_cur]
-            widenings_all += numfiles * [widening_process]
+    clusters = params_dispersion['clusterlist']
+
+    for cluster_cur in clusters:
+        for directory in params_dispersion['directories'][cluster_cur]:
+            for widening_process in widenings_in:
+                # list files
+                files_all.extend(glob.glob(directory + '/All_models_processed_prepare_*%4.2f.out' % widening_process))
+                numfiles = len(glob.glob(directory + '/All_models_processed_prepare_*%4.2f.out' % widening_process))
+                clusters_all += numfiles * [cluster_cur]
+                widenings_all += numfiles * [widening_process]
 
     # split it over the cores
     size = comm.Get_size()
@@ -435,12 +431,11 @@ def apply_stuff(comm, directories, widenings_in, clusters_in, functions, params_
         # file_probsum = None
 
         (alpha_sum_prop, num_models_prop, exp_sum_prop) = postprocess_util.process_one_file_all(file, cluster_process,
-                                                                                                clusters_in,
                                                                                                 widenings_in, functions,
                                                                                                 params_dispersion,
                                                                                                 dispersion_ref,
                                                                                                 dispersion_all,
-                                                                                                model_ref, outputs_all, file_probsum=file_probsum)
+                                                                                                model_ref, outputs_all, file_probsum=file_probsum, thin_target=thin_target)
         print('done', rank, file)
 
         alpha_sum += alpha_sum_prop
@@ -534,49 +529,91 @@ print(size, rank)
 # directories=['OUT_POINTS_1228_RUN/OUT']
 # clusters=[0]
 directories = ['OUT_CLUSTER0_NEW_CLUSTERS_RUN/OUT', 'OUT_CLUSTER1_NEW_CLUSTERS_RUN/OUT',
-               'OUT_CLUSTER2_NEW_CLUSTERS_RUN/OUT', 'OUT_CLUSTER3_NEW_CLUSTERS_RUN/OUT',
-               'OUT_CLUSTER4_NEW_CLUSTERS_RUN/OUT', 'OUT_CLUSTER5_NEW_CLUSTERS_RUN/OUT',
-               'OUT_CLUSTER6_NEW_CLUSTERS_RUN/OUT', 'OUT_CLUSTER7_NEW_CLUSTERS_RUN/OUT',
-               'OUT_CLUSTER8_NEW_CLUSTERS_RUN/OUT', 'OUT_CLUSTER0_NEW_CLUSTERS_RUN2/OUT',
-               'OUT_CLUSTER1_NEW_CLUSTERS_RUN2/OUT', 'OUT_CLUSTER2_NEW_CLUSTERS_RUN2/OUT',
-               'OUT_CLUSTER3_NEW_CLUSTERS_RUN2/OUT', 'OUT_CLUSTER4_NEW_CLUSTERS_RUN2/OUT',
-               'OUT_CLUSTER5_NEW_CLUSTERS_RUN2/OUT', 'OUT_CLUSTER6_NEW_CLUSTERS_RUN2/OUT',
-               'OUT_CLUSTER7_NEW_CLUSTERS_RUN2/OUT', 'OUT_CLUSTER8_NEW_CLUSTERS_RUN2/OUT']
-clusters = [0, 1, 2, 3, 4, 5, 6, 7, 8, 0, 1, 2, 3, 4, 5, 6, 7, 8]
+              'OUT_CLUSTER2_NEW_CLUSTERS_RUN/OUT', 'OUT_CLUSTER3_NEW_CLUSTERS_RUN/OUT',
+              'OUT_CLUSTER4_NEW_CLUSTERS_RUN/OUT', 'OUT_CLUSTER5_NEW_CLUSTERS_RUN/OUT',
+              'OUT_CLUSTER6_NEW_CLUSTERS_RUN/OUT', 'OUT_CLUSTER7_NEW_CLUSTERS_RUN/OUT',
+              'OUT_CLUSTER8_NEW_CLUSTERS_RUN/OUT', 'OUT_CLUSTER0_NEW_CLUSTERS_RUN2/OUT',
+              'OUT_CLUSTER1_NEW_CLUSTERS_RUN2/OUT', 'OUT_CLUSTER2_NEW_CLUSTERS_RUN2/OUT',
+              'OUT_CLUSTER3_NEW_CLUSTERS_RUN2/OUT', 'OUT_CLUSTER4_NEW_CLUSTERS_RUN2/OUT',
+              'OUT_CLUSTER5_NEW_CLUSTERS_RUN2/OUT', 'OUT_CLUSTER6_NEW_CLUSTERS_RUN2/OUT',
+              'OUT_CLUSTER7_NEW_CLUSTERS_RUN2/OUT', 'OUT_CLUSTER8_NEW_CLUSTERS_RUN2/OUT']
+#              'OUT_CLUSTER0_DEEP/OUT', 'OUT_CLUSTER1_DEEP/OUT',
+#              'OUT_CLUSTER2_DEEP/OUT', 'OUT_CLUSTER3_DEEP/OUT', 
+#              'OUT_CLUSTER4_DEEP/OUT']
+clusters = [0, 1, 2, 3, 4, 5, 6, 7, 8, 0, 1, 2, 3, 4, 5, 6, 7, 8]#, 10, 11, 12, 13, 14]
 
-#directories = ['OUT_POINTS_15254_RUN/OUT']
-#clusters = [0]
+directories = ['OUT_CLUSTER0_NEW_CLUSTERS_RUN/OUT_250', 'OUT_CLUSTER1_NEW_CLUSTERS_RUN/OUT_250',
+              'OUT_CLUSTER2_NEW_CLUSTERS_RUN/OUT_250', 'OUT_CLUSTER3_NEW_CLUSTERS_RUN/OUT_250',
+              'OUT_CLUSTER4_NEW_CLUSTERS_RUN/OUT_250', 'OUT_CLUSTER5_NEW_CLUSTERS_RUN/OUT_250',
+              'OUT_CLUSTER6_NEW_CLUSTERS_RUN/OUT_250', 'OUT_CLUSTER7_NEW_CLUSTERS_RUN/OUT_250',
+              'OUT_CLUSTER8_NEW_CLUSTERS_RUN/OUT_250', 'OUT_CLUSTER0_NEW_CLUSTERS_RUN2/OUT_250',
+              'OUT_CLUSTER1_NEW_CLUSTERS_RUN2/OUT_250', 'OUT_CLUSTER2_NEW_CLUSTERS_RUN2/OUT_250',
+              'OUT_CLUSTER3_NEW_CLUSTERS_RUN2/OUT_250', 'OUT_CLUSTER4_NEW_CLUSTERS_RUN2/OUT_250',
+              'OUT_CLUSTER5_NEW_CLUSTERS_RUN2/OUT_250', 'OUT_CLUSTER6_NEW_CLUSTERS_RUN2/OUT_250',
+              'OUT_CLUSTER7_NEW_CLUSTERS_RUN2/OUT_250', 'OUT_CLUSTER8_NEW_CLUSTERS_RUN2/OUT_250',
+              'OUT_CLUSTER0_DEEP/OUT', 'OUT_CLUSTER1_DEEP/OUT',
+              'OUT_CLUSTER2_DEEP/OUT', 'OUT_CLUSTER3_DEEP/OUT', 
+              'OUT_CLUSTER4_DEEP/OUT']
+clusters = [0, 1, 2, 3, 4, 5, 6, 7, 8, 0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14]
 
-#directories = ['OUT_POINTS_1228_RUN/OUT']
-#clusters = [0]
+directories = ['OUT_CLUSTER0_NEW_CLUSTERS_RUN/OUT_250', 'OUT_CLUSTER1_NEW_CLUSTERS_RUN/OUT_250',
+              'OUT_CLUSTER2_NEW_CLUSTERS_RUN/OUT_250', 'OUT_CLUSTER3_NEW_CLUSTERS_RUN/OUT_250',
+              'OUT_CLUSTER4_NEW_CLUSTERS_RUN/OUT_250', 'OUT_CLUSTER5_NEW_CLUSTERS_RUN/OUT_250',
+              'OUT_CLUSTER6_NEW_CLUSTERS_RUN/OUT_250', 'OUT_CLUSTER7_NEW_CLUSTERS_RUN/OUT_250',
+              'OUT_CLUSTER8_NEW_CLUSTERS_RUN/OUT_250', 'OUT_CLUSTER0_NEW_CLUSTERS_RUN2/OUT_250',
+              'OUT_CLUSTER1_NEW_CLUSTERS_RUN2/OUT_250', 'OUT_CLUSTER2_NEW_CLUSTERS_RUN2/OUT_250',
+              'OUT_CLUSTER3_NEW_CLUSTERS_RUN2/OUT_250', 'OUT_CLUSTER4_NEW_CLUSTERS_RUN2/OUT_250',
+              'OUT_CLUSTER5_NEW_CLUSTERS_RUN2/OUT_250', 'OUT_CLUSTER6_NEW_CLUSTERS_RUN2/OUT_250',
+              'OUT_CLUSTER7_NEW_CLUSTERS_RUN2/OUT_250', 'OUT_CLUSTER8_NEW_CLUSTERS_RUN2/OUT_250',
+              'OUT_CLUSTER0_DEEP/OUT_250', 'OUT_CLUSTER1_DEEP/OUT_250',
+              'OUT_CLUSTER2_DEEP/OUT_250', 'OUT_CLUSTER3_DEEP/OUT_250', 
+              'OUT_CLUSTER4_DEEP/OUT_250',
+              'OUT_CLUSTER24_OCEANS/OUT','OUT_CLUSTER25_OCEANS/OUT','OUT_CLUSTER26_OCEANS/OUT']
+clusters = [0, 1, 2, 3, 4, 5, 6, 7, 8, 0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 24, 25, 26]
 
+#directories = ['OUT_CLUSTER0_NEW_CLUSTERS_RUN/OUT', 'OUT_CLUSTER1_NEW_CLUSTERS_RUN/OUT',
+#              'OUT_CLUSTER0_NEW_CLUSTERS_RUN2/OUT',
+#              'OUT_CLUSTER1_NEW_CLUSTERS_RUN2/OUT', ]
+#clusters = [0, 1, 0, 1]
 
 # directories = ['OUT_CLUSTER8_NEW_CLUSTERS_RUN/OUT', 'OUT_CLUSTER8_NEW_CLUSTERS_RUN2/OUT']
 # clusters = [8,8]
 
+# directories = ['OUT_CLUSTER2_NEW_CLUSTERS_RUN/OUT', 'OUT_CLUSTER2_NEW_CLUSTERS_RUN2/OUT']
+# clusters = [2,2]
+
 # directories=['OUT_POINTS_1228_RUN/OUT']
-# clusters=[0]
+# clusters=[1228]
+
+#directories=['OUT_POINTS_15254_RUN/OUT']
+#clusters=[15254]
 
 # directories=['OUT_CLUSTER0_NARROW/OUT','OUT_CLUSTER1_NARROW/OUT','OUT_CLUSTER2_NARROW/OUT','OUT_CLUSTER6_NARROW/OUT','OUT_CLUSTER7_NARROW/OUT','OUT_CLUSTER8_NARROW/OUT','OUT_CLUSTER9_NARROW/OUT','OUT_CLUSTER0_NARROW_HIGHT/OUT','OUT_CLUSTER1_NARROW_HIGHT/OUT','OUT_CLUSTER2_NARROW_HIGHT/OUT','OUT_CLUSTER6_NARROW_HIGHT/OUT','OUT_CLUSTER7_NARROW_HIGHT/OUT','OUT_CLUSTER8_NARROW_HIGHT/OUT','OUT_CLUSTER9_NARROW_HIGHT/OUT']
 # directories.extend(['OUT_CLUSTER'+str(i)+'_NARROW/OUT' for i in range(10,30)])
 # clusters=[0,1,2,6,7,8,9,0,1,2,6,7,8,9]
 # clusters.extend(range(10,30))
 
-maxpercent = 0.001
-suffix = '_0.001'
+maxpercent = 10.
+suffix = '_10.'
 batch = 500
-outdir_ref = 'OUT_NEW'
-#outdir_ref = 'OUT_POINTS_1228_RUN_1'
-outdir = outdir_ref + suffix
-widenings = [1.]#, 2., 3., 4.]
+outdir_ref = "OUT_ALL_DEEP_OCEAN"# 'OUT_POINTS_15254'#'
+#outdir_ref = 'OUT_POINTS_15254'
+outdir = outdir_ref
+widenings = [1., 2., 3., 4.]
 points = 'all'  # [1228,1273,1487,5459,1839,9215,3989,11172,11123,11186]
+thin_target=None
+
+outdir = outdir_ref + suffix
+
+if not os.path.exists(outdir_ref) and rank == 0:
+    os.mkdir(outdir_ref)
 
 if not os.path.exists(outdir) and rank == 0:
     os.mkdir(outdir)
-print(outdir)
 
 #functions = [postprocess_functions.get_histograms]
-functions=[postprocess_functions.create_posterior,postprocess_functions.get_average,postprocess_functions.get_histograms,postprocess_functions.get_dispersion_mean,postprocess_functions.get_tradeoff]
+functions = [postprocess_functions.create_posterior,postprocess_functions.get_average,postprocess_functions.get_histograms,postprocess_functions.get_dispersion_mean]#,postprocess_functions.get_tradeoff]
+
 
 if rank == 0:
     print('start')
@@ -604,7 +641,7 @@ num_models_done = comm.bcast(num_models_done, root=0)
 if num_models_done:
     params_dispersion = comm.bcast(params_dispersion, root=0)
 else:
-    postprocess_util.count_models(directories, clusters, widenings, params_dispersion, comm)
+    postprocess_util.count_models(directories, widenings, params_dispersion, comm, thin_target=thin_target)
 # else:
 #    f=open(alphafiles_present[0])
 #    numdis_dict={}
@@ -636,7 +673,10 @@ if rank == 0:
     grp.create_dataset('numdis', data=dispersion_all_ref['numdis'])
     grp.create_dataset('lat', data=dispersion_all_ref['lat'])
     grp.create_dataset('lon', data=dispersion_all_ref['lon'])
-    grp.create_dataset('cluster', data=dispersion_all_ref['cluster'])
+    grp.create_dataset('clusterlist', data=np.array(params_dispersion['clusterlist']))
+    grp2 = grp.create_group('cluster')
+    for cl in dispersion_all_ref['cluster']:
+        grp2.create_dataset(str(cl), data=dispersion_all_ref['cluster'][cl])
     grp = f.create_group('dispersion_params')
     grp2 = grp.create_group('L')
     grp2.create_dataset('periods', data=params_dispersion['L']['periods'])
@@ -645,12 +685,14 @@ if rank == 0:
     grp2.create_dataset('periods', data=params_dispersion['R']['periods'])
     grp2.create_dataset('modes', data=params_dispersion['R']['modes'])
     grp = f.create_group('reference')
-    grp2 = grp.create_group('L')
-    grp2.create_dataset('dispersion', data=dispersion_ref['L']['dispersion'])
-    grp2.create_dataset('error', data=dispersion_ref['L']['error'])
-    grp2 = grp.create_group('R')
-    grp2.create_dataset('dispersion', data=dispersion_ref['R']['dispersion'])
-    grp2.create_dataset('error', data=dispersion_ref['R']['error'])
+    for cl in dispersion_all_ref['cluster']:
+        grp3 = grp.create_group(str(cl))
+        grp2 = grp3.create_group('L')
+        grp2.create_dataset('dispersion', data=dispersion_ref[cl]['L']['dispersion'])
+        grp2.create_dataset('error', data=dispersion_ref[cl]['L']['error'])
+        grp2 = grp3.create_group('R')
+        grp2.create_dataset('dispersion', data=dispersion_ref[cl]['R']['dispersion'])
+        grp2.create_dataset('error', data=dispersion_ref[cl]['R']['error'])
     grp = f.create_group('cluster')
     grp2 = grp.create_group('L')
     grp2.create_dataset('dispersion', data=dispersion_all_ref['L']['dispersion'])
@@ -673,7 +715,10 @@ if rank == 0:
     grp.create_dataset('numdis', data=dispersion_all_ref['numdis'])
     grp.create_dataset('lat', data=dispersion_all_ref['lat'])
     grp.create_dataset('lon', data=dispersion_all_ref['lon'])
-    grp.create_dataset('cluster', data=dispersion_all_ref['cluster'])
+    grp.create_dataset('clusterlist', data=np.array(params_dispersion['clusterlist']))
+    grp2 = grp.create_group('cluster')
+    for cl in dispersion_all_ref['cluster']:
+        grp2.create_dataset(str(cl), data=dispersion_all_ref['cluster'][cl])
     grp = f.create_group('dispersion_params')
     grp2 = grp.create_group('L')
     grp2.create_dataset('periods', data=params_dispersion['L']['periods'])
@@ -682,12 +727,14 @@ if rank == 0:
     grp2.create_dataset('periods', data=params_dispersion['R']['periods'])
     grp2.create_dataset('modes', data=params_dispersion['R']['modes'])
     grp = f.create_group('reference')
-    grp2 = grp.create_group('L')
-    grp2.create_dataset('dispersion', data=dispersion_ref['L']['dispersion'])
-    grp2.create_dataset('error', data=dispersion_ref['L']['error'])
-    grp2 = grp.create_group('R')
-    grp2.create_dataset('dispersion', data=dispersion_ref['R']['dispersion'])
-    grp2.create_dataset('error', data=dispersion_ref['R']['error'])
+    for cl in dispersion_all_ref['cluster']:
+        grp3 = grp.create_group(str(cl))
+        grp2 = grp3.create_group('L')
+        grp2.create_dataset('dispersion', data=dispersion_ref[cl]['L']['dispersion'])
+        grp2.create_dataset('error', data=dispersion_ref[cl]['L']['error'])
+        grp2 = grp3.create_group('R')
+        grp2.create_dataset('dispersion', data=dispersion_ref[cl]['R']['dispersion'])
+        grp2.create_dataset('error', data=dispersion_ref[cl]['R']['error'])
     grp = f.create_group('cluster')
     grp2 = grp.create_group('L')
     grp2.create_dataset('dispersion', data=dispersion_all_ref['L']['dispersion'])
@@ -706,9 +753,10 @@ if rank == 0:
 comm.Barrier()
 num_models_dict = params_dispersion['num_models']
 
-i = 25
+i = 0
 # for i in range(100,200):
 # for i in [100]:
+#for i in range(0,10):
 while i * batch < dispersion_all_ref['numdis'] + 1:
     # while i==0:
     if points == "all":
@@ -728,21 +776,22 @@ while i * batch < dispersion_all_ref['numdis'] + 1:
         print('get alphamax')
     alphafile = outdir + '/alphamax_' + file_suffix + '.txt'
 
-    found_alphamax = process_alphamax(comm, maxpercent, alphafile, dispersion_ref, dispersion_all, outdir_ref, points2, clusters, widenings)
+    found_alphamax = process_alphamax(comm, maxpercent, alphafile, dispersion_ref, dispersion_all, outdir_ref, points2, widenings)
 
     found_alphamax = comm.bcast(found_alphamax, root=0)
 
     if not found_alphamax:
         print('calculating alphamax')
         get_alpha_max(comm, directories, widenings, clusters, params_dispersion, dispersion_ref, dispersion_all,
-                      alphafile, outdir_ref=outdir_ref, maxpercent=maxpercent)
+                      alphafile, outdir_ref=outdir_ref, maxpercent=maxpercent, thin_target=thin_target)
 
     if rank == 0:
         print('apply functions')
     output = apply_stuff(comm, directories, widenings, clusters, functions, params_dispersion, dispersion_ref,
-                         dispersion_all, model_ref, outdir_ref=outdir_ref)  #
+                         dispersion_all, model_ref, outdir_ref=outdir_ref, thin_target=thin_target)  #
 
     if rank == 0:
+        print('printing result to files')
 
         ############################################################
         # print to files

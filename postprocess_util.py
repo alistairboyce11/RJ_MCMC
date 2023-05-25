@@ -54,9 +54,23 @@ def get_dispersion(directories, clusters, points=[], filename='dispersion_all.in
     params_dispersion = {}
     params_dispersion['R'] = {}
     params_dispersion['L'] = {}
-    params_dispersion['clusters'] = np.array(clusters)
+    params_dispersion['clusterlist'] = []
+    params_dispersion['directories'] = {}
+    dispersion_all['cluster'] = {}
+
 
     for ind_cluster in range(len(clusters)):
+
+        if clusters[ind_cluster] in dispersion_all['cluster']:
+            params_dispersion['directories'][clusters[ind_cluster]].append(directories[ind_cluster])
+            continue
+
+        params_dispersion['clusterlist'].append(clusters[ind_cluster])
+        params_dispersion['directories'][clusters[ind_cluster]] = [directories[ind_cluster]]
+
+        dispersion_ref[clusters[ind_cluster]]={}
+        dispersion_ref[clusters[ind_cluster]]['R']={}
+        dispersion_ref[clusters[ind_cluster]]['L']={}
 
         # different references for different clusters
         file = open(directories[ind_cluster] + '/' + filename, 'r')
@@ -72,7 +86,9 @@ def get_dispersion(directories, clusters, points=[], filename='dispersion_all.in
 
         dispersion_all['lat'] = np.array(file.readline().split()).astype('float')
         dispersion_all['lon'] = np.array(file.readline().split()).astype('float')
-        dispersion_all['cluster'] = np.array(file.readline().split()).astype('int')
+        clusterlist = np.array(file.readline().split()).astype('float')
+        clusterlist = clusterlist.astype(np.int64)
+        dispersion_all['cluster'][clusters[ind_cluster]] = np.where(clusterlist == clusters[ind_cluster])[0]
 
         # Read rayleigh data
         ndatad_R = int(file.readline())
@@ -115,16 +131,9 @@ def get_dispersion(directories, clusters, points=[], filename='dispersion_all.in
 
         # fill reference dispersion curves: one line per cluster
 
-        if ind_cluster == 0:
-            dispersion_ref['R']['dispersion'] = np.atleast_2d(dispersion_R_ref)
-            dispersion_ref['R']['error'] = np.atleast_2d(error_R_ref)
-            dispersion_ref['R']['error_sum'] = [np.sum(np.log(error_R_ref))]
-        else:
-            ar1, ar2 = np.atleast_2d(dispersion_ref['R']['dispersion'], dispersion_R_ref)
-            dispersion_ref['R']['dispersion'] = np.append(ar1, ar2, axis=0)
-            ar1, ar2 = np.atleast_2d(dispersion_ref['R']['error'], error_R_ref)
-            dispersion_ref['R']['error'] = np.append(ar1, ar2, axis=0)
-            dispersion_ref['R']['error_sum'].append(np.sum(np.log(error_R_ref)))
+        dispersion_ref[clusters[ind_cluster]]['R']['dispersion'] = dispersion_R_ref
+        dispersion_ref[clusters[ind_cluster]]['R']['error'] = error_R_ref
+        dispersion_ref[clusters[ind_cluster]]['R']['error_sum'] = np.sum(np.log(error_R_ref))
 
         # individual data, identical every time
         dispersion_all['R']['dispersion'] = dispersion_R
@@ -170,16 +179,10 @@ def get_dispersion(directories, clusters, points=[], filename='dispersion_all.in
 
                 j += 1
 
-        if ind_cluster == 0:
-            dispersion_ref['L']['dispersion'] = np.atleast_2d(dispersion_L_ref)
-            dispersion_ref['L']['error'] = np.atleast_2d(error_L_ref)
-            dispersion_ref['L']['error_sum'] = [np.sum(np.log(error_L_ref))]
-        else:
-            ar1, ar2 = np.atleast_2d(dispersion_ref['L']['dispersion'], dispersion_L_ref)
-            dispersion_ref['L']['dispersion'] = np.append(ar1, ar2, axis=0)
-            ar1, ar2 = np.atleast_2d(dispersion_ref['L']['error'], error_L_ref)
-            dispersion_ref['L']['error'] = np.append(ar1, ar2, axis=0)
-            dispersion_ref['L']['error_sum'].append(np.sum(np.log(error_L_ref)))
+        dispersion_ref[clusters[ind_cluster]]['L']['dispersion'] = dispersion_L_ref
+        dispersion_ref[clusters[ind_cluster]]['L']['error'] = error_L_ref
+        dispersion_ref[clusters[ind_cluster]]['L']['error_sum'] = np.sum(np.log(error_L_ref))
+        
         dispersion_all['L']['dispersion'] = dispersion_L
         dispersion_all['L']['error'] = error_L
         dispersion_all['L']['error_sum'] = np.sum(np.log(error_L), axis=0)
@@ -187,9 +190,8 @@ def get_dispersion(directories, clusters, points=[], filename='dispersion_all.in
         params_dispersion['L']['modes'] = mode_L
 
         file.close()
-    dispersion_ref['R']['error_sum'] = np.array(dispersion_ref['R']['error_sum'])
-    dispersion_ref['L']['error_sum'] = np.array(dispersion_ref['L']['error_sum'])
 
+    params_dispersion['clusterlist'] = np.array(params_dispersion['clusterlist'])
     return params_dispersion, dispersion_ref, dispersion_all
 
 
@@ -254,8 +256,9 @@ def get_metadata(directories, widenings):
     return
 
 
-def process_file_alphamax_all(file, clusters, widenings, cluster, widening, params_dispersion, dispersion_ref,
-                              dispersion_all, maxpercent, num_to_store, num_models_cur=np.exp(1.), file_probsum=None):
+def process_file_alphamax_all(file, widenings, cluster, widening, params_dispersion, dispersion_ref,
+                              dispersion_all, maxpercent, num_to_store, num_models_cur=np.exp(1.), file_probsum=None,
+                              thin_target=None):
     '''processes one file to get alphamax
     input: input_dict
     input_dict contains:
@@ -315,7 +318,16 @@ def process_file_alphamax_all(file, clusters, widenings, cluster, widening, para
     alpha_max = np.ones((num_to_store, numdis)) * float('-inf')
 
     params_inversion = read_header(lines[:9])
+
+    # thinning to get all files to same 'effective thinning'
+    if thin_target is None:
+        thin_true = 1
+    else:
+        thin_true = int(round(thin_target / params_inversion['thin']))
+    print('thin_true',thin_true)
+
     if not params_inversion:
+        f.close()
         return
 
     widening = params_inversion['widening']
@@ -326,9 +338,17 @@ def process_file_alphamax_all(file, clusters, widenings, cluster, widening, para
     i_model = 0
     # lines=f.readlines()
     probsums_out = []
+    maxlines = len(lines)
     while valid_model:
+        if 9 + 11 * (i_model) > maxlines:
+            valid_model = False
+            continue
         lines_model = lines[9 + 11 * i_model:9 + 11 * (i_model + 1)]
         i_model += 1
+        # thinning to get all files to same 'effective thinning'
+        if (i_model // params_inversion['num_proc']) % thin_true != 0:
+            continue
+
         valid_model, dispersion_one, model = read_model(lines_model, widening, cluster)
         if not valid_model:
             continue
@@ -336,6 +356,7 @@ def process_file_alphamax_all(file, clusters, widenings, cluster, widening, para
             continue
         elif len(dispersion_one['R']['dispersion']) == 0:
             continue
+
         # elif model['npt_true']<8:
         #    continue
         cnt += 1
@@ -352,7 +373,7 @@ def process_file_alphamax_all(file, clusters, widenings, cluster, widening, para
         #    valid_model=False
 
         # calculate alpha
-        alpha, probsum = get_alpha_all(dispersion_one, clusters, widenings, params_dispersion, dispersion_ref,
+        alpha, probsum = get_alpha_all(dispersion_one, widenings, params_dispersion, dispersion_ref,
                                        dispersion_all,
                                        num_models_cur, probsum_prop)
         probsums_out.append(probsum)
@@ -383,7 +404,7 @@ def process_file_alphamax_all(file, clusters, widenings, cluster, widening, para
     return alpha_max, num_model
 
 
-def get_alpha_all(dispersion_one, clusters, widenings, params_dispersion, dispersion_ref, dispersion_all,
+def get_alpha_all(dispersion_one, widenings, params_dispersion, dispersion_ref, dispersion_all,
                   num_models_cur=np.exp(1), probsum=None):
     '''
     Gets alpha for one dispersion curve
@@ -407,6 +428,7 @@ def get_alpha_all(dispersion_one, clusters, widenings, params_dispersion, disper
         alpha for all cluster members.
 
     '''
+    clusters = params_dispersion['clusterlist']
 
     ndatad_R = params_dispersion['R']['ndatad']
     ndatad_L = params_dispersion['L']['ndatad']
@@ -418,8 +440,6 @@ def get_alpha_all(dispersion_one, clusters, widenings, params_dispersion, disper
     Ad_L = dispersion_one['L']['Ad']
     error_R = dispersion_all['R']['error']
     error_L = dispersion_all['L']['error']
-    error_R_ref_sum = dispersion_ref['R']['error_sum']
-    error_L_ref_sum = dispersion_ref['L']['error_sum']
     # error_R_sum=dispersion_all['R']['error_sum']
     # error_L_sum=dispersion_all['L']['error_sum']
     numdis = dispersion_all['numdis']
@@ -456,15 +476,18 @@ def get_alpha_all(dispersion_one, clusters, widenings, params_dispersion, disper
             try:
                 numprob = 0.
                 probsum = 0.
-                for i in range(len(clusters)):
+                for cluster in clusters:
                     for widening in widenings:
-                        if params_dispersion['num_models'][clusters[i]][widening] == 0:
+                        if params_dispersion['num_models'][cluster][widening] == 0:
                             continue
-                        dispersion_R_ref = dispersion_ref['R']['dispersion'][i, :]
-                        dispersion_L_ref = dispersion_ref['L']['dispersion'][i, :]
+                        dispersion_R_ref = dispersion_ref[cluster]['R']['dispersion']
+                        dispersion_L_ref = dispersion_ref[cluster]['L']['dispersion']
 
-                        error_R_ref = dispersion_ref['R']['error'][i, :]
-                        error_L_ref = dispersion_ref['L']['error'][i, :]
+                        error_R_ref = dispersion_ref[cluster]['R']['error']
+                        error_L_ref = dispersion_ref[cluster]['L']['error']
+
+                        error_R_ref_sum=dispersion_ref[cluster]['R']['error_sum']
+                        error_L_ref_sum=dispersion_ref[cluster]['L']['error_sum']
 
                         if np.shape(dispersion_R_ref) == (0,):
                             print('here')
@@ -478,8 +501,8 @@ def get_alpha_all(dispersion_one, clusters, widenings, params_dispersion, disper
                         like_one -= np.sum(np.divide(np.square(dispersion_L_ref - dispersion_L_one),
                                                      2 * Ad_L ** 2 * np.square(
                                                          np.multiply(error_L_ref / 100., dispersion_L_ref))), axis=0)
-                        like_one -= error_R_ref_sum[i] + 150  # static shift to avoid exponential explosion
-                        like_one -= error_L_ref_sum[i] + 150  # static shift to avoid exponential explosion
+                        like_one -= error_R_ref_sum + 150  # static shift to avoid exponential explosion
+                        like_one -= error_L_ref_sum + 150  # static shift to avoid exponential explosion
                         like_one -= ndatad_R * np.log(Ad_R)
                         like_one -= ndatad_L * np.log(Ad_L)
                         like_one /= widening
@@ -517,6 +540,7 @@ def read_header(lines_header):
 
     d = lines_header.pop(
         0)  # f.readline() # contains rank of processor, number of file for the processor and number of models stored at most. Not used or tested currently
+    params_inversion['num_proc'] = 112
     params_inversion['everyall'] = int(float(d.split()[1]))
     data = lines_header.pop(0).split()  # f.readline().split()
     params_inversion['burn-in'] = float(data[0])
@@ -596,7 +620,6 @@ def read_model(lines_model, widening, cluster):
 
     dispersion_one['like_w'] = float(lines_model.pop(0))  # f.readline())
     model['like_w'] = dispersion_one['like_w']
-    dispersion_one['widening'] = widening
     dispersion_one['cluster'] = cluster
 
     len_R = int(lines_model.pop(0))  # f.readline())
@@ -686,8 +709,8 @@ def get_model_ref(filename='Modified_PREM_GLOBAL.in'):
     return model_ref
 
 
-def process_one_file_all(file, cluster, clusters_in, widenings_in, functions, params_dispersion, dispersion_ref,
-                         dispersion_all, model_ref, outputs_all={}, file_probsum=None):
+def process_one_file_all(file, cluster, widenings_in, functions, params_dispersion, dispersion_ref,
+                         dispersion_all, model_ref, outputs_all={}, file_probsum=None, thin_target=None):
     '''
     Processes one file, reading the podels in the file, applying the functions to them and stacking the results
 
@@ -718,6 +741,13 @@ def process_one_file_all(file, cluster, clusters_in, widenings_in, functions, pa
     f = open(file, 'r')
     lines = f.readlines()
     params_inversion = read_header(lines[:9])
+
+    # thinning to get all files to same 'effective thinning'
+    if thin_target is None:
+        thin_true = 1
+    else:
+        thin_true = int(round(thin_target / params_inversion['thin']))
+
     widening = params_inversion['widening']
 
     t2 = time.time()
@@ -761,16 +791,27 @@ def process_one_file_all(file, cluster, clusters_in, widenings_in, functions, pa
     numtot = 0
     i_model = 0
     valid_model = True
+    maxlines = len(lines)
     while valid_model:
+        if 9 + 11 * (i_model) > maxlines:
+            valid_model = False
+            continue
         lines_model = lines[9 + 11 * i_model:9 + 11 * (i_model + 1)]
         i_model += 1
+        # thinning to get all files to same 'effective thinning'
+        if (i_model // params_inversion['num_proc']) % thin_true != 0:
+            continue
         t1 = time.time()
         valid_model, dispersion_one, model = read_model(lines_model, widening, cluster)
         #        if numtot>1000:
         #            valid_model=False
         if not valid_model:
+            t2 = time.time()
+            time_read += t2 - t1    
             continue
         elif len(dispersion_one.keys()) == 0:
+            t2 = time.time()
+            time_read += t2 - t1
             continue
 
         t2 = time.time()
@@ -786,7 +827,7 @@ def process_one_file_all(file, cluster, clusters_in, widenings_in, functions, pa
             probsum_prop = float(lines_probsum[i_line_probsum])
             i_line_probsum += 1
 
-        alpha, probsum = get_alpha_all(dispersion_one, clusters_in, widenings_in, params_dispersion, dispersion_ref,
+        alpha, probsum = get_alpha_all(dispersion_one, widenings_in, params_dispersion, dispersion_ref,
                                        dispersion_all,
                                        num_models_cur=params_dispersion['num_models'][cluster][widening],
                                        probsum=probsum_prop)
@@ -844,7 +885,7 @@ def process_one_file_all(file, cluster, clusters_in, widenings_in, functions, pa
     return alpha_sum, numtot, exp_sum
 
 
-def get_alpha_norm(dispersion_one, clusters, widenings, params_dispersion, dispersion_ref, dispersion_all):
+def get_alpha_norm(dispersion_one, widenings, params_dispersion, dispersion_ref, dispersion_all):
     '''
     Gets alpha for one dispersion curve
 
@@ -867,6 +908,7 @@ def get_alpha_norm(dispersion_one, clusters, widenings, params_dispersion, dispe
         alpha for all cluster members.
 
     '''
+    clusters = params_dispersion['clusterlist']
 
     ndatad_R = params_dispersion['R']['ndatad']
     ndatad_L = params_dispersion['L']['ndatad']
@@ -973,24 +1015,25 @@ def get_alpha_norm(dispersion_one, clusters, widenings, params_dispersion, dispe
     return alpha
 
 
-def count_models(directories, clusters, widenings, params_dispersion, comm):
+def count_models(directories, widenings, params_dispersion, comm, thin_target=None):
     size = comm.Get_size()
     rank = comm.Get_rank()
     rank2 = rank
 
+    clusters = params_dispersion['clusterlist']
+
     files_all = []
     num_models_dict = {}
     # initiate stuff
-    for i_dir in range(len(directories)):
-        directory = directories[i_dir]
-        cluster_cur = clusters[i_dir]
-        num_models_dict[cluster_cur] = {}
-        for widening in widenings:
-            num_models_dict[cluster_cur][widening] = 0
-            # list files
-            files_all_tmp = glob.glob(directory + '/All_models_processed_prepare_*%4.2f.out' % widening)
-            files_all_tmp.sort()
-            files_all.extend(files_all_tmp)
+    for i, cluster in enumerate(clusters):
+        num_models_dict[cluster] = {}
+        for directory in params_dispersion['directories'][cluster]:
+            for widening in widenings:
+                num_models_dict[cluster][widening] = 0
+                # list files
+                files_all_tmp = glob.glob(directory + '/All_models_processed_prepare_*%4.2f.out' % widening)
+                files_all_tmp.sort()
+                files_all.extend(files_all_tmp)
 
     whodoeswhat = {}
     for i in range(len(files_all)):
@@ -1003,10 +1046,12 @@ def count_models(directories, clusters, widenings, params_dispersion, comm):
             num_models_dict[i][widening] = 0
 
     for i, cluster in enumerate(clusters):
-        directory = directories[i]
         for widening in widenings:
-            files_all_tmp = glob.glob(directory + '/All_models_processed_prepare_*%4.2f.out' % widening)
-            # files_all_tmp=['OUT_CLUSTER0_START/OUT/All_models_processed_prepare_0000_ 1.00.out']
+            files_all_tmp = []
+            for directory in params_dispersion['directories'][cluster]:
+            
+                files_all_tmp.extend(glob.glob(directory + '/All_models_processed_prepare_*%4.2f.out' % widening))
+                # files_all_tmp=['OUT_CLUSTER0_START/OUT/All_models_processed_prepare_0000_ 1.00.out']
             files_all_tmp.sort()
             files = []
             for i in range(len(files_all_tmp)):
@@ -1036,14 +1081,15 @@ def count_models(directories, clusters, widenings, params_dispersion, comm):
                 file = files[i]
 
                 # process one file
-                num_models_prop = count_one_file(files[i])
+                print('counting for file', file, 'rank', rank)
+                num_models_prop = count_one_file(files[i], thin_target=thin_target)
                 num_models_tmp += num_models_prop
 
             computing[:] = [x for x in computing if x != 0]
             # merge results between cores on core 0
             if rank in np.unique(computing):
                 comm.Ssend([np.array([num_models_tmp]), MPI.INT], dest=0,
-                           tag=3 + int(widening) * 100 + int(cluster) * 1000)
+                            tag=3 + int(widening) * 100 + int(cluster) * 1000)
             if rank == 0:
                 # recieve and merge data from all other cores
                 for i in np.unique(computing):
@@ -1063,23 +1109,41 @@ def count_models(directories, clusters, widenings, params_dispersion, comm):
     return
 
 
-def count_one_file(file):
+def count_one_file(file, thin_target=None):
     f = open(file, 'r')
     lines = f.readlines()
-    read_header(lines[:9])
+
+    params_inversion = read_header(lines[:9])
+
+    # thinning to get all files to same 'effective thinning'
+    if thin_target is None:
+        thin_true = 1
+    else:
+        thin_true = int(round(thin_target / params_inversion['thin']))
+
+    if not params_inversion:
+        return
 
     valid_model = True
     cnt = 0
     i_model = 0
-    print(file)
+    maxlines = len(lines)
+    print('decimation: ',thin_true)
     while valid_model:
+        if 9 + 11 * (i_model) > maxlines:
+            valid_model = False
+            continue
         lines_model = lines[9 + 11 * i_model:9 + 11 * (i_model + 1)]
         i_model += 1
+        # thinning to get all files to same 'effective thinning'
+        if (i_model // params_inversion['num_proc']) % thin_true != 0:
+            continue
         valid_model, dispersion_one, model = read_model(lines_model, 1, 0)
         if not valid_model:
             continue
         elif len(dispersion_one.keys()) == 0:
             continue
+
         cnt += 1
     f.close()
     return cnt
