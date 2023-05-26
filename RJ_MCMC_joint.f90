@@ -24,7 +24,7 @@ program RJ_MCMC
     real log, sqrt
 
     integer i,ii,sample,ind,ount,k ! various indices
-    integer th,th_all
+    integer th
     integer nlims_cur,nlims_cur_diff
     logical ier, error_flag ! error flags for dispersion curves and minos_bran
     integer npt,npt_prop,npt_iso,npt_ani ! numbers of points, isotropic, anisotropic
@@ -65,8 +65,8 @@ program RJ_MCMC
     !for MPI
     integer ra,ran,rank, nbproc, ierror ,status(MPI_STATUS_SIZE),group_world,good_group,MPI_COMM_small,flag
     ! ierror: MPI-related error status, nbproc: MPI-related, number of processes, rank, group_world: MPI-related
-    character filename*130, number*4, filenametmp*300
-    character filenamemax*30  !filename for writing the best model
+    character filename*13, number*4, filenametmp*300
+    character filenamemax*300  !filename for writing the best model
     real model_ref(mk,9) ! reference model, all models are deviations from it
     real,dimension(mk) :: r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,xi,vp_data,vs_data ! input for forward modelling
     integer nptfinal,nic,noc,nic_ref,noc_ref,jcom ! more inputs
@@ -112,8 +112,6 @@ program RJ_MCMC
     real convAd_Ls(burn_in_widening+nsample_widening) !variations of uncertainty parameters
     real convsigmav(burn_in_widening+nsample_widening)
     real convsigmavs(burn_in_widening+nsample_widening)
-    real convsigmavp(burn_in_widening+nsample_widening)
-    real convsigmavps(burn_in_widening+nsample_widening)
 
     real ncell_bi(burn_in)
     real ncells_bi(burn_in)
@@ -145,8 +143,6 @@ program RJ_MCMC
     real convAd_Ls_bi(burn_in) !variations of uncertainty parameters
     real convsigmav_bi(burn_in)
     real convsigmavs_bi(burn_in)
-    real convsigmavp_bi(burn_in)
-    real convsigmavps_bi(burn_in)
 
     ! for mpi write purposes
     integer filehandle
@@ -177,16 +173,9 @@ program RJ_MCMC
     nb_bytes_model=7*nb_bytes_integer+(1+4*mk+2*ndatadmax)*nb_bytes_real+2*nb_bytes_double ! number of bytes in each model
     write(*,*)'nb_bytes_model',nb_bytes_model
 
-    !Start Parralelization of the code. From now on, the code is run on each
-    !processor independently, with ra = the number of the proc.
-
-    ra=0
-
     !************************************************************
     !                READ PREM
     !************************************************************
-
-    nlims_cur=1
     open(7,file="Modified_PREM_GLOBAL.in",status='old',form='formatted')
     !open(7,file="Model_PREM_SIMPLE.in",status='old',form='formatted')
     !  110 format(20a4)
@@ -204,6 +193,8 @@ program RJ_MCMC
     j=j-1
 
     write(*,*)'read prem'
+
+    nlims_cur=1
     open(65,file=dirname//'/dispersion_all.in',status='old')! 65: name of the opened file in memory (unit identifier)
     read(65,*,IOSTAT=io)numdis
     read(65,*,IOSTAT=io) ! I don't need to read the individual dispersion curves anymore
@@ -272,13 +263,13 @@ program RJ_MCMC
 
     write(*,*)dirname
 
-    pxi = 0.4             ! proposal for change in xi
+    pxi = 0.1             ! proposal for change in xi
     p_vp = 0.1           ! proposal for change in vp/vsv
     pd = 10!0.2         ! proposal on change in position
     pv = 0.1!0.04     ! proposal on velocity
     pAd_R = 0.5        ! proposal for change in R noise
     pAd_L = 0.5        ! proposal for change in L noise
-    sigmav=0.15         ! proposal for vsv when creating a new layer
+    sigmav=0.1         ! proposal for vsv when creating a new layer
 
 
 
@@ -292,10 +283,6 @@ program RJ_MCMC
     ! Initilalise sigma (noise parameter)
     Ad_R = Ad_R_max-pAd_R! Ad_min+ran3(ra)*(Ad_R_max-Ad_min)
     Ad_L = Ad_L_max-pAd_L
-
-    !! start from true Ad
-    !Ad_R = 10
-    !Ad_L = 5
 
     j=0
     tes=.false.
@@ -334,7 +321,7 @@ program RJ_MCMC
         enddo
 
         !write(*,*)'before combine_linear'
-        call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+        call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
             r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,vs_data,xi,vp_data)
 
         !write(*,*)'after combine_linear'
@@ -435,31 +422,33 @@ program RJ_MCMC
 
     if (ran==0) write(*,*)widening
     if (ran==0) write(*,*)like,like_w
-
-    lsd_R=0
-    lsd_L=0
-
-    ncell=0
-    ncells=0
-    convd_R=0
-    convd_L=0
-    convd_Rs=0
-    convd_Ls=0
-    convB=0
-    convBs=0
-    convBa=0
-    convBas=0
-    convD=0
-    convDs=0
-    convvs=0
-    convvss=0
-    convdp=0
-    convdps=0
-    convDa=0
-    convDas=0
-    convP=0
-    convPs=0
-    ier=.false.
+    
+    ncell_bi=0
+    ncells_bi=0
+    convd_R_bi=0
+    convd_L_bi=0
+    convd_Rs_bi=0
+    convd_Ls_bi=0
+    convB_bi=0
+    convBs_bi=0
+    convBa_bi=0
+    convBas_bi=0
+    convD_bi=0
+    convDs_bi=0
+    convvs_bi=0
+    convvss_bi=0
+    convdp_bi=0
+    convdps_bi=0
+    convDa_bi=0
+    convDas_bi=0
+    convP_bi=0
+    convPs_bi=0
+    convAd_R_bi=0
+    convAd_Rs_bi=0
+    convAd_L_bi=0
+    convAd_Ls_bi=0
+    convsigmav_bi=0
+    convsigmavs_bi=0
 
     write(*,*)'DONE INITIALIZING'
 
@@ -468,6 +457,7 @@ program RJ_MCMC
     burnin_in_progress=.true.
 
     widening=widening_start
+    
     do i_w=1,n_w
 
         num_file=-1
@@ -546,64 +536,31 @@ program RJ_MCMC
                 if ((Acnd_R/(Prnd_R+1))<0.34) pAd_R=pAd_R*(1-perturb)
                 if ((Acnd_L/(Prnd_L+1))>0.54) pAd_L=pAd_L*(1+perturb) ! for love waves
                 if ((Acnd_L/(Prnd_L+1))<0.34) pAd_L=pAd_L*(1-perturb)
-
                 if ((Acv/(Prv+1))>0.54) pv=pv*(1+perturb) ! 2 layers for vsv
                 if ((Acv/(Prv+1))<0.34) pv=pv*(1-perturb)
-
                 if ((Acp/(Prp+1))>0.54) pd=pd*(1+perturb) ! 2 layers for changing depth
                 if ((Acp/(Prp+1))<0.34) pd=pd*(1-perturb)
 
-                !------------------------------------------------
-                ! UPDATE SIGMAV
-
-                !write(*,*) '****',AcB/PrB,(Ar_birth_old/100.),0.5*((AcB/PrB)-(AcD/PrD))
-                if ((abs((AcB/PrB)-Ar_birth_old)>2*abs((AcB/PrB)-(AcD/PrD))).and.&
-                    (AcB.ne.0)) then !special treatement for adding/removing layers
-                    !write(*,*)
-                    !write(*,*)'update ---------------------'
-                    !write(*,*)Ar_birth_old,100*AcB/PrB
-                    !write(*,*)sigmav_old,sigmav
-
-                    if ((AcB/PrB)>Ar_birth_old) then! Going in the right direction
-                        if (sigmav>sigmav_old) then !Going up
-                            sigmav_new=sigmav*(1+perturb)
-                        else !Going down
-                            sigmav_new=sigmav*(1-perturb)
-                        endif
-                    else ! Going in the wrong direction
-                        if (sigmav>sigmav_old) then !Going up
-                            sigmav_new=sigmav*(1-perturb)
-                        else
-                            sigmav_new=sigmav*(1+perturb)
-                        endif
-                    endif
-                    !write(*,*)sigmav_new
-                    !write(*,*)
-                    sigmav_old=sigmav
-                    sigmav=sigmav_new
-                    Ar_birth_old=AcB/PrB
-                    PrB=0
-                    PrD=0
-                    AcB=0
-                    AcD=0
-                endif
-
+                PrB=0
+                PrD=0
+                AcB=0
+                AcD=0
                 PrP=0
                 PrV=0
                 PrBa=0
                 PrDa=0
-                AcP=0
-                AcV=0
                 AcBa=0
                 AcDa=0
+                AcP=0
+                AcV=0
                 Acnd_R=0
                 Prnd_R=0
+                Prnd_L=0
+                Acnd_L=0
                 Acxi=0
                 Prxi=0
                 Ac_vp=0
                 Pr_vp=0
-                Prnd_L=0
-                Acnd_L=0
             endif
 
             isoflag_prop = isoflag
@@ -611,10 +568,7 @@ program RJ_MCMC
             like_prop =like
             liked_R_prop=liked_R
             liked_L_prop=liked_L
-
-
             npt_prop = npt
-
             lsd_R_prop = lsd_R
             lsd_L_prop =lsd_L
             Ad_R_prop = Ad_R
@@ -743,8 +697,11 @@ program RJ_MCMC
                 ind=ceiling(ran3(ra)*npt)
                 if (ind==0) ind=1
 
-                !if (ount.GT.burn_in) then
-                !write(*,*)voro(ind,1),d_max/2
+                if (ind>npt) then
+                    write(*,*)npt,ind
+                    stop "763"
+                endif
+
                 PrV=PrV+1
                 voro_prop(ind,2)=voro(ind,2)+gasdev(ra)*pv
 
@@ -771,14 +728,11 @@ program RJ_MCMC
                     call whichcell_d(voro_prop(npt_prop,1),voro,npt,ind)!
 
                     voro_prop(npt_prop,2) = voro(ind,2)+gasdev(ra)*sigmav ! sigmav: special width for new layers
-                    !voro_prop(npt_prop,2) = -width+2*width*ran3(ra) ! use completely random new value
                     voro_prop(npt_prop,3) = -1
-                    !voro_prop(npt_prop,4) = voro(ind,4)+gasdev(ra)*p_vp
                     voro_prop(npt_prop,4) = vp_min+(vp_max-vp_min)*ran3(ra)
                     isoflag_prop(npt_prop) = .true.
 
                     logprob_vsv=log(1/(sigmav*sqrt(2*pi)))-((voro(ind,2)-voro_prop(npt_prop,2))**2)/(2*sigmav**2) ! correct acceptance rates because transdimensional
-                    !logprob_vp=log(1/(p_vp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(npt_prop,4))**2)/(2*p_vp**2)
 
                     !Check bounds
                     if ((voro_prop(npt_prop,2)<=-width).or.(voro_prop(npt_prop,2)>=width)) then
@@ -820,7 +774,6 @@ program RJ_MCMC
 
                     call whichcell_d(voro(ind,1),voro_prop,npt_prop,ind2)
                     logprob_vsv=log(1/(sigmav*sqrt(2*pi)))-((voro(ind,2)-voro_prop(ind2,2))**2)/(2*sigmav**2) ! same as for birth
-                    !logprob_vp=log(1/(p_vp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(ind2,4))**2)/(2*p_vp**2)
 
                 endif
             elseif (u<0.9) then !Birth an anisotropic layer----------------------------------------
@@ -882,7 +835,7 @@ program RJ_MCMC
             !**************************************************************************
             if (out==1) then ! maybe we don't need a forward calculation for changes in noise parameters
 
-                call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro_prop,npt_prop,d_max,&
+                call combine(model_ref,nptref,nic_ref,noc_ref,voro_prop,npt_prop,d_max,&
                     r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,vs_data,xi,vp_data)
 
                 if (ndatad_R>0) then
@@ -1088,7 +1041,6 @@ program RJ_MCMC
                     write(*,*)'AR_value',100*AcV/PrV
 
                     write(*,*)'AR_Birth',100*AcB/PrB,'AR_Death',100*AcD/PrD
-                    write(*,*)'sigmav',sigmav
                     write(*,*)'AR_Birtha',100*AcBa/PrBa,'AR_Deatha',100*AcDa/PrDa
                     write(*,*)'AR_xi',100*Acxi/Prxi,'pxi',pxi
                     write(*,*)'AR__vp',100*Ac_vp/Pr_vp,'p_vp',p_vp
@@ -1121,11 +1073,9 @@ program RJ_MCMC
                 !endif
 
                 if (ount>burn_in) then
-                    write(*,*)'burn-in done',rank
                     burnin_in_progress=.false.
                     ount=0
-                    call MPI_BARRIER(MPI_COMM_WORLD, ierror)
-                    write(*,*)'barrier reached',rank
+
                     call MPI_REDUCE(convBa_bi,convBas_bi,burn_in,&
                     MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
                     call MPI_REDUCE(convB_bi,convBs_bi,burn_in,&
@@ -1174,7 +1124,7 @@ program RJ_MCMC
                     endif
 
                     call MPI_BARRIER(MPI_COMM_WORLD, ierror)
-                    write(*,*)'reducing done',rank
+
                     IF (rank==0) THEN
 
                         write(filenametmp,"('/Convergence_Birth_burn-in_',I3.3,'.out')")rank
@@ -1213,7 +1163,7 @@ program RJ_MCMC
                         open(54,file=dirname//filenametmp,status='replace')
                         write(54,*)burn_in,n_w,burn_in_widening,nsample_widening
                         do i=1,burn_in
-                            write(54,*)convdp(i)
+                            write(54,*)convdp_bi(i)
                         enddo
                         close(54)
 
@@ -1221,7 +1171,7 @@ program RJ_MCMC
                         open(54,file=dirname//filenametmp,status='replace')
                         write(54,*)burn_in,n_w,burn_in_widening,nsample_widening
                         do i=1,burn_in
-                            write(54,*)convxi(i)
+                            write(54,*)convxi_bi(i)
                         enddo
                         close(54)
 
@@ -1301,7 +1251,7 @@ program RJ_MCMC
                         open(54,file=dirname//filenametmp,status='replace')
                         write(54,*)burn_in,n_w,burn_in_widening,nsample_widening
                         do i=1,burn_in
-                            write(54,*)convdps(i)
+                            write(54,*)convdps_bi(i)
                         enddo
                         close(54)
 
@@ -1309,7 +1259,7 @@ program RJ_MCMC
                         open(54,file=dirname//filenametmp,status='replace')
                         write(54,*)burn_in,n_w,burn_in_widening,nsample_widening
                         do i=1,burn_in
-                            write(54,*)convxis(i)
+                            write(54,*)convxis_bi(i)
                         enddo
                         close(54)
 
@@ -1390,7 +1340,7 @@ program RJ_MCMC
                         open(54,file=dirname//filenametmp,status='replace')
                         write(54,*)burn_in,n_w,burn_in_widening,nsample_widening
                         do i=1,burn_in
-                            write(54,*)convdp(i)
+                            write(54,*)convdp_bi(i)
                         enddo
                         close(54)
 
@@ -1398,7 +1348,7 @@ program RJ_MCMC
                         open(54,file=dirname//filenametmp,status='replace')
                         write(54,*)burn_in,n_w,burn_in_widening,nsample_widening
                         do i=1,burn_in
-                            write(54,*)convxi(i)
+                            write(54,*)convxi_bi(i)
                         enddo
                         close(54)
 
@@ -1443,7 +1393,7 @@ program RJ_MCMC
                         close(53)
 
                     endif
-                    write(*,*)'writing done',rank
+
                 endif
 
                 cycle ! continue the loop skipping anything below
@@ -1466,15 +1416,14 @@ program RJ_MCMC
                 close(rank*100)
             ENDIF
 
-            IF ((ount.GT.burn_in_widening).and.(.not.(burnin_in_progress))) THEN
+            IF (ount.GT.burn_in_widening) THEN
                 sample=sample+1
 
                 IF (mod(ount,thin)==0) THEN
 
                     th = th + 1
-                    th_all=th_all+1
 
-                    call combine_linear_vp(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
+                    call combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                         r,rho,vpv,vph,vsv,vsh,qkappa,qshear,eta,nptfinal,nic,noc,vs_data,xi,vp_data)
 
                     !write(*,*)th-1,nbproc,rank,(th-1)*nbproc,everyall,filenamemax
@@ -1486,7 +1435,7 @@ program RJ_MCMC
                     num_file=num_file+1
 
                     write(*,*)num_file,widening
-                    write(filenamemax,"('/All_models_prepare_',I3.3,'_',f5.2,'.out')")num_file,widening
+                    write(filenamemax,"('/All_models_prepare_',I4.4,'_',f5.2,'.out')")num_file,widening
                     write(*,*)filenamemax
 
                     call MPI_FILE_OPEN(MPI_COMM_WORLD,dirname//filenamemax,MPI_MODE_WRONLY + MPI_MODE_CREATE, &
@@ -1651,29 +1600,32 @@ program RJ_MCMC
                     !write(*,*)'writing time (once every 20 iterations)',t2-t1
 
                 endif
-                !get convergence
-                convBa(ount)=100*AcBa/PrBa ! acceptance rates in percent
-                convB(ount)=100*AcB/PrB
-                convDa(ount)=100*AcDa/PrDa
-                convD(ount)=100*AcD/PrD
-                convvp(ount)=100*Ac_vp/Pr_vp
-                convvs(ount)=100*Acv/Prv
-                convdp(ount)=100*Acp/Prp
-                convxi(ount)=100*Acxi/Prxi
-                convd_R(ount)=lsd_R
-                convd_L(ount)=lsd_L
-                ncell(ount)=npt
-                convAd_R(ount)=Ad_R
-                convAd_L(ount)=Ad_L
+                
             endif
-                !**********************************************************************
+            
+            !get convergence
+            convBa(ount)=100*AcBa/PrBa ! acceptance rates in percent
+            convB(ount)=100*AcB/PrB
+            convDa(ount)=100*AcDa/PrDa
+            convD(ount)=100*AcD/PrD
+            convvp(ount)=100*Ac_vp/Pr_vp
+            convvs(ount)=100*Acv/Prv
+            convdp(ount)=100*Acp/Prp
+            convxi(ount)=100*Acxi/Prxi
+            convd_R(ount)=lsd_R
+            convd_L(ount)=lsd_L
+            ncell(ount)=npt
+            convAd_R(ount)=Ad_R
+            convAd_L(ount)=Ad_L
 
-                !       Display what is going on every "Display" samples
+            !**********************************************************************
 
-                !**********************************************************************
+            !       Display what is going on every "Display" samples
+
+            !**********************************************************************
 
             IF ((mod(ount,display).EQ.0).and.(mod(ran,10).EQ.0)) THEN
-   
+
                 write(*,*)'processor number',ran+1,'/',nbproc
                 write(*,*)'widening',widening
                 if (mod(ount,burn_in_widening+nsample_widening)<burn_in_widening) then
@@ -1687,6 +1639,7 @@ program RJ_MCMC
                 write(*,*)'Acceptance rates'
                 write(*,*)'AR_move',100*AcP/PrP
                 write(*,*)'AR_value',100*AcV/PrV
+
                 write(*,*)'AR_Birth',100*AcB/PrB,'AR_Death',100*AcD/PrD,'sigmav',sigmav
                 write(*,*)'AR_Birtha',100*AcBa/PrBa,'AR_Deatha',100*AcDa/PrDa
                 write(*,*)'AR_xi',100*Acxi/Prxi,'pxi',pxi
@@ -1698,13 +1651,10 @@ program RJ_MCMC
                 write(*,*)'-----------------------------------------'
                 write(*,*)
                 write(*,*)
-
-            endif
-
-            !write(*,*)ount
-
-            !endif
+            END IF
         end do !End Markov chain
+        call MPI_BARRIER(MPI_COMM_WORLD, ierror)
+        call MPI_FILE_CLOSE(filehandle,ierror)
 
         k=0
         if (th.ne.0) then !normalize averages
@@ -1721,8 +1671,6 @@ program RJ_MCMC
         do i=1,nbproc
             call MPI_REDUCE(inorout,inorouts,21000,MPI_Integer,MPI_Sum,i-1,MPI_COMM_WORLD,ierror)
         enddo
-
-        write(*,*)'rank=',ran,'th=',th
 
         j=0
         k=0
@@ -1746,43 +1694,36 @@ program RJ_MCMC
         enddo
 
 
-        call MPI_Group_incl(group_world, j, members, good_group, ierror)
-        !IF (ran==0) write(*,*)'1'
-        !write(*,*)ran,members(1:9)
-        call MPI_Comm_create(MPI_COMM_WORLD, good_group, MPI_COMM_small, ierror)
-        !IF (ran==0) write(*,*)'2'
+        call MPI_REDUCE(convBa,convBas,(burn_in_widening+nsample_widening),&
+        MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
+        call MPI_REDUCE(convB,convBs,(burn_in_widening+nsample_widening),&
+        MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
+        call MPI_REDUCE(convDa,convDas,(burn_in_widening+nsample_widening),&
+        MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
+        call MPI_REDUCE(convD,convDs,(burn_in_widening+nsample_widening),&
+        MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
+        call MPI_REDUCE(convvp,convvps,(burn_in_widening+nsample_widening),&
+        MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
+        call MPI_REDUCE(convvs,convvss,(burn_in_widening+nsample_widening),&
+        MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
+        call MPI_REDUCE(convdp,convdps,(burn_in_widening+nsample_widening),&
+        MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
+        call MPI_REDUCE(convxi,convxis,(burn_in_widening+nsample_widening),&
+        MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
+        call MPI_REDUCE(convd_R,convd_Rs,(burn_in_widening+nsample_widening),&
+        MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
+        call MPI_REDUCE(convd_L,convd_Ls,(burn_in_widening+nsample_widening),&
+        MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
+        call MPI_REDUCE(convAd_R,convAd_Rs,(burn_in_widening+nsample_widening),&
+        MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
+        call MPI_REDUCE(convAd_L,convAd_Ls,(burn_in_widening+nsample_widening),&
+        MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
+        call MPI_REDUCE(ncell,ncells,(burn_in_widening+nsample_widening),&
+        MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
+        call MPI_REDUCE(convsigmav,convsigmavs,(burn_in_widening+nsample_widening),&
+        MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
 
-        if (flag==1) then
-
-            call MPI_REDUCE(convBa,convBas,(burn_in_widening+nsample_widening),&
-            MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
-            call MPI_REDUCE(convB,convBs,(burn_in_widening+nsample_widening),&
-            MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
-            call MPI_REDUCE(convDa,convDas,(burn_in_widening+nsample_widening),&
-            MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
-            call MPI_REDUCE(convD,convDs,(burn_in_widening+nsample_widening),&
-            MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
-            call MPI_REDUCE(convvp,convvps,(burn_in_widening+nsample_widening),&
-            MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
-            call MPI_REDUCE(convvs,convvss,(burn_in_widening+nsample_widening),&
-            MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
-            call MPI_REDUCE(convdp,convdps,(burn_in_widening+nsample_widening),&
-            MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
-            call MPI_REDUCE(convxi,convxis,(burn_in_widening+nsample_widening),&
-            MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
-            call MPI_REDUCE(convd_R,convd_Rs,(burn_in_widening+nsample_widening),&
-            MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
-            call MPI_REDUCE(convd_L,convd_Ls,(burn_in_widening+nsample_widening),&
-            MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
-            call MPI_REDUCE(convAd_R,convAd_Rs,(burn_in_widening+nsample_widening),&
-            MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
-            call MPI_REDUCE(convAd_L,convAd_Ls,(burn_in_widening+nsample_widening),&
-            MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
-            call MPI_REDUCE(ncell,ncells,(burn_in_widening+nsample_widening),&
-            MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
-            call MPI_REDUCE(convsigmav,convsigmavs,(burn_in_widening+nsample_widening),&
-            MPI_Real,MPI_Sum,0,MPI_COMM_WORLD,ierror)
-
+        if (rank==0) then
             convPs=convPs/nbproc
             convBs=convBs/nbproc
             convBas=convBas/nbproc
@@ -1798,8 +1739,9 @@ program RJ_MCMC
             convAd_Ls=convAd_Ls/nbproc
             convsigmavs=convsigmavs/nbproc
             ncells=ncells/nbproc
-
         endif
+        
+        call MPI_BARRIER(MPI_COMM_WORLD, ierror)
 
         !***********************************************************************
 
@@ -1807,7 +1749,7 @@ program RJ_MCMC
 
         !***********************************************************************
 
-        IF (ran==members(1)) THEN
+        IF (rank==0) THEN
             write(filenametmp,"('/Convergence_Birth_',f5.2'_',I3.3,'.out')")widening,rank
             open(54,file=dirname//filenametmp,status='replace')
             write(54,*)burn_in,n_w,burn_in_widening,nsample_widening
@@ -2074,10 +2016,6 @@ program RJ_MCMC
             close(53)
 
         ENDIF
-
-        call MPI_Group_free(good_group, ierror)
-        call MPI_Comm_free(MPI_COMM_small, ierror)
-        call MPI_BARRIER(MPI_COMM_WORLD, ierror)
 
         widening=widening+widening_step
 
