@@ -90,7 +90,7 @@ subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
 
         if (j>npt) then
 
-            if ((j>npt+1).and.(model_ref(i,1)<radius(npt+1))) then
+            if ((j>npt+1)) then
 
                 r(k)=model_ref(i,1)
                 rho(k)=model_ref(i,2)
@@ -108,7 +108,7 @@ subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
                 k=k-1
                 i=i-1
 
-            elseif ((j==npt+1).and.(model_ref(i,1)<=radius(j))) then
+            elseif ((model_ref(i,1)<=radius(j))) then
                 r(k)=radius(j)
 
                 rho(k)=interp(model_ref(i,1),model_ref(i+1,1),model_ref(i,2),model_ref(i+1,2),r(k))
@@ -149,7 +149,7 @@ subroutine combine(model_ref,nptref,nic_ref,noc_ref,voro,npt,d_max,&
 
                 j=j+1
 
-            elseif ((j==npt+1).and.(model_ref(i,1)>radius(j))) then
+            elseif ((model_ref(i,1)>radius(j))) then
                 r(k)=model_ref(i,1)
                 rho(k)=model_ref(i,2)
                 qkappa(k)=model_ref(i,5)
