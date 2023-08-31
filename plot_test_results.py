@@ -11,7 +11,7 @@ from matplotlib import rcParams
 matplotlib.rcParams['font.family'] = 'sans-serif'
 matplotlib.rcParams['font.sans-serif'] = ['Arial']
 matplotlib.rcParams['font.size'] = 10
-import os, sys
+import os, sys, glob
 import matplotlib.patches as patches
 from matplotlib.ticker import NullFormatter, LinearLocator
 from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,AutoMinorLocator)
@@ -22,7 +22,12 @@ from scipy import stats
 import pandas
 from numpy import unravel_index
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+from scipy.interpolate import interp1d
+from scipy.signal import decimate
+
 cm = 1/2.54
+dec_post=100 # Smoothing/decimation of the posterior to 100 points on the depth section
+
 # Make it work for Python 2+3 and with Unicode
 import io
 try:
@@ -33,13 +38,13 @@ except NameError:
 ####################### SET PARAMS ############################################
 # input directory, contains all the outputs from the MCMC code
 
-Layer_Hist      = True
-Layers_Aniso_Tr = True
+Layer_Hist      = False
+Layers_Aniso_Tr = False
 Dispersion      = True
 Posterior       = True
 Posterior2      = True
-Sigmad          = True
-Convergence     = True
+Sigmad          = False
+Convergence     = False
 PsPp_Fit        = False
 Corr_Hist       = False
 
@@ -64,13 +69,13 @@ if Corr_Hist:
         exit('exiting....')
     
     av_int = int(sys.argv[2])
-    if av_int!=50 and av_int!=100 and av_int!=200:
+    if av_int!=50 and av_int!=100 and av_int!=200 and av_int!=150 and av_int!=300:
         print('Bad av_int supplied...')
         print('Options [2] :     Averaging interval, 50,100,200')
         exit('exiting....')
 
     dh=int(sys.argv[3])
-    if dh!=50 and dh!=100 and dh!=200:
+    if dh!=50 and dh!=100 and dh!=200 and dh!=31 and dh!=61 and dh!=201:
         print('Bad histogram discretization supplied...')
         print('Options [3] :     hist discretisation, 50,100,200')
         exit('exiting....')
@@ -106,8 +111,29 @@ maxnlay = 80
 
 fname_pre=str(os.getcwd().split('/')[-1])+'_'
 
-PREM_loc='/Users/alistair/Google_Drive/Lyon_Pdoc/mk_synth_data/DISC_PREM_20'
+if os.path.isfile(directory+'/../Modified_PREM_CRATON.in'):
+    PREM_loc='/Users/alistair/Google_Drive/Lyon_Pdoc/mk_synth_data/Modified_PREM_CRATON'
+elif os.path.isfile(directory+'/../Modified_PREM_OCEAN.in'):
+    PREM_loc='/Users/alistair/Google_Drive/Lyon_Pdoc/mk_synth_data/Modified_PREM_OCEAN'
+elif os.path.isfile(directory+'/../Modified_PREM_OROGEN.in'):
+    PREM_loc='/Users/alistair/Google_Drive/Lyon_Pdoc/mk_synth_data/Modified_PREM_OROGEN'
+elif os.path.isfile(directory+'/../Modified_PREM_GLOBAL.in'):
+    PREM_loc='/Users/alistair/Google_Drive/Lyon_Pdoc/mk_synth_data/Modified_PREM_GLOBAL'
+else:
+    CR1_mod=glob.glob('CR1_PREM*in')[0]
+    PREM_loc='/Users/alistair/Google_Drive/Lyon_Pdoc/crust1.0/'+str(CR1_mod[0:-3])
 
+print(PREM_loc)
+
+def decimate_for_plot(input,dec_post):
+    # Decimate some lists/arrays (e.g., input) for plotting
+    # by a factor calculated for dec_post points per plot in depth.
+    length=len(input)
+    q=int(length/dec_post)
+    # print(length, q)
+    dec_input=decimate(np.array(input),q)
+
+    return dec_input
 
 
 def weighted_avg_and_std(values, weights):
@@ -120,6 +146,90 @@ def weighted_avg_and_std(values, weights):
     # Fast and numerically precise:
     variance = np.average((values-average)**2, weights=weights)
     return (average, math.sqrt(variance))
+
+def get_CR1_depth(directory):
+    CR1_d_m = 0
+
+    cwd=str(os.getcwd())
+    if '23_FINAL' in cwd or '22_PHI_TREF' in cwd or '20_CR1_' in cwd or '21_CR1_ANISO' in cwd or '24_SCALED_PHI_TESTS'in cwd or  '25_FIXED_PHI_TESTS'in cwd:
+        lat_in=cwd.split('/')[-1].split('_')[1][0:-1]
+        lon_in=cwd.split('/')[-1].split('_')[2][0:-1]
+
+        os.chdir('/Users/alistair/Google_Drive/Lyon_Pdoc/crust1.0')
+        if not os.path.isfile('./getCN1point_AB'):
+            print('Compiling....')
+            os.system('gfortran getCN1point_AB.f -o getCN1point_AB')
+        print('Running....')
+        os.system('./getCN1point_AB '+str(lat_in)+' '+str(lon_in)+' > ./cr1.out')
+
+
+        file=open('./cr1.out','r')
+        lines=file.readlines()
+        file.close()
+
+        header2=lines[0].split(' ')
+        header2 = [x for x in header2 if x != '']
+        # print(header2)
+        ilat=int(header2[2])
+        ilon=int(header2[3].split('\n')[0])
+        header3=lines[1].split(' ')
+        header3 = [x for x in header3 if x != '']
+        topo=-1*float(header3[1])
+        # print(ilat, ilon, topo)
+
+        CR1_depth=[];CR1_rad=[];CR1_rho=[];CR1_vp=[];CR1_vs=[]
+        dc=0
+        for k, line in enumerate(lines[3:-1]):
+            data=line.split()
+            # print(line.split(), len(line.split()), line[11])
+            d=-1*float(data[3])
+            rad=6371000-(d*1000)
+            rho=float(data[2])*1000
+            vs=float(data[1])*1000
+            vp=float(data[0])*1000
+
+            if d > 0 and vs > 1: # Eliminate topography AND Water
+                dc=dc+1
+                if dc==1: # Add surface point
+                    CR1_depth.append(float(0.0))
+                    CR1_rad.append(6371000.0)
+                    CR1_rho.append(rho)
+                    CR1_vs.append(vs)
+                    CR1_vp.append(vp)
+                    CR1_depth.append(d)
+                    CR1_rad.append(rad)
+                    CR1_rho.append(rho)
+                    CR1_vs.append(vs)
+                    CR1_vp.append(vp)
+                else:
+                    thick=d-CR1_depth[-1]
+                    if thick>0 and rho>CR1_rho[-1] and vs > CR1_vs[-1] and vp> CR1_vp[-1]: # Eliminate zero thickness layers and slow sediments
+                        CR1_depth.append(CR1_depth[-1])
+                        CR1_rad.append(CR1_rad[-1])
+                        CR1_rho.append(rho)
+                        CR1_vs.append(vs)
+                        CR1_vp.append(vp)
+                        CR1_depth.append(d)
+                        CR1_rad.append(rad)
+                        CR1_rho.append(rho)
+                        CR1_vs.append(vs)
+                        CR1_vp.append(vp)
+
+        CR1_d_m=CR1_depth[-1]
+
+        os.system('rm cr1.out')
+        os.chdir(cwd)
+
+    elif os.path.isfile(directory+'/../Modified_PREM_CRATON.in'):
+        CR1_d_m=35.0
+    elif os.path.isfile(directory+'/../Modified_PREM_OCEAN.in'):
+        CR1_d_m=10.0
+    elif os.path.isfile(directory+'/../Modified_PREM_OROGEN.in'):
+        CR1_d_m=65.0
+    elif os.path.isfile(directory+'/../Modified_PREM_GLOBAL.in'):
+        CR1_d_m=24.4  
+    print('CR1 Moho depth : '+str(CR1_d_m)+'km')
+    return CR1_d_m 
 
 
 
@@ -313,7 +423,12 @@ if Dispersion:
         Modes_L=np.unique(n_L)
 
         # Get Ref:
-        REF_loc='/Users/alistair/Google_Drive/Lyon_Pdoc/mk_synth_data/ZERO_MOD_BAYES_FR_O/'
+        # if 'Modified' in PREM_loc:
+        #     REF_loc='/Users/alistair/Google_Drive/Lyon_Pdoc/mk_synth_data/ZERO_MOD_BAYES_FR_O'
+        # else:
+            
+        REF_loc=PREM_loc
+
         file=open(REF_loc+'/'+'Dispersion_ref.out','r')
         lines=file.readlines()
         file.close()
@@ -868,6 +983,7 @@ if Posterior:
 
     ax0.invert_yaxis()
     ax0.set_xlim([vref_min,vref_max])
+    ax0.set_xlim([1000,7000])
     ax0.set_xlabel('$V_{SV}$ (m/s)', fontsize=10)
     ax0.set_title('S-wave velocity')
     ax1.set_ylim([prof,0.])
@@ -878,7 +994,9 @@ if Posterior:
     ax1.xaxis.set_minor_locator(MultipleLocator(0.1))
     ax1.xaxis.set_major_locator(MultipleLocator(0.2))
 
-    ax2.set_xlim([vp_min,vp_max])
+    # ax2.set_xlim([vp_min,vp_max])
+    ax2.set_xlim([2000,15000])
+
     # ax2.set_xlim([-0.5,0.5])
     ax0.set_ylabel('Depth (km)',fontsize=10)
     # ax2.set_xlabel(r'VpVs*(1+X)',fontsize=10)
@@ -913,7 +1031,7 @@ if Posterior:
         # True models in cyan.
         true,=ax0.plot(true_vsv,true_depth,c='white',linewidth=1)
         try:
-            # ax1.plot(true_xi,true_depth,c='white',linewidth=1,alpha=1,marker='o',markersize=2,mfc='k')
+            ax1.plot(true_xi,true_depth,c='white',linewidth=1) #,alpha=1,marker='o',markersize=2,mfc='k')
             ax2.plot(true_vp,true_depth,c='white',linewidth=1)
 
         except:
@@ -941,7 +1059,7 @@ if Posterior:
         # prem models in cyan.
         prem,=ax0.plot(prem_vsv,prem_depth,c='white',linewidth=1)
         try:
-            # ax1.plot(prem_xi,prem_depth,c='white',linewidth=1,alpha=1,marker='o',markersize=2,mfc='k')
+            ax1.plot(prem_xi,prem_depth,c='white',linewidth=1) #,alpha=1,marker='o',markersize=2,mfc='k')
             ax2.plot(prem_vp,prem_depth,c='white',linewidth=1)
 
         except:
@@ -993,7 +1111,7 @@ if Posterior:
         
     # Average models in red.
     ave,=ax0.plot(average_vs,depths,c='r',linewidth=1)
-    # ax1.plot(average_xi,depths,c='r',linewidth=1)
+    ax1.plot(average_xi,depths,c='r',linewidth=1)
     ax2.plot(average_vp,depths,c='r',linewidth=1)
     ax4.plot(average_probani,depths,c='k',linewidth=1)
 
@@ -1108,53 +1226,46 @@ if Posterior2:
         Proc2_Xi_abs=np.loadtxt(directory+'/Proc2_Xi_abs.txt')
         Proc2_Vp_abs=np.loadtxt(directory+'/Proc2_Vp_abs.txt')
 
-        vsvd_depths=Proc2_Vs_abs[:,0]
-        vsvd_means=Proc2_Vs_abs[:,1]
-        vsvd_medians=Proc2_Vs_abs[:,2]
-        vsvd_025=Proc2_Vs_abs[:,3]
-        vsvd_160=Proc2_Vs_abs[:,4]
-        vsvd_310=Proc2_Vs_abs[:,5]
-        vsvd_450=Proc2_Vs_abs[:,6]
-        vsvd_550=Proc2_Vs_abs[:,7]
-        vsvd_690=Proc2_Vs_abs[:,8]
-        vsvd_840=Proc2_Vs_abs[:,9]
-        vsvd_975=Proc2_Vs_abs[:,10]
+        vsvd_depths_dec=Proc2_Vs_abs[:,0]
+        vsvd_means_dec=Proc2_Vs_abs[:,1]
+        vsvd_medians_dec=Proc2_Vs_abs[:,2]
+        vsvd_025_dec=Proc2_Vs_abs[:,3]
+        vsvd_160_dec=Proc2_Vs_abs[:,4]
+        vsvd_310_dec=Proc2_Vs_abs[:,5]
+        vsvd_450_dec=Proc2_Vs_abs[:,6]
+        vsvd_550_dec=Proc2_Vs_abs[:,7]
+        vsvd_690_dec=Proc2_Vs_abs[:,8]
+        vsvd_840_dec=Proc2_Vs_abs[:,9]
+        vsvd_975_dec=Proc2_Vs_abs[:,10]
 
-        xid_depths=Proc2_Xi_abs[:,0]
-        xid_means=Proc2_Xi_abs[:,1]
-        xid_medians=Proc2_Xi_abs[:,2]
-        xid_025=Proc2_Xi_abs[:,3]
-        xid_160=Proc2_Xi_abs[:,4]
-        xid_310=Proc2_Xi_abs[:,5]
-        xid_450=Proc2_Xi_abs[:,6]
-        xid_550=Proc2_Xi_abs[:,7]
-        xid_690=Proc2_Xi_abs[:,8]
-        xid_840=Proc2_Xi_abs[:,9]
-        xid_975=Proc2_Xi_abs[:,10]
+        xid_depths_dec=Proc2_Xi_abs[:,0]
+        xid_means_dec=Proc2_Xi_abs[:,1]
+        xid_medians_dec=Proc2_Xi_abs[:,2]
+        xid_025_dec=Proc2_Xi_abs[:,3]
+        xid_160_dec=Proc2_Xi_abs[:,4]
+        xid_310_dec=Proc2_Xi_abs[:,5]
+        xid_450_dec=Proc2_Xi_abs[:,6]
+        xid_550_dec=Proc2_Xi_abs[:,7]
+        xid_690_dec=Proc2_Xi_abs[:,8]
+        xid_840_dec=Proc2_Xi_abs[:,9]
+        xid_975_dec=Proc2_Xi_abs[:,10]
 
-        vpd_depths=Proc2_Vp_abs[:,0]
-        vpd_means=Proc2_Vp_abs[:,1]
-        vpd_medians=Proc2_Vp_abs[:,2]
-        vpd_025=Proc2_Vp_abs[:,3]
-        vpd_160=Proc2_Vp_abs[:,4]
-        vpd_310=Proc2_Vp_abs[:,5]
-        vpd_450=Proc2_Vp_abs[:,6]
-        vpd_550=Proc2_Vp_abs[:,7]
-        vpd_690=Proc2_Vp_abs[:,8]
-        vpd_840=Proc2_Vp_abs[:,9]
-        vpd_975=Proc2_Vp_abs[:,10]
+        vpd_depths_dec=Proc2_Vp_abs[:,0]
+        vpd_means_dec=Proc2_Vp_abs[:,1]
+        vpd_medians_dec=Proc2_Vp_abs[:,2]
+        vpd_025_dec=Proc2_Vp_abs[:,3]
+        vpd_160_dec=Proc2_Vp_abs[:,4]
+        vpd_310_dec=Proc2_Vp_abs[:,5]
+        vpd_450_dec=Proc2_Vp_abs[:,6]
+        vpd_550_dec=Proc2_Vp_abs[:,7]
+        vpd_690_dec=Proc2_Vp_abs[:,8]
+        vpd_840_dec=Proc2_Vp_abs[:,9]
+        vpd_975_dec=Proc2_Vp_abs[:,10]
         
     else:
 
 
-        fname_VsProc=directory+'/Proc2_Vs_abs.txt'
-        f_VsProc=open(fname_VsProc,'w')
 
-        fname_XiProc=directory+'/Proc2_Xi_abs.txt'
-        f_XiProc=open(fname_XiProc,'w')
-        
-        fname_VpProc=directory+'/Proc2_Vp_abs.txt'
-        f_VpProc=open(fname_VpProc,'w')
 
         for i in range(np.shape(hist_vsvd)[0]):
             print('layer: '+str(i))
@@ -1174,6 +1285,7 @@ if Posterior2:
                 for k in range(0,val_vpd):
                     temp_vpd.append(vps[j])
 
+            vsvd_depths=depths.copy()
             vsvd_means.append(np.round_(np.mean(temp_vsvd),4))
             vsvd_medians.append(np.round_(np.median(temp_vsvd),4))
             vsvd_975.append(np.round_(np.quantile(temp_vsvd, 0.975),4))
@@ -1186,6 +1298,7 @@ if Posterior2:
             vsvd_025.append(np.round_(np.quantile(temp_vsvd, 0.025),4))
             vsvd_std.append(np.round_(np.std(temp_vsvd),4))
 
+            xid_depths=depths.copy()
             xid_means.append(np.round_(np.mean(temp_xid),4))
             xid_medians.append(np.round_(np.median(temp_xid),4))
             xid_975.append(np.round_(np.quantile(temp_xid, 0.975),4))
@@ -1197,7 +1310,8 @@ if Posterior2:
             xid_160.append(np.round_(np.quantile(temp_xid, 0.16),4))
             xid_025.append(np.round_(np.quantile(temp_xid, 0.025),4))
             xid_std.append(np.round_(np.std(temp_xid),4))
-
+            
+            vpd_depths=depths.copy()
             vpd_means.append(np.round_(np.mean(temp_vpd),4))
             vpd_medians.append(np.round_(np.median(temp_vpd),4))
             vpd_975.append(np.round_(np.quantile(temp_vpd, 0.975),4))
@@ -1210,10 +1324,58 @@ if Posterior2:
             vpd_025.append(np.round_(np.quantile(temp_vpd, 0.025),4))
             vpd_std.append(np.round_(np.std(temp_vpd),4))
 
+        # Decimate these quantities for writing to text file and plotting.
+
+        vsvd_depths_dec=decimate_for_plot(vsvd_depths,dec_post)
+        vsvd_means_dec=decimate_for_plot(vsvd_means,dec_post)
+        vsvd_medians_dec=decimate_for_plot(vsvd_medians,dec_post)
+        vsvd_025_dec=decimate_for_plot(vsvd_025,dec_post)
+        vsvd_160_dec=decimate_for_plot(vsvd_160,dec_post)
+        vsvd_310_dec=decimate_for_plot(vsvd_310,dec_post)
+        vsvd_450_dec=decimate_for_plot(vsvd_450,dec_post)
+        vsvd_550_dec=decimate_for_plot(vsvd_550,dec_post)
+        vsvd_690_dec=decimate_for_plot(vsvd_690,dec_post)
+        vsvd_840_dec=decimate_for_plot(vsvd_840,dec_post)
+        vsvd_975_dec=decimate_for_plot(vsvd_975,dec_post)
+
+        xid_depths_dec=decimate_for_plot(xid_depths,dec_post)
+        xid_means_dec=decimate_for_plot(xid_means,dec_post)
+        xid_medians_dec=decimate_for_plot(xid_medians,dec_post)
+        xid_025_dec=decimate_for_plot(xid_025,dec_post)
+        xid_160_dec=decimate_for_plot(xid_160,dec_post)
+        xid_310_dec=decimate_for_plot(xid_310,dec_post)
+        xid_450_dec=decimate_for_plot(xid_450,dec_post)
+        xid_550_dec=decimate_for_plot(xid_550,dec_post)
+        xid_690_dec=decimate_for_plot(xid_690,dec_post)
+        xid_840_dec=decimate_for_plot(xid_840,dec_post)
+        xid_975_dec=decimate_for_plot(xid_975,dec_post)
+
+        vpd_depths_dec=decimate_for_plot(vpd_depths,dec_post)
+        vpd_means_dec=decimate_for_plot(vpd_means,dec_post)
+        vpd_medians_dec=decimate_for_plot(vpd_medians,dec_post)
+        vpd_025_dec=decimate_for_plot(vpd_025,dec_post)
+        vpd_160_dec=decimate_for_plot(vpd_160,dec_post)
+        vpd_310_dec=decimate_for_plot(vpd_310,dec_post)
+        vpd_450_dec=decimate_for_plot(vpd_450,dec_post)
+        vpd_550_dec=decimate_for_plot(vpd_550,dec_post)
+        vpd_690_dec=decimate_for_plot(vpd_690,dec_post)
+        vpd_840_dec=decimate_for_plot(vpd_840,dec_post)
+        vpd_975_dec=decimate_for_plot(vpd_975,dec_post)
+
+        fname_VsProc=directory+'/Proc2_Vs_abs.txt'
+        f_VsProc=open(fname_VsProc,'w')
+
+        fname_XiProc=directory+'/Proc2_Xi_abs.txt'
+        f_XiProc=open(fname_XiProc,'w')
+        
+        fname_VpProc=directory+'/Proc2_Vp_abs.txt'
+        f_VpProc=open(fname_VpProc,'w')
+
+        for i in range(len(vsvd_depths_dec)):
         # for i in range(len(vsvd_means)):
-            f_VsProc.write('  %3.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f\n' % (depths[i], vsvd_means[i], vsvd_medians[i], vsvd_025[i], vsvd_160[i], vsvd_310[i], vsvd_450[i], vsvd_550[i], vsvd_690[i], vsvd_840[i], vsvd_975[i]))
-            f_XiProc.write('  %3.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f\n' % (depths[i], xid_means[i], xid_medians[i], xid_025[i],     xid_160[i],  xid_310[i],  xid_450[i],  xid_550[i],  xid_690[i],  xid_840[i], xid_975[i]))
-            f_VpProc.write('  %3.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f\n' % (depths[i], vpd_means[i], vpd_medians[i], vpd_025[i],     vpd_160[i],  vpd_310[i],  vpd_450[i],  vpd_550[i],  vpd_690[i],  vpd_840[i], vpd_975[i]))
+            f_VsProc.write('  %3.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f\n' % (vsvd_depths_dec[i], vsvd_means_dec[i], vsvd_medians_dec[i], vsvd_025_dec[i], vsvd_160_dec[i], vsvd_310_dec[i], vsvd_450_dec[i], vsvd_550_dec[i], vsvd_690_dec[i], vsvd_840_dec[i], vsvd_975_dec[i]))
+            f_XiProc.write('  %3.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f\n' % (xid_depths_dec[i], xid_means_dec[i], xid_medians_dec[i], xid_025_dec[i],     xid_160_dec[i],  xid_310_dec[i],  xid_450_dec[i],  xid_550_dec[i],  xid_690_dec[i],  xid_840_dec[i], xid_975_dec[i]))
+            f_VpProc.write('  %3.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f\n' % (vpd_depths_dec[i], vpd_means_dec[i], vpd_medians_dec[i], vpd_025_dec[i],     vpd_160_dec[i],  vpd_310_dec[i],  vpd_450_dec[i],  vpd_550_dec[i],  vpd_690_dec[i],  vpd_840_dec[i], vpd_975_dec[i]))
 
         f_VsProc.close()
         f_XiProc.close()
@@ -1228,14 +1390,19 @@ if Posterior2:
     # depths=np.linspace(0,prof,disd+1)
 
     ax0.invert_yaxis()
-    ax0.set_xlim([vref_min,vref_max])
+    # ax0.set_xlim([vref_min,vref_max])
+    ax0.set_xlim([1000,7000])
     ax0.set_xlabel('$V_{SV}$ (m/s)', fontsize=10)
     ax0.set_title('S-wave velocity')
     ax1.set_ylim([prof,0.])
     ax1.set_xlabel('$Xi$',fontsize=10)
-    ax1.set_xlim([xi_min,xi_max])
+    # ax1.set_xlim([xi_min,xi_max])
+    ax1.set_xlim([0.6, 1.4])
+
     ax1.set_title('Radial Anisotropy')
-    ax2.set_xlim([vp_min,vp_max])
+    # ax2.set_xlim([vp_min,vp_max])
+    ax2.set_xlim([2000,15000])
+
     ax0.set_ylabel('Depth (km)',fontsize=10)
     ax2.set_xlabel('$V_{PH}$ (m/s)',fontsize=10)
     ax2.set_title('P-wave velocity')
@@ -1243,20 +1410,22 @@ if Posterior2:
     # ax1.pcolormesh(xis,depths,xid,cmap='viridis')
     # ax0.pcolormesh(vsvs,depths,vsvd,cmap='viridis')
 
-    ax0.fill_betweenx(depths,vsvd_025,vsvd_975,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.15)
-    ax0.fill_betweenx(depths,vsvd_160,vsvd_840,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.25)
-    ax0.fill_betweenx(depths,vsvd_310,vsvd_690,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.35)
-    ax0.fill_betweenx(depths,vsvd_450,vsvd_550,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.45)
+    
 
-    ax1.fill_betweenx(depths,xid_025,xid_975,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.15)
-    ax1.fill_betweenx(depths,xid_160,xid_840,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.25)
-    ax1.fill_betweenx(depths,xid_310,xid_690,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.35)
-    ax1.fill_betweenx(depths,xid_450,xid_550,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.45)
+    ax0.fill_betweenx(vsvd_depths_dec,vsvd_025_dec,vsvd_975_dec,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.15)
+    ax0.fill_betweenx(vsvd_depths_dec,vsvd_160_dec,vsvd_840_dec,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.25)
+    ax0.fill_betweenx(vsvd_depths_dec,vsvd_310_dec,vsvd_690_dec,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.35)
+    ax0.fill_betweenx(vsvd_depths_dec,vsvd_450_dec,vsvd_550_dec,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.45)
 
-    ax2.fill_betweenx(depths,vpd_025,vpd_975,facecolor='darkgreen', rasterized=False, alpha=0.15)
-    ax2.fill_betweenx(depths,vpd_160,vpd_840,facecolor='darkgreen', rasterized=False, alpha=0.25)
-    ax2.fill_betweenx(depths,vpd_310,vpd_690,facecolor='darkgreen', rasterized=False, alpha=0.35)
-    ax2.fill_betweenx(depths,vpd_450,vpd_550,facecolor='darkgreen', rasterized=False, alpha=0.45)
+    ax1.fill_betweenx(xid_depths_dec,xid_025_dec,xid_975_dec,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.15)
+    ax1.fill_betweenx(xid_depths_dec,xid_160_dec,xid_840_dec,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.25)
+    ax1.fill_betweenx(xid_depths_dec,xid_310_dec,xid_690_dec,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.35)
+    ax1.fill_betweenx(xid_depths_dec,xid_450_dec,xid_550_dec,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.45)
+
+    ax2.fill_betweenx(vpd_depths_dec,vpd_025_dec,vpd_975_dec,facecolor='darkgreen', rasterized=False, alpha=0.15)
+    ax2.fill_betweenx(vpd_depths_dec,vpd_160_dec,vpd_840_dec,facecolor='darkgreen', rasterized=False, alpha=0.25)
+    ax2.fill_betweenx(vpd_depths_dec,vpd_310_dec,vpd_690_dec,facecolor='darkgreen', rasterized=False, alpha=0.35)
+    ax2.fill_betweenx(vpd_depths_dec,vpd_450_dec,vpd_550_dec,facecolor='darkgreen', rasterized=False, alpha=0.45)
 
 
 
@@ -1266,9 +1435,9 @@ if Posterior2:
     # ax1.plot(xid_means,depths,c='b',linewidth=1)
     # ax2.plot(vpd_means,depths,c='b',linewidth=1)
 
-    median2,=ax0.plot(vsvd_medians,depths,c='b',linewidth=2)
-    ax1.plot(xid_medians,depths,c='b',linewidth=2)
-    ax2.plot(vpd_medians,depths,c='b',linewidth=2)
+    median2,=ax0.plot(vsvd_medians_dec,vsvd_depths_dec,c='b',linewidth=2)
+    ax1.plot(xid_medians_dec,xid_depths_dec,c='b',linewidth=2)
+    ax2.plot(vpd_medians_dec,vpd_depths_dec,c='b',linewidth=2)
 
     # true model overlaid on the posterior (only for synthetic tests)
     if os.path.isfile(directory+'/'+'true_model.out'):
@@ -1422,10 +1591,9 @@ if Posterior2:
         ax4.plot(average_probani,average_depths,c='k',linewidth=1)
 
     else:
-        mean,=ax0.plot(vsvd_means,depths,c='r',linewidth=2)
-        ax1.plot(xid_means,depths,c='r',linewidth=2)
-        ax2.plot(vpd_means,depths,c='r',linewidth=2)
-
+        mean,=ax0.plot(vsvd_means_dec,vsvd_depths_dec,c='r',linewidth=2)
+        ax1.plot(xid_means_dec,xid_depths_dec,c='r',linewidth=2)
+        ax2.plot(vpd_means_dec,vpd_depths_dec,c='r',linewidth=2)
 
     ax4.set_xlabel('Probability',fontsize=10)
     ax4.set_title('Anisotropy')
@@ -1492,7 +1660,7 @@ if Posterior2:
     # vps=np.linspace(vp_min,vp_max,disv+1)
     # depths=np.linspace(0,prof,disd+1)
 
-    if '16_' in os.getcwd():
+    if '30_' in os.getcwd():
         R_vref_min=-40
         R_vref_max=40
         R_xi_min=-40
@@ -1501,6 +1669,15 @@ if Posterior2:
         R_vp_max=40
         x_minor=[10,10,10]
         x_major=[20,20,20]
+    elif '25_' in os.getcwd() or '24_'  in os.getcwd() :
+        R_vref_min=-15
+        R_vref_max=15
+        R_xi_min=-15
+        R_xi_max=15
+        R_vp_min=-15
+        R_vp_max=15
+        x_minor=[5,5,5]
+        x_major=[10,10,10]
     else:
         R_vref_min=-10
         R_vref_max=10
@@ -1513,15 +1690,15 @@ if Posterior2:
 
     Rax0.invert_yaxis()
     Rax0.set_xlim([R_vref_min,R_vref_max])
-    Rax0.set_xlabel('$V_{SV}$ (%)', fontsize=10)
+    Rax0.set_xlabel('$\delta V_{SV}$ (%)', fontsize=10)
     Rax0.set_title('S-wave velocity',fontsize=10)
     Rax1.set_ylim([prof,0.])
-    Rax1.set_xlabel('$Xi$ (%)',fontsize=10)
+    Rax1.set_xlabel('$\delta$\u03BE (%)',fontsize=10)
     Rax1.set_xlim([R_xi_min,R_xi_max])
     Rax1.set_title('Radial Anisotropy',fontsize=10)
     Rax2.set_xlim([R_vp_min,R_vp_max])
     Rax0.set_ylabel('Depth (km)',fontsize=10)
-    Rax2.set_xlabel('$V_{PH}$ (%)',fontsize=10)
+    Rax2.set_xlabel('$\delta V_{PH}$ (%)',fontsize=10)
     Rax2.set_title('P-wave velocity',fontsize=10)
 
 
@@ -1570,19 +1747,60 @@ if Posterior2:
     prem_xi_disd=np.zeros(len(depths))
     prem_vph_disd=np.zeros(len(depths))
 
-    for k in range(len(depths)):
-        a=np.abs(depths[k]-prem_depth)
-        a1=np.where(a==a.min())[0]
-        if len(a1) != 1:
-            if depths[k]>prem_depth[a1[0]]:
-                ind=a1[0]
+    ################ For gradients: ################
+    if not 'DISC' in PREM_loc:
+        for k in range(len(depths)):
+
+            if depths[k]==0.0:
+                prem_vsv_disd[k]=prem_vsv[-1]
+                prem_xi_disd[k]=prem_xi[-1]
+                prem_vph_disd[k]=prem_vph[-1]
+            elif depths[k]==700.0:
+                prem_vsv_disd[k]=prem_vsv[0]
+                prem_xi_disd[k]=prem_xi[0]
+                prem_vph_disd[k]=prem_vph[0]
+
             else:
-                ind=a1[1]
-        else:
-            ind=a1
-        prem_vsv_disd[k]=prem_vsv[ind]
-        prem_xi_disd[k]=prem_xi[ind]
-        prem_vph_disd[k]=prem_vph[ind]
+                # print(prem_depth)
+                # print(depths[k])
+                ind1=np.where(prem_depth>depths[k])[0][-1]
+                ind2=np.where(prem_depth<depths[k])[0][0]
+                # print(ind1, ind2)
+                # print(prem_depth[ind2],depths[k],prem_depth[ind1])
+
+                x=np.array([prem_depth[ind2],prem_depth[ind1]])
+                y1=np.array([prem_vsv[ind2],prem_vsv[ind1]])
+                y2=np.array([prem_xi[ind2],prem_xi[ind1]])
+                y3=np.array([prem_vph[ind2],prem_vph[ind1]])
+
+                vsv_interp = interp1d(x, y1, kind = "linear")
+                xi_interp = interp1d(x, y2, kind = "linear")
+                vph_interp = interp1d(x, y3, kind = "linear")
+                
+                prem_vsv_disd[k]=vsv_interp(depths[k])
+                prem_xi_disd[k]=xi_interp(depths[k])
+                prem_vph_disd[k]=vph_interp(depths[k])
+
+                # print(prem_vsv[ind2],prem_vsv_disd[k],prem_vsv[ind1])
+
+    else:
+        ############### For discretized ################
+        for k in range(len(depths)):
+            a=np.abs(depths[k]-prem_depth)
+            a1=np.where(a==a.min())[0]
+            if len(a1) != 1:
+                if depths[k]>prem_depth[a1[0]]:
+                    ind=a1[0]
+                else:
+                    ind=a1[1]
+            else:
+                ind=a1
+
+            prem_vsv_disd[k]=prem_vsv[ind]
+            prem_xi_disd[k]=prem_xi[ind]
+            prem_vph_disd[k]=prem_vph[ind]
+            # print(k, depths[k], a1, prem_depth[a1])
+
 
     average_depths=[]
     average_vsv=[]
@@ -1610,41 +1828,41 @@ if Posterior2:
         Proc2_Xi_rel=np.loadtxt(directory+'/Proc2_Xi_rel.txt')
         Proc2_Vp_rel=np.loadtxt(directory+'/Proc2_Vp_rel.txt')
 
-        depths_vsv_rel=Proc2_Vs_rel[:,0]
-        average_vsv_rel=Proc2_Vs_rel[:,1]
-        vsvd_medians_rel=Proc2_Vs_rel[:,2]
-        vsvd_025_rel=Proc2_Vs_rel[:,3]
-        vsvd_160_rel=Proc2_Vs_rel[:,4]
-        vsvd_310_rel=Proc2_Vs_rel[:,5]
-        vsvd_450_rel=Proc2_Vs_rel[:,6]
-        vsvd_550_rel=Proc2_Vs_rel[:,7]
-        vsvd_690_rel=Proc2_Vs_rel[:,8]
-        vsvd_840_rel=Proc2_Vs_rel[:,9]
-        vsvd_975_rel=Proc2_Vs_rel[:,10]
+        depths_vsv_rel_dec=Proc2_Vs_rel[:,0]
+        average_vsv_rel_dec=Proc2_Vs_rel[:,1]
+        vsvd_medians_rel_dec=Proc2_Vs_rel[:,2]
+        vsvd_025_rel_dec=Proc2_Vs_rel[:,3]
+        vsvd_160_rel_dec=Proc2_Vs_rel[:,4]
+        vsvd_310_rel_dec=Proc2_Vs_rel[:,5]
+        vsvd_450_rel_dec=Proc2_Vs_rel[:,6]
+        vsvd_550_rel_dec=Proc2_Vs_rel[:,7]
+        vsvd_690_rel_dec=Proc2_Vs_rel[:,8]
+        vsvd_840_rel_dec=Proc2_Vs_rel[:,9]
+        vsvd_975_rel_dec=Proc2_Vs_rel[:,10]
 
-        depths_xi_rel=Proc2_Xi_rel[:,0]
-        average_xi_rel=Proc2_Xi_rel[:,1]
-        xid_medians_rel=Proc2_Xi_rel[:,2]
-        xid_025_rel=Proc2_Xi_rel[:,3]
-        xid_160_rel=Proc2_Xi_rel[:,4]
-        xid_310_rel=Proc2_Xi_rel[:,5]
-        xid_450_rel=Proc2_Xi_rel[:,6]
-        xid_550_rel=Proc2_Xi_rel[:,7]
-        xid_690_rel=Proc2_Xi_rel[:,8]
-        xid_840_rel=Proc2_Xi_rel[:,9]
-        xid_975_rel=Proc2_Xi_rel[:,10]
+        depths_xi_rel_dec=Proc2_Xi_rel[:,0]
+        average_xi_rel_dec=Proc2_Xi_rel[:,1]
+        xid_medians_rel_dec=Proc2_Xi_rel[:,2]
+        xid_025_rel_dec=Proc2_Xi_rel[:,3]
+        xid_160_rel_dec=Proc2_Xi_rel[:,4]
+        xid_310_rel_dec=Proc2_Xi_rel[:,5]
+        xid_450_rel_dec=Proc2_Xi_rel[:,6]
+        xid_550_rel_dec=Proc2_Xi_rel[:,7]
+        xid_690_rel_dec=Proc2_Xi_rel[:,8]
+        xid_840_rel_dec=Proc2_Xi_rel[:,9]
+        xid_975_rel_dec=Proc2_Xi_rel[:,10]
 
-        depths_vph_rel=Proc2_Vp_rel[:,0]
-        average_vph_rel=Proc2_Vp_rel[:,1]
-        vpd_medians_rel=Proc2_Vp_rel[:,2]
-        vpd_025_rel=Proc2_Vp_rel[:,3]
-        vpd_160_rel=Proc2_Vp_rel[:,4]
-        vpd_310_rel=Proc2_Vp_rel[:,5]
-        vpd_450_rel=Proc2_Vp_rel[:,6]
-        vpd_550_rel=Proc2_Vp_rel[:,7]
-        vpd_690_rel=Proc2_Vp_rel[:,8]
-        vpd_840_rel=Proc2_Vp_rel[:,9]
-        vpd_975_rel=Proc2_Vp_rel[:,10]
+        depths_vph_rel_dec=Proc2_Vp_rel[:,0]
+        average_vph_rel_dec=Proc2_Vp_rel[:,1]
+        vpd_medians_rel_dec=Proc2_Vp_rel[:,2]
+        vpd_025_rel_dec=Proc2_Vp_rel[:,3]
+        vpd_160_rel_dec=Proc2_Vp_rel[:,4]
+        vpd_310_rel_dec=Proc2_Vp_rel[:,5]
+        vpd_450_rel_dec=Proc2_Vp_rel[:,6]
+        vpd_550_rel_dec=Proc2_Vp_rel[:,7]
+        vpd_690_rel_dec=Proc2_Vp_rel[:,8]
+        vpd_840_rel_dec=Proc2_Vp_rel[:,9]
+        vpd_975_rel_dec=Proc2_Vp_rel[:,10]
 
     else:
 
@@ -1663,7 +1881,7 @@ if Posterior2:
             average_vph_rel=((np.array(vpd_means)-prem_vph_disd)/prem_vph_disd)*100
 
 
-
+        depths_vsv_rel=depths.copy()
         vsvd_025_rel=((np.array(vsvd_025)-prem_vsv_disd)/prem_vsv_disd)*100
         vsvd_160_rel=((np.array(vsvd_160)-prem_vsv_disd)/prem_vsv_disd)*100
         vsvd_310_rel=((np.array(vsvd_310)-prem_vsv_disd)/prem_vsv_disd)*100
@@ -1673,6 +1891,7 @@ if Posterior2:
         vsvd_840_rel=((np.array(vsvd_840)-prem_vsv_disd)/prem_vsv_disd)*100
         vsvd_975_rel=((np.array(vsvd_975)-prem_vsv_disd)/prem_vsv_disd)*100
 
+        depths_xi_rel=depths.copy()
         xid_025_rel=((np.array(xid_025)-prem_xi_disd)/prem_xi_disd)*100
         xid_160_rel=((np.array(xid_160)-prem_xi_disd)/prem_xi_disd)*100
         xid_310_rel=((np.array(xid_310)-prem_xi_disd)/prem_xi_disd)*100
@@ -1682,6 +1901,7 @@ if Posterior2:
         xid_840_rel=((np.array(xid_840)-prem_xi_disd)/prem_xi_disd)*100
         xid_975_rel=((np.array(xid_975)-prem_xi_disd)/prem_xi_disd)*100
 
+        depths_vph_rel=depths.copy()
         vpd_025_rel=((np.array(vpd_025)-prem_vph_disd)/prem_vph_disd)*100
         vpd_160_rel=((np.array(vpd_160)-prem_vph_disd)/prem_vph_disd)*100
         vpd_310_rel=((np.array(vpd_310)-prem_vph_disd)/prem_vph_disd)*100
@@ -1690,6 +1910,45 @@ if Posterior2:
         vpd_690_rel=((np.array(vpd_690)-prem_vph_disd)/prem_vph_disd)*100
         vpd_840_rel=((np.array(vpd_840)-prem_vph_disd)/prem_vph_disd)*100
         vpd_975_rel=((np.array(vpd_975)-prem_vph_disd)/prem_vph_disd)*100
+
+        # Decimate for writing and plotting.
+
+        depths_vsv_rel_dec=decimate_for_plot(depths_vsv_rel,dec_post)
+        vsvd_025_rel_dec=decimate_for_plot(vsvd_025_rel,dec_post)
+        vsvd_160_rel_dec=decimate_for_plot(vsvd_160_rel,dec_post)
+        vsvd_310_rel_dec=decimate_for_plot(vsvd_310_rel,dec_post)
+        vsvd_450_rel_dec=decimate_for_plot(vsvd_450_rel,dec_post)
+        vsvd_550_rel_dec=decimate_for_plot(vsvd_550_rel,dec_post)
+        vsvd_690_rel_dec=decimate_for_plot(vsvd_690_rel,dec_post)
+        vsvd_840_rel_dec=decimate_for_plot(vsvd_840_rel,dec_post)
+        vsvd_975_rel_dec=decimate_for_plot(vsvd_975_rel,dec_post)
+
+        depths_xi_rel_dec=decimate_for_plot(depths_xi_rel,dec_post)
+        xid_025_rel_dec=decimate_for_plot(xid_025_rel,dec_post)
+        xid_160_rel_dec=decimate_for_plot(xid_160_rel,dec_post)
+        xid_310_rel_dec=decimate_for_plot(xid_310_rel,dec_post)
+        xid_450_rel_dec=decimate_for_plot(xid_450_rel,dec_post)
+        xid_550_rel_dec=decimate_for_plot(xid_550_rel,dec_post)
+        xid_690_rel_dec=decimate_for_plot(xid_690_rel,dec_post)
+        xid_840_rel_dec=decimate_for_plot(xid_840_rel,dec_post)
+        xid_975_rel_dec=decimate_for_plot(xid_975_rel,dec_post)
+
+        depths_vph_rel_dec=decimate_for_plot(depths_vph_rel,dec_post)
+        vpd_025_rel_dec=decimate_for_plot(vpd_025_rel,dec_post)
+        vpd_160_rel_dec=decimate_for_plot(vpd_160_rel,dec_post)
+        vpd_310_rel_dec=decimate_for_plot(vpd_310_rel,dec_post)
+        vpd_450_rel_dec=decimate_for_plot(vpd_450_rel,dec_post)
+        vpd_550_rel_dec=decimate_for_plot(vpd_550_rel,dec_post)
+        vpd_690_rel_dec=decimate_for_plot(vpd_690_rel,dec_post)
+        vpd_840_rel_dec=decimate_for_plot(vpd_840_rel,dec_post)
+        vpd_975_rel_dec=decimate_for_plot(vpd_975_rel,dec_post)
+
+        vsvd_medians_rel_dec=decimate_for_plot(vsvd_medians_rel,dec_post)
+        xid_medians_rel_dec=decimate_for_plot(xid_medians_rel,dec_post)
+        vpd_medians_rel_dec=decimate_for_plot(vpd_medians_rel,dec_post)
+        average_vsv_rel_dec=decimate_for_plot(average_vsv_rel,dec_post)
+        average_xi_rel_dec=decimate_for_plot(average_xi_rel,dec_post)
+        average_vph_rel_dec=decimate_for_plot(average_vph_rel,dec_post)
 
         fname_VsProc_rel=directory+'/Proc2_Vs_rel.txt'
         f_VsProc_rel=open(fname_VsProc_rel,'w')
@@ -1700,30 +1959,36 @@ if Posterior2:
         fname_VpProc_rel=directory+'/Proc2_Vp_rel.txt'
         f_VpProc_rel=open(fname_VpProc_rel,'w')
 
-        for i in range(len(vsvd_means)):
-            f_VsProc_rel.write('  %3.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f\n' % (depths[i], average_vsv_rel[i], vsvd_medians_rel[i], vsvd_025_rel[i], vsvd_160_rel[i], vsvd_310_rel[i], vsvd_450_rel[i], vsvd_550_rel[i], vsvd_690_rel[i], vsvd_840_rel[i], vsvd_975_rel[i]))
-            f_XiProc_rel.write('  %3.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f\n' % (depths[i], average_xi_rel[i],   xid_medians_rel[i],  xid_025_rel[i],  xid_160_rel[i],  xid_310_rel[i],  xid_450_rel[i],  xid_550_rel[i],  xid_690_rel[i],  xid_840_rel[i],  xid_975_rel[i]))
-            f_VpProc_rel.write('  %3.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f\n' % (depths[i], average_vph_rel[i],  vpd_medians_rel[i],  vpd_025_rel[i],  vpd_160_rel[i],  vpd_310_rel[i],  vpd_450_rel[i],  vpd_550_rel[i],  vpd_690_rel[i],  vpd_840_rel[i],  vpd_975_rel[i]))
+        for i in range(len(depths_vsv_rel_dec)):
+            f_VsProc_rel.write('  %3.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f\n' % (depths_vsv_rel_dec[i], average_vsv_rel_dec[i], vsvd_medians_rel_dec[i], vsvd_025_rel_dec[i], vsvd_160_rel_dec[i], vsvd_310_rel_dec[i], vsvd_450_rel_dec[i], vsvd_550_rel_dec[i], vsvd_690_rel_dec[i], vsvd_840_rel_dec[i], vsvd_975_rel_dec[i]))
+            f_XiProc_rel.write('  %3.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f\n' % (depths_xi_rel_dec[i], average_xi_rel_dec[i],   xid_medians_rel_dec[i],  xid_025_rel_dec[i],  xid_160_rel_dec[i],  xid_310_rel_dec[i],  xid_450_rel_dec[i],  xid_550_rel_dec[i],  xid_690_rel_dec[i],  xid_840_rel_dec[i],  xid_975_rel_dec[i]))
+            f_VpProc_rel.write('  %3.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f %5.5f\n' % (depths_vph_rel_dec[i], average_vph_rel_dec[i],  vpd_medians_rel_dec[i],  vpd_025_rel_dec[i],  vpd_160_rel_dec[i],  vpd_310_rel_dec[i],  vpd_450_rel_dec[i],  vpd_550_rel_dec[i],  vpd_690_rel_dec[i],  vpd_840_rel_dec[i],  vpd_975_rel_dec[i]))
 
         f_VsProc_rel.close()
         f_XiProc_rel.close()
         f_VpProc_rel.close()
 
 
-    Rax0.fill_betweenx(depths,vsvd_025_rel,vsvd_975_rel,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.15)
-    Rax0.fill_betweenx(depths,vsvd_160_rel,vsvd_840_rel,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.25)
-    Rax0.fill_betweenx(depths,vsvd_310_rel,vsvd_690_rel,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.35)
-    Rax0.fill_betweenx(depths,vsvd_450_rel,vsvd_550_rel,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.45)
+    Rax0.fill_betweenx(depths_vsv_rel_dec,vsvd_025_rel_dec,vsvd_975_rel_dec,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.15)
+    Rax0.fill_betweenx(depths_vsv_rel_dec,vsvd_160_rel_dec,vsvd_840_rel_dec,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.25)
+    Rax0.fill_betweenx(depths_vsv_rel_dec,vsvd_310_rel_dec,vsvd_690_rel_dec,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.35)
+    Rax0.fill_betweenx(depths_vsv_rel_dec,vsvd_450_rel_dec,vsvd_550_rel_dec,facecolor=[1.0, 0.0, 0.0], rasterized=False, alpha=0.45)
 
-    Rax1.fill_betweenx(depths,xid_025_rel,xid_975_rel,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.15)
-    Rax1.fill_betweenx(depths,xid_160_rel,xid_840_rel,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.25)
-    Rax1.fill_betweenx(depths,xid_310_rel,xid_690_rel,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.35)
-    Rax1.fill_betweenx(depths,xid_450_rel,xid_550_rel,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.45)
+    Rax1.fill_betweenx(depths_xi_rel_dec,xid_025_rel_dec,xid_975_rel_dec,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.15)
+    Rax1.fill_betweenx(depths_xi_rel_dec,xid_160_rel_dec,xid_840_rel_dec,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.25)
+    Rax1.fill_betweenx(depths_xi_rel_dec,xid_310_rel_dec,xid_690_rel_dec,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.35)
+    Rax1.fill_betweenx(depths_xi_rel_dec,xid_450_rel_dec,xid_550_rel_dec,facecolor=[0.0, 0.0, 1.0], rasterized=False, alpha=0.45)
 
-    Rax2.fill_betweenx(depths,vpd_025_rel,vpd_975_rel,facecolor='darkgreen', rasterized=False, alpha=0.15)
-    Rax2.fill_betweenx(depths,vpd_160_rel,vpd_840_rel,facecolor='darkgreen', rasterized=False, alpha=0.25)
-    Rax2.fill_betweenx(depths,vpd_310_rel,vpd_690_rel,facecolor='darkgreen', rasterized=False, alpha=0.35)
-    Rax2.fill_betweenx(depths,vpd_450_rel,vpd_550_rel,facecolor='darkgreen', rasterized=False, alpha=0.45)
+    Rax2.fill_betweenx(depths_vph_rel_dec,vpd_025_rel_dec,vpd_975_rel_dec,facecolor='darkgreen', rasterized=False, alpha=0.15)
+    Rax2.fill_betweenx(depths_vph_rel_dec,vpd_160_rel_dec,vpd_840_rel_dec,facecolor='darkgreen', rasterized=False, alpha=0.25)
+    Rax2.fill_betweenx(depths_vph_rel_dec,vpd_310_rel_dec,vpd_690_rel_dec,facecolor='darkgreen', rasterized=False, alpha=0.35)
+    Rax2.fill_betweenx(depths_vph_rel_dec,vpd_450_rel_dec,vpd_550_rel_dec,facecolor='darkgreen', rasterized=False, alpha=0.45)
+
+
+
+# decimate(vsvd_medians_rel,5),decimate(vsvd_medians_rel
+
+
 
 
     # prem models in black. - i.e. zero percent.
@@ -1731,6 +1996,13 @@ if Posterior2:
     Rax1.plot([0,0],[0,dmax],c='grey',linewidth=0.5)
     Rax2.plot([0,0],[0,dmax],c='grey',linewidth=0.5)
 
+    # if '25_' in os.getcwd():
+    #     Rax0.plot([R_vref_min,R_vref_max],[35,35],'--',c='grey',linewidth=0.5)
+    #     Rax1.plot([R_xi_min,R_xi_max],[35,35],'--',c='grey',linewidth=0.5)
+    #     Rax2.plot([R_vp_min,R_vp_max],[35,35],'--',c='grey',linewidth=0.5)  
+    #     Rax2.annotate('Moho',(R_vp_max-0.5,35+1), fontsize=8, color='k', backgroundcolor='none',ha='right', va='top') # , bbox=dict(facecolor='white',edgecolor='black', pad=2.0)
+
+    #######################################################################
     # true model overlaid on the posterior (only for synthetic tests)
     if os.path.isfile(directory+'/'+'true_model.out'):
         file=open(directory+'/'+'true_model.out','r')
@@ -1761,44 +2033,90 @@ if Posterior2:
         true_xi_disd=np.zeros(len(depths))
         true_vph_disd=np.zeros(len(depths))
 
-        for k in range(len(depths)):
-            a=np.abs(depths[k]-true_depth)
-            a1=np.where(a==a.min())[0]
-            if len(a1) != 1:
-                if depths[k]>true_depth[a1[0]]:
-                    ind=a1[0]
+
+        if not 'DISC' in PREM_loc:
+
+            ################ For gradients: ########################
+            for k in range(len(depths)):
+
+                if depths[k]==0.0:
+                    true_vsv_disd[k]=prem_vsv[-1]
+                    true_xi_disd[k]=prem_xi[-1]
+                    true_vph_disd[k]=prem_vph[-1]
+                elif depths[k]==700.0:
+                    true_vsv_disd[k]=prem_vsv[0]
+                    true_xi_disd[k]=prem_xi[0]
+                    true_vph_disd[k]=prem_vph[0]
+
                 else:
-                    ind=a1[1]
-            else:
-                ind=a1
-            true_vsv_disd[k]=true_vsv[ind]
-            true_xi_disd[k]=true_xi[ind]
-            true_vph_disd[k]=true_vph[ind]
+                    # print(true_depth)
+                    # print(depths[k])
+
+                    ind1=np.where(true_depth>depths[k])[0][-1]
+                    ind2=np.where(true_depth<depths[k])[0][0]
+                    # print(ind1, ind2)
+                    # print(true_depth[ind2],true_depth[k],true_depth[ind1])
+
+                    x=np.array([true_depth[ind2],true_depth[ind1]])
+                    y1=np.array([true_vsv[ind2],true_vsv[ind1]])
+                    y2=np.array([true_xi[ind2],true_xi[ind1]])
+                    y3=np.array([true_vph[ind2],true_vph[ind1]])
+
+                    vsv_interp = interp1d(x, y1, kind = "linear")
+                    xi_interp = interp1d(x, y2, kind = "linear")
+                    vph_interp = interp1d(x, y3, kind = "linear")
+                    
+                    true_vsv_disd[k]=vsv_interp(depths[k])
+                    true_xi_disd[k]=xi_interp(depths[k])
+                    true_vph_disd[k]=vph_interp(depths[k])
+        else:
+            ############### For discretized model: ################
+            for k in range(len(depths)):
+                a=np.abs(depths[k]-true_depth)
+                a1=np.where(a==a.min())[0]
+                if len(a1) != 1:
+                    if depths[k]>true_depth[a1[0]]:
+                        ind=a1[0]
+                    else:
+                        ind=a1[1]
+                else:
+                    ind=a1
+                true_vsv_disd[k]=true_vsv[ind]
+                true_xi_disd[k]=true_xi[ind]
+                true_vph_disd[k]=true_vph[ind]
+
 
         true_vsv_rel=((true_vsv_disd-prem_vsv_disd)/prem_vsv_disd)*100
         true_xi_rel=((true_xi_disd-prem_xi_disd)/prem_xi_disd)*100
         true_vph_rel=((true_vph_disd-prem_vph_disd)/prem_vph_disd)*100
 
 
-        Fit_vsv_xi=True
+        # Fit_vsv_xi=True
 
-        vsv_2_sum=np.zeros(disd)
-        xi_2_sum=np.zeros(disd)
-        vph_2_sum=np.zeros(disd)
-        for i in range(0,disd):
-            vsv_2_sum[i]=((vsvd_medians_rel[i]-true_vsv_rel[i])**2)
-            xi_2_sum[i]=((xid_medians_rel[i]-true_xi_rel[i])**2)
-            vph_2_sum[i]=((vpd_medians_rel[i]-true_vph_rel[i])**2)
-            # print(depths[i], np.sqrt(vsv_2_sum[i]), np.sqrt(xi_2_sum[i]))
-        if Fit_vsv_xi:
-            # Model_fit=(1-np.sqrt((np.sum(np.hstack((vsv_2_sum)))/(disd*2))))*100
-            Model_fit=np.sqrt(np.mean(np.hstack((vsv_2_sum,xi_2_sum))))
-        else:
-            Model_fit=np.sqrt(np.mean(np.hstack((vsv_2_sum))))
-        print('****')
+        # disd_ind=np.where(depths<=prof)[0][-1]
+        # print(disd_ind, depths[disd_ind])
 
-        print('Model Fit: '+str(Model_fit))
-        print('****')
+        # vsv_2_sum=np.zeros(disd)
+        # xi_2_sum=np.zeros(disd)
+        # vph_2_sum=np.zeros(disd)
+        
+        # for i in range(0,disd-1):
+        #     vsv_2_sum[i]=((vsvd_medians_rel[i]-true_vsv_rel[i])**2)
+        #     xi_2_sum[i]=((xid_medians_rel[i]-true_xi_rel[i])**2)
+        #     vph_2_sum[i]=((vpd_medians_rel[i]-true_vph_rel[i])**2)
+        #     # print(depths[i], np.sqrt(vsv_2_sum[i]), np.sqrt(xi_2_sum[i]))
+        # if Fit_vsv_xi:
+        #     # Model_fit=(1-np.sqrt((np.sum(np.hstack((vsv_2_sum)))/(disd*2))))*100
+        #     Model_fit=np.sqrt(np.mean(np.hstack((vsv_2_sum,xi_2_sum))))
+        # else:
+        #     Model_fit=np.sqrt(np.mean(np.hstack((vsv_2_sum))))
+        # print('****')
+
+        # print('Model Fit: '+str(Model_fit))
+        # print('****')
+
+    #######################################################################
+
 
     if os.path.isfile(directory+'/'+'true_model.out'):
         # True models in cyan.
@@ -1806,14 +2124,48 @@ if Posterior2:
         Rax1.plot(true_xi_rel,depths,c='k',linewidth=1) # ,alpha=1,marker='o',markersize=2,mfc='k'
         Rax2.plot(true_vph_rel,depths,c='k',linewidth=1)
 
-    median2,=Rax0.plot(vsvd_medians_rel,depths,c='b',linewidth=2)
-    Rax1.plot(xid_medians_rel,depths,c='b',linewidth=2)
-    if '16_' in os.getcwd():
-        Rax2.plot(vpd_medians_rel,depths,c='b',linewidth=2) 
+        ########################################################################
+        # Write out true models to files
+       
+        fname_VsT_rel=directory+'/Proc2_Vs_true.txt'
+        f_VsT_rel=open(fname_VsT_rel,'w')
+        # f_VsT_rel.write("Depth, Prem_vsv, true_mod_vsv, true_mod_rel_vsv\n")
+        for k in range(len(depths)):
+            f_VsT_rel.write("{0:8.3f} {1:8.3f} {2:8.3f} {3:8.3f}\n".format(depths[k], prem_vsv_disd[k], true_vsv_disd[k], true_vsv_rel[k]))         
+        f_VsT_rel.close()
+
+
+        fname_XiT_rel=directory+'/Proc2_Xi_true.txt'
+        f_XiT_rel=open(fname_XiT_rel,'w')
+        # f_XiT_rel.write("Depth, Prem_xi, true_mod_xi, true_mod_rel_xi\n")
+        for k in range(len(depths)):
+            f_XiT_rel.write("{0:8.3f} {1:8.3f} {2:8.3f} {3:8.3f}\n".format(depths[k], prem_xi_disd[k], true_xi_disd[k], true_xi_rel[k]))         
+        f_XiT_rel.close()
+
+        fname_VpT_rel=directory+'/Proc2_Vp_true.txt'
+        f_VpT_rel=open(fname_VpT_rel,'w')
+        # f_VpT_rel.write("Depth, Prem_vph, true_mod_vph, true_mod_rel_vph\n")
+        for k in range(len(depths)):
+            f_VpT_rel.write("{0:8.3f} {1:8.3f} {2:8.3f} {3:8.3f}\n".format(depths[k], prem_vph_disd[k], true_vph_disd[k], true_vph_rel[k]))         
+        f_VpT_rel.close()
+
+
+    median2,=Rax0.plot(vsvd_medians_rel_dec,depths_vsv_rel_dec,c='r',linewidth=2)
+    Rax1.plot(xid_medians_rel_dec,depths_xi_rel_dec,c='b',linewidth=2)
+    if '16_' in os.getcwd() or '24_'  in os.getcwd() :
+        Rax2.plot(vpd_medians_rel_dec,depths_vph_rel_dec,c='b',linewidth=2) 
 
     # mean,=Rax0.plot(average_vsv_rel,depths,c='r',linewidth=2)
     # Rax1.plot(average_xi_rel,depths,c='r',linewidth=2)
     # Rax2.plot(average_vph_rel,depths,c='r',linewidth=2)
+
+    # Add moho here.
+    CR1_moho_depth=get_CR1_depth(directory)
+
+    Rax0.plot([R_vref_min,R_vref_max],[CR1_moho_depth,CR1_moho_depth],'k--',linewidth=1)
+    Rax0.text(R_vref_min+0.1*R_vref_max,CR1_moho_depth+10,'Moho',fontsize=8, color='k',horizontalalignment='left', verticalalignment='top')
+    Rax1.plot([R_xi_min,R_xi_max],[CR1_moho_depth,CR1_moho_depth],'k--',linewidth=1)
+    Rax2.plot([R_vp_min,R_vp_max],[CR1_moho_depth,CR1_moho_depth],'k--',linewidth=1)
 
 
     # Make proxy artists to make the legend work
@@ -1828,8 +2180,8 @@ if Posterior2:
         # plt.legend([prem, mean, median2, q95, (q95, q65)], ['PREM', 'mean', 'median', '95% mods.', '65% mods.'],loc='lower right')
         plt.legend([prem, median2, q95, (q95, q68), (q95, q68, q38), (q95, q68, q38, q10)], ['reference', 'median', '95% mods.', '68% mods.', '38% mods.', '10% mods.'],loc='lower right')
 
-    if os.path.isfile(directory+'/'+'true_model.out'):
-        Rax1.annotate('$\u03A7^{2}_{M}$='+str(np.round(Model_fit,2))+'%',(0, 0),xytext=(5,5),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='bottom', bbox=dict(facecolor='white',edgecolor='grey', pad=2.0, alpha=0.5))
+    # if os.path.isfile(directory+'/'+'true_model.out'):
+        # Rax1.annotate('$\u03A7^{2}_{M}$='+str(np.round(Model_fit,2))+'%',(0, 0),xytext=(5,5),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='bottom', bbox=dict(facecolor='white',edgecolor='grey', pad=2.0, alpha=0.5))
     Rax0.annotate('$\u03A7^{2}_{D}$='+str(np.round(chi,2))+'km/s',(0, 0),xytext=(5,5),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='bottom', bbox=dict(facecolor='white',edgecolor='grey', pad=2.0, alpha=0.5))
 
     Rax0.annotate('a',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=10,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
@@ -2091,10 +2443,10 @@ if Convergence:
 
         plt.figure('convergence_birth')
         plt.title('Birth Rate Convergence')
-        plt.plot(convB_one[burn_in:],label='birth, one core')
-        plt.plot(convB[burn_in:],label='birth, all cores')
-        plt.plot(convBa_one[burn_in:],label='birth anisotropic, one core')
-        plt.plot(convBa[burn_in:],label='birth anisotropic, all cores')
+        plt.plot(convB_one[burn_in:],'b-',label='birth, one core')
+        plt.plot(convBa_one[burn_in:],'g-',label='birth anisotropic, one core')
+        plt.plot(convB[burn_in:],'orange',label='birth, all cores')
+        plt.plot(convBa[burn_in:],'r-',label='birth anisotropic, all cores')
         plt.xlabel('Iteration number')
         plt.ylabel('XXX')
         plt.xlim([0,nsample])
@@ -2125,10 +2477,10 @@ if Convergence:
 
         plt.figure('convergence_death')
         plt.title('Death Rate Convergence')
-        plt.plot(convD_one[burn_in:],label='death, one core')
-        plt.plot(convD[burn_in:],label='death, all cores')
-        plt.plot(convDa_one[burn_in:],label='death anisotropic, one core')
-        plt.plot(convDa[burn_in:],label='death anisotropic, all cores')
+        plt.plot(convD_one[burn_in:],'b-',label='death, one core')
+        plt.plot(convDa_one[burn_in:],'g-',label='death anisotropic, one core')
+        plt.plot(convD[burn_in:],'orange',label='death, all cores')
+        plt.plot(convDa[burn_in:],'r-',label='death anisotropic, all cores')
         plt.xlabel('Iteration number')
         plt.ylabel('XXX')
         plt.xlim([0,nsample])
@@ -2359,10 +2711,10 @@ if PsPp_Fit:
 
 
 if Corr_Hist:
-    if os.path.isfile(directory+'/'+'Posterior_corr_100_200.json'):
+    if os.path.isfile(directory+'/'+'Posterior_corr_150_300.json'):
         print('Posterior Correlation file present')
         
-        with open(directory+'/'+'Posterior_corr_100_200.json') as data_file:
+        with open(directory+'/'+'Posterior_corr_150_300.json') as data_file:
             corrs = json.load(data_file)
 
         nsample  = int(corrs['params_inversion']['nsample'])
@@ -2395,7 +2747,7 @@ if Corr_Hist:
             # max_1=np.round_(float(corrs['params_inversion']['vpref_max']),2)
             min_1=np.round_(float(corrs['nostack'][str(av_int)]['av_vph_min'][p1_u_dep_ind]),2)
             max_1=np.round_(float(corrs['nostack'][str(av_int)]['av_vph_max'][p1_u_dep_ind]),2)
-            p1_l='$V_{PH}$'
+            p1_l='$\delta V_{PH}$'
 
         if p1 == 'vsv':
             # min_1=np.round_(float(corrs['params_inversion']['vsref_min']),2)
@@ -2403,18 +2755,18 @@ if Corr_Hist:
             min_1=np.round_(float(corrs['nostack'][str(av_int)]['av_vsv_min'][p1_u_dep_ind]),2)
             max_1=np.round_(float(corrs['nostack'][str(av_int)]['av_vsv_max'][p1_u_dep_ind]),2)
 
-            p1_l='$V_{SV}$'
+            p1_l='$\delta V_{SV}$'
 
         if p2 == 'vsv':
             # min_2=np.round_(float(corrs['params_inversion']['vsref_min']),2)
             # max_2=np.round_(float(corrs['params_inversion']['vsref_max']),2)
             min_2=np.round_(float(corrs['nostack'][str(av_int)]['av_vsv_min'][p2_u_dep_ind]),2)
             max_2=np.round_(float(corrs['nostack'][str(av_int)]['av_vsv_max'][p2_u_dep_ind]),2)
-            p2_l='$V_{SV}$'
+            p2_l='$\delta V_{SV}$'
 
         if p2 == 'xi':
-            min_2=np.round_(float(corrs['params_inversion']['xi_min']),2)
-            max_2=np.round_(float(corrs['params_inversion']['xi_max']),2)
+            min_2=np.round_(float(corrs['nostack'][str(av_int)]['av_xi_min'][p2_u_dep_ind]),2)
+            max_2=np.round_(float(corrs['nostack'][str(av_int)]['av_xi_max'][p2_u_dep_ind]),2)
             p2_l='$Xi$'
 
         p1_l_dep = p1_u_dep+av_int
@@ -2440,6 +2792,8 @@ if Corr_Hist:
 
         y_array = np.linspace(min_1+(((max_1-min_1)/dh)/2), max_1-(((max_1-min_1)/dh)/2), dh) # Center of the bins
         x_array = np.linspace(min_2+(((max_2-min_2)/dh)/2), max_2-(((max_2-min_2)/dh)/2), dh)
+
+        
 
         # print(x_array[dh//2-1])
         # print(x_array)
@@ -2485,23 +2839,22 @@ if Corr_Hist:
         y=y/np.max(y[:])
 
         # Set up your x and y labels
-        ylabel = str(p1_l)+' (m/s) '+str(int(p1_u_dep))+' - '+str(int(p1_l_dep))+' km'
-        if p2 == 'xi':
-            xlabel = str(p2_l)+' '+str(int(p2_u_dep))+' - '+str(int(p2_l_dep))+' km' 
-        else:
-            xlabel = str(p2_l)+' (m/s) '+str(int(p2_u_dep))+' - '+str(int(p2_l_dep))+' km' 
+        ylabel = str(p1_l)+' (%) '+str(int(p1_u_dep))+' - '+str(int(p1_l_dep))+' km'
+        xlabel = str(p2_l)+' (%) '+str(int(p2_u_dep))+' - '+str(int(p2_l_dep))+' km' 
         # Define the locations for the axes
-        left, width = 0.12, 0.55
-        bottom, height = 0.12, 0.55
+        left, width = 0.13, 0.56
+        bottom, height = 0.13, 0.56
         bottom_h = left_h = left+width+0.05
         
         # Set up the geometry of the three plots
         rect_corrxy = [left, bottom, width, height] # dimensions of temp plot
-        rect_histx = [left, bottom_h, width, 0.25] # dimensions of x-histogram
-        rect_histy = [left_h, bottom, 0.25, height] # dimensions of y-histogram
-        
+        rect_histx = [left, bottom_h, width, 0.24] # dimensions of x-histogram
+        rect_histy = [left_h, bottom, 0.24, height] # dimensions of y-histogram
+        rect_title = [left_h, bottom_h, 0.24, 0.24] # dimensions of title box
+
+
         # Set up the size of the figure
-        fig = plt.figure('Corr_hist', figsize=(10,9.5))
+        fig = plt.figure('Corr_hist', figsize=(13*cm,11*cm))
         # plt.title('Correlation')
 
         # Make the three plots
@@ -2509,6 +2862,19 @@ if Corr_Hist:
         axHistx = fig.add_axes(rect_histx) # x histogram
         axHisty = fig.add_axes(rect_histy) # y histogram
         
+        axtitle = fig.add_axes(rect_title) # Title box
+        axtitle.set_xticks([]); axtitle.set_yticks([])
+        axtitle.set_xlim([0, 1])
+        axtitle.set_ylim([0, 1])
+        axtitle.axis("off")
+        title=str(p1_l)+' & '+str(p2_l)
+
+
+        axtitle.annotate('Correlation',(0.5, 1),xytext=(-5,-5),xycoords='axes fraction',fontsize=12,textcoords='offset points', color='k', backgroundcolor='none',ha='center', va='top')
+        axtitle.annotate(title,(0.5, 0.7),xytext=(-5,-5),xycoords='axes fraction',fontsize=12,textcoords='offset points', color='k', backgroundcolor='none',ha='center', va='top')
+        axtitle.annotate(str(int(p1_u_dep))+' - '+str(int(p1_l_dep))+' km',(0.5, 0.4),xytext=(-5,-5),xycoords='axes fraction',fontsize=12,textcoords='offset points', color='k', backgroundcolor='none',ha='center', va='top')
+        
+
         # Remove the inner axes numbers of the histograms
         nullfmt = NullFormatter()
         axHistx.xaxis.set_major_formatter(nullfmt)
@@ -2527,7 +2893,7 @@ if Corr_Hist:
 
 
         # option 1
-        # axCorr.imshow(p1_p2, extent=[ymin,ymax,xmin,xmax], aspect='auto',
+        # axCorr.imshow(p1_p2, aspect='auto',
         #     interpolation='nearest', origin='lower')
         # Option 2
         # axCorr.contourf(p1_p2, extent=[ymin-1,ymax+1,xmin-1,xmax+1], origin='lower')
@@ -2595,40 +2961,43 @@ if Corr_Hist:
         axCorr.set_xlim([min_2, max_2])
         axCorr.set_ylim([min_1, max_1])
 
-        xlabels=[ str(i) for i in np.linspace(min_2, max_2,3)]
-        ylabels=[ str(i) for i in np.linspace(min_1, max_1,3)]
+        if p2 == 'xi':
+            xlabels=[ str(int(np.round_((i-1)*100,1))) for i in np.linspace(min_2, max_2,5)]
+        else:
+            xlabels=[ str(int(np.round_((i-0)*100,1))) for i in np.linspace(min_2, max_2,5)]  
+        ylabels=[ str(int(np.round_((i-0)*100,1))) for i in np.linspace(min_1, max_1,5)]
+
+        axCorr.xaxis.set_ticks(np.linspace(min_2, max_2,5))
+        axCorr.xaxis.set_ticklabels(xlabels, fontsize=10)
+        axCorr.yaxis.set_ticks(np.linspace(min_1, max_1,5))
+        axCorr.yaxis.set_ticklabels(ylabels, fontsize=10)
 
 
-        axCorr.xaxis.set_ticks(np.linspace(min_2, max_2,3))
-        axCorr.xaxis.set_ticklabels(xlabels, fontsize=12)
-        axCorr.yaxis.set_ticks(np.linspace(min_1, max_1,3))
-        axCorr.yaxis.set_ticklabels(ylabels, fontsize=12)
+        # axins1 = inset_axes(axCorr,
+        #             width="40%",  # width = 40% of parent_bbox width
+        #             height="5%",  # height : 5%
+        #             loc='lower right')
+        # cbar=plt.colorbar(m, cax=axins1, orientation="horizontal")
+        # cbar.ax.locator_params(nbins=5)
+        # # COLORBAR
+        # fg_color = 'white'
+        # # set colorbar tick color
+        # cbar.ax.xaxis.set_tick_params(color=fg_color)
+        # # set colorbar edgecolor 
+        # cbar.outline.set_edgecolor(fg_color)
+        # # set colorbar ticklabels
+        # cbar.ax.xaxis.set_tick_params(color=fg_color, labelcolor=fg_color, labelsize=14)
+        # cbar.ax.set_title(label='KDE - Probability', color=fg_color, fontsize=14)
 
+        # axins1.xaxis.set_ticks_position("top")
+        # axins1.xaxis.set_label_position("top")
 
-        axins1 = inset_axes(axCorr,
-                    width="40%",  # width = 40% of parent_bbox width
-                    height="5%",  # height : 5%
-                    loc='lower right')
-        cbar=plt.colorbar(m, cax=axins1, orientation="horizontal")
-        cbar.ax.locator_params(nbins=5)
-        # COLORBAR
-        fg_color = 'white'
-        # set colorbar tick color
-        cbar.ax.xaxis.set_tick_params(color=fg_color)
-        # set colorbar edgecolor 
-        cbar.outline.set_edgecolor(fg_color)
-        # set colorbar ticklabels
-        cbar.ax.xaxis.set_tick_params(color=fg_color, labelcolor=fg_color, labelsize=14)
-        cbar.ax.set_title(label='KDE - Probability', color=fg_color, fontsize=14)
-
-        axins1.xaxis.set_ticks_position("top")
-        axins1.xaxis.set_label_position("top")
-
+        # axCorr.plot([0, dh], [0, dh], '--g', linewidth=1) # 
         axCorr.plot([min_2, max_2], [min_1, max_1], '--g', linewidth=1) # 
 
         #Plot the axes labels
-        axCorr.set_xlabel(xlabel,fontsize=16)
-        axCorr.set_ylabel(ylabel,fontsize=16)
+        axCorr.set_xlabel(xlabel,fontsize=10)
+        axCorr.set_ylabel(ylabel,fontsize=10)
 
         # xlabels=[ str(i) for i in np.linspace(min_2, max_2,5)]
         # ylabels=[ str(i) for i in np.linspace(min_1, max_1,5)]
@@ -2680,19 +3049,31 @@ if Corr_Hist:
 
         ############### Lets add some labels here!!!!
 
-        axCorr.annotate('(a)',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=12,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
-        axHistx.annotate('(b)',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=12,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
-        axHisty.annotate('(c)',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=12,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
 
-        axCorr.annotate('r={:.2f}'.format(r),(1, 1),xytext=(-5,-5),xycoords='axes fraction',fontsize=12,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
+        if p2 == 'xi':
+            x_median=(x_median-1)*100.
+            x_mean=(x_mean-1)*100.
+        else:
+            x_median=(x_median-0)*100.
+            x_mean=(x_mean-0)*100.  
+        y_median=(y_median-0)*100.
+        y_mean=(y_mean-0)*100. 
 
-        axHistx.annotate('-- median={:.2f}'.format(x_median),(1, 1),xytext=(-5,-5),xycoords='axes fraction',fontsize=12,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
-        axHistx.annotate('- mean={:.2f}'.format(x_mean),(1, 1),xytext=(-5,-20),xycoords='axes fraction',fontsize=12,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
-        # axHistx.annotate('std={:.2f}'.format(x_std),(1, 1),xytext=(-5,-35),xycoords='axes fraction',fontsize=12,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
 
-        axHisty.annotate('-- median={:.2f}'.format(y_median),(1, 1),xytext=(-5,-5),xycoords='axes fraction',fontsize=12,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
-        axHisty.annotate('- mean={:.2f}'.format(y_mean),(1, 1),xytext=(-5,-20),xycoords='axes fraction',fontsize=12,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
-        # axHisty.annotate('std={:.2f}'.format(y_std),(1, 1),xytext=(-5,-35),xycoords='axes fraction',fontsize=12,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+
+        axCorr.annotate('a',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=10,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
+        axHistx.annotate('b',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=10,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
+        axHisty.annotate('c',(0, 1),xytext=(5,-5),xycoords='axes fraction',fontsize=10,textcoords='offset points', color='k', backgroundcolor='none',ha='left', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
+
+        axCorr.annotate('r={:.2f}'.format(r),(1, 1),xytext=(-5,-5),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top', bbox=dict(facecolor='white',edgecolor='black', pad=2.0))
+
+        axHistx.annotate('-- median={:.1f}%'.format(x_median),(1, 1),xytext=(-5,-5),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+        axHistx.annotate('- mean={:.1f}%'.format(x_mean),(1, 1),xytext=(-5,-20),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+        # axHistx.annotate('std={:.1f}'.format(x_std),(1, 1),xytext=(-5,-35),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+
+        axHisty.annotate('-- median={:.1f}%'.format(y_median),(1, 1),xytext=(-5,-5),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+        axHisty.annotate('- mean={:.1f}%'.format(y_mean),(1, 1),xytext=(-5,-20),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
+        # axHisty.annotate('std={:.2f}'.format(y_std),(1, 1),xytext=(-5,-35),xycoords='axes fraction',fontsize=8,textcoords='offset points', color='k', backgroundcolor='none',ha='right', va='top')
 
         # Plot mean and std on the plots.
         axHistx.plot([x_mean_pos,x_mean_pos],[0, 1],c='b',linewidth=1, alpha=1)
@@ -2728,7 +3109,6 @@ if Corr_Hist:
         #################### Plot Max points and LSQR / inital model points
         # Max position: x, r
         axCorr.plot(max_loc_p1_p2[1]+0.5,max_loc_p1_p2[0]+0.5,c='r',marker='x',markersize=5,linewidth=1, alpha=1) # centered using +0.5
-        
         Modes='fund'
         # Modes='over'
 
@@ -2813,19 +3193,45 @@ if Corr_Hist:
         for label in ticklabels:
             label.set_fontsize(12)
             label.set_family('sans-serif')
-        
-        # #Cool trick that changes the number of tickmarks for the histogram axes
-        axHisty.xaxis.set_major_locator(LinearLocator(3))
-        axHistx.yaxis.set_major_locator(LinearLocator(3))
+            
+        axCorr.spines["right"].set_linewidth(1.5)
+        axCorr.spines["left"].set_linewidth(1.5)
+        axCorr.spines["top"].set_linewidth(1.5)
+        axCorr.spines["bottom"].set_linewidth(1.5)
+        axCorr.tick_params(labelsize=10)
+        # axCorr.yaxis.set_minor_locator(MultipleLocator(0.05))
+        # axCorr.yaxis.set_major_locator(MultipleLocator(0.1))
+        # axCorr.xaxis.set_minor_locator(MultipleLocator(0.05))
+        # axCorr.xaxis.set_major_locator(MultipleLocator(0.1))
+
+        axHisty.spines["right"].set_linewidth(1.5)
+        axHisty.spines["left"].set_linewidth(1.5)
+        axHisty.spines["top"].set_linewidth(1.5)
+        axHisty.spines["bottom"].set_linewidth(1.5)
+        axHisty.tick_params(labelsize=10)
+        axHisty.xaxis.set_minor_locator(MultipleLocator(0.25))
+        axHisty.xaxis.set_major_locator(MultipleLocator(0.5))
+
+
+        axHistx.spines["right"].set_linewidth(1.5)
+        axHistx.spines["left"].set_linewidth(1.5)
+        axHistx.spines["top"].set_linewidth(1.5)
+        axHistx.spines["bottom"].set_linewidth(1.5)
+        axHistx.tick_params(labelsize=10)
+        axHistx.yaxis.set_minor_locator(MultipleLocator(0.25))
+        axHistx.yaxis.set_major_locator(MultipleLocator(0.5))
+
+
+        # # #Cool trick that changes the number of tickmarks for the histogram axes
+        # axHisty.xaxis.set_major_locator(LinearLocator(3))
+        # axHistx.yaxis.set_major_locator(LinearLocator(3))
         axHisty.yaxis.set_major_locator(LinearLocator(5))
         axHistx.xaxis.set_major_locator(LinearLocator(5))
-
-
-        axCorr.yaxis.set_major_locator(LinearLocator(5))
-        axCorr.xaxis.set_major_locator(LinearLocator(5))
+        # axCorr.yaxis.set_major_locator(LinearLocator(5))
+        # axCorr.xaxis.set_major_locator(LinearLocator(5))
 
         # plt.show()
-        plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Corr_av_'+str(av_int)+'_dh_'+str(dh)+'_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)+'.png',dpi=200)
+        plt.savefig(directory+'/PLOTS/'+str(fname_pre)+'Corr_av_'+str(av_int)+'_dh_'+str(dh)+'_'+str(p1)+'_'+str(p1_u_dep)+'_'+str(p2)+'_'+str(p2_u_dep)+'.pdf')
         plt.close()
 
 
