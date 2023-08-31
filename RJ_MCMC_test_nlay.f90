@@ -60,7 +60,7 @@ program RJ_MCMC
     real, parameter :: d_min = 0   ! depth bounds  
     real, parameter :: d_max = 700 
       
-    real, parameter :: width = 0.4 ! width of the prior in vsv
+    real, parameter :: width = 0.2 ! width of the prior in vsv
     
     real, parameter :: vp_min = -0.4
     real, parameter :: vp_max = 0.4 ! bounds of the prior in vp
@@ -79,11 +79,11 @@ program RJ_MCMC
     double precision, parameter ::    Ad_PsPp_min = 0.1
 
     !!!!!!!!!!!!!!! Add a prior for starting models close to PREM !!!!!!!!!!!!!!!!!
-    real, parameter :: sp_width = 0.15 ! width of the prior in vsv
-    real, parameter :: sp_vp_min = -0.15
-    real, parameter :: sp_vp_max = 0.15 ! bounds of the prior in vp
-    real, parameter :: sp_xi_min = 0.85 ! bounds of the prior in xi
-    real, parameter :: sp_xi_max = 1.15
+    real, parameter :: sp_width = 0.1 ! width of the prior in vsv
+    real, parameter :: sp_vp_min = -0.2
+    real, parameter :: sp_vp_max = 0.2 ! bounds of the prior in vp
+    real, parameter :: sp_xi_min = 0.8 ! bounds of the prior in xi
+    real, parameter :: sp_xi_max = 1.2
     real, parameter :: sp_malay = 40
     double precision, parameter ::    sp_Ad_R_max = 65 ! bounds of the prior in Ad_R - the error parameter for rayleigh wave velocity
     double precision, parameter ::    sp_Ad_L_max = 65 ! bounds of the prior in Ad_L
@@ -108,7 +108,7 @@ program RJ_MCMC
     ! Parameters for Displaying results 
     !-------------------------------------------- 
 
-    integer, parameter :: display = 1000 ! display results in OUT/mpi.out 
+    integer, parameter :: display = 5000 ! display results in OUT/mpi.out 
     !every display samples
 
      !discretezation for the posterior distribution.
@@ -260,8 +260,8 @@ program RJ_MCMC
     pv1 = 0.1! 0.04     ! proposal on velocity
     pAd_R = 5        ! proposal for change in R noise
     pAd_L = 5        ! proposal for change in L noise
-    sigmav=0.05        ! proposal for vsv when creating a new layer
-    sigmavp=0.05     ! proposal for vp when creating a new layer
+    sigmav=0.1        ! proposal for vsv when creating a new layer
+    sigmavp=0.1     ! proposal for vp when creating a new layer
     if (PsPp_flag==1) then
         pAd_PsPp = 5        ! proposal for change in PsPp tdiff noise
     end if
@@ -361,7 +361,7 @@ program RJ_MCMC
     !     i=1,nptref)
     ! close(7)
 
-    open(7,file="Model_PREM_DISC_20.in",status='old',form='formatted')
+    open(7,file="Model_PREM_SIMPLE.in",status='old',form='formatted')
     read(7,*) nptref,nic_ref,noc_ref
     do i = 1,nptref
          read(7,*) model_ref(i,1),&
@@ -1366,8 +1366,9 @@ program RJ_MCMC
                                 
                 if (vp_flag==0) then
                     ! Vp Free
-                    voro_prop(npt_prop,4) = voro(ind,4)+gasdev(ra)*sigmavp ! sigmavp: special width for new layers
-                    logprob_vp=log(1/(sigmavp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(npt_prop,4))**2)/(2*sigmavp**2)
+                    voro_prop(npt_prop,4) = vp_min+(vp_max-vp_min)*ran3(ra)
+                    ! voro_prop(npt_prop,4) = voro(ind,4)+gasdev(ra)*sigmavp ! sigmavp: special width for new layers
+                    ! logprob_vp=log(1/(sigmavp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(npt_prop,4))**2)/(2*sigmavp**2)
                 elseif (vp_flag==1) then
                     ! Vp scaled
                     if (vp_scale.gt.1.0) then
@@ -1375,11 +1376,11 @@ program RJ_MCMC
                     else
                         voro_prop(npt_prop,4) = voro_prop(npt_prop,2) * vp_scale
                     endif
-                    logprob_vp = 1.0
+                    !logprob_vp = 1.0
                 elseif (vp_flag==2) then
                     ! Vp Fixed to ref
                     voro_prop(npt_prop,4) = 0.0
-                    logprob_vp = 1.0
+                    !logprob_vp = 1.0
                 end if
 
                 !Check bounds                    
@@ -1427,13 +1428,13 @@ program RJ_MCMC
                 call whichcell_d(voro(ind,1),voro_prop,npt_prop,ind2)
                 logprob_vsv= log(1/(sigmav*sqrt(2*pi)))-((voro(ind,2)-voro_prop(ind2,2))**2)/(2*sigmav**2) ! same as for birth
                 
-                if (vp_flag==0) then
-                    ! Vp Free
-                    logprob_vp=log(1/(sigmavp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(ind2,4))**2)/(2*sigmavp**2)
-                elseif ((vp_flag==1).or.(vp_flag==2)) then
-                    ! Vp scaled or Vp Fixed to ref
-                    logprob_vp = 1.0 
-                end if
+                ! if (vp_flag==0) then
+                !     ! Vp Free
+                !     logprob_vp=log(1/(sigmavp*sqrt(2*pi)))-((voro(ind,4)-voro_prop(ind2,4))**2)/(2*sigmavp**2)
+                ! elseif ((vp_flag==1).or.(vp_flag==2)) then
+                !     ! Vp scaled or Vp Fixed to ref
+                !     logprob_vp = 1.0 
+                ! end if
                 
             endif
         elseif (u<0.9) then !Birth of an anisotropic layer----------------------------------------
@@ -1651,7 +1652,7 @@ program RJ_MCMC
             if (vp_flag==0) then
                 ! Vp Free
                 if (log(ran3(ra))<log(out) + log(real(npt)+1)-log(real(npt_prop)+1) -&
-                    log(2*width)-logprob_vsv-log(vp_max-vp_min)-logprob_vp&
+                    log(2*width)-logprob_vsv&!-log(vp_max-vp_min)-logprob_vp&
                     -like_prop+like) then ! transdimensional case
                     accept=.true.
                     AcB=AcB+1
@@ -1672,7 +1673,7 @@ program RJ_MCMC
                 ! Vp Free
                 if (log(ran3(ra))<log(out) + log(real(npt)+1)&
                     -log(real(npt_prop)+1) + &
-                    log(2*width)+logprob_vsv+log(vp_max-vp_min)+logprob_vp&
+                    log(2*width)+logprob_vsv&!+log(vp_max-vp_min)+logprob_vp&
                     -like_prop+like) then! transdimensional case
                     accept=.true.
                     AcD=AcD+1
@@ -1833,7 +1834,8 @@ program RJ_MCMC
                 write(100,*)Ad_R,Ad_L !,Ad_PsPp ! Need a new post processing again.
                 do i=1,nptfinal-noc
                     write(100,*)(rearth-r(nptfinal+1-i))/1000.,vsv(nptfinal+1-i)&
-                    ,xi(nptfinal+1-i),vph(nptfinal+1-i) ! vp_data(nptfinal+1-i) instead
+                    ,xi(nptfinal+1-i),vph(nptfinal+1-i),vs_data(nptfinal+1-i)&
+                    ,vp_data(nptfinal+1-i)
                 enddo
                 write(100,*)like_prop
                 !write(100,*)logalpha(:numdis)

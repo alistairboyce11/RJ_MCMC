@@ -3,7 +3,7 @@
 """
 Created on Thu Apr 21 16:43:33 2022
 
-@author: dorian
+@author: dorian & alistair
 """
 import numpy as np
 import os
@@ -161,24 +161,24 @@ def get_model_ref(filename='Model_PREM_SIMPLE.in'):
         contains the data of the reference model.
 
     '''
-    
+
     file=filename
-    
+
     model_ref={}
-    
+
     f=open(file,'r')
     lines=f.readlines()
     f.close()
-    
+
     data=lines[0].split()
     ntot=int(data[0])
     nic=int(data[1])
     noc=int(data[2])
-    
+
     npt_true=ntot-noc
-    
+
     rearth=float(lines[-1].split()[0])
-    
+
     d=np.zeros((npt_true))
     vsv=np.zeros_like(d)
     vsh=np.zeros_like(d)
@@ -191,7 +191,7 @@ def get_model_ref(filename='Model_PREM_SIMPLE.in'):
         vsv[i]=float(data[3])
         vph[i]=float(data[6])
         vsh[i]=float(data[7])
-    
+
     model_ref['npt_true']=npt_true
     model_ref['depth']=d
     model_ref['vpv']=vpv
@@ -775,7 +775,7 @@ def create_post_array_ref(model,model_ref,dispersion_one,obs_disp,params_inversi
         has 2 subdicts, 'stack' and 'nostack'.
 
     '''
-    ndatad=100
+    ndatad=700
     ndatav=401
     outputs={}
     outputs['stack']={}
@@ -1189,15 +1189,35 @@ def write_posterior_corr_dict(output_directory,input,params_inversion):
 
 def main():
     print('start')
-    if os.path.isfile('Model_PREM_DISC_20.in'):
-        model_ref=get_model_ref(filename='Model_PREM_DISC_20.in')    
-    elif os.path.isfile('Model_PREM_DISC_10.in'):
-        model_ref=get_model_ref(filename='Model_PREM_DISC_10.in')
-    elif os.path.isfile('Model_PREM_SIMPLE.in'):
-        model_ref=get_model_ref(filename='Model_PREM_SIMPLE.in')
+    # if os.path.isfile('Model_PREM_DISC_20.in'):
+    #     model_ref=get_model_ref(filename='Model_PREM_DISC_20.in')    
+    # elif os.path.isfile('Model_PREM_DISC_10.in'):
+    #     model_ref=get_model_ref(filename='Model_PREM_DISC_10.in')
+    # elif os.path.isfile('Model_PREM_SIMPLE.in'):
+    #     model_ref=get_model_ref(filename='Model_PREM_SIMPLE.in')
+    # elif os.path.isfile('Modified_PREM_GLOBAL.in'):
+    #     model_ref=get_model_ref(filename='Modified_PREM_GLOBAL.in')
+    # elif os.path.isfile('Modified_PREM_CRATON.in'):
+    #     model_ref=get_model_ref(filename='Modified_PREM_CRATON.in')
+    # elif os.path.isfile('Modified_PREM_OCEAN.in'):
+    #     model_ref=get_model_ref(filename='Modified_PREM_OCEAN.in')
+    # elif os.path.isfile('Modified_PREM_OROGEN.in'):
+    #     model_ref=get_model_ref(filename='Modified_PREM_OROGEN.in')
+    # else:
+    #     sys.exit('Ref model not found... exit')
+    
+    if len(glob.glob('*.in')) ==1 and os.path.isfile(glob.glob('*.in')[0]):
+        fname_in=glob.glob('*.in')[0]
+        # print(len(fname_in))
+        print(' --------------------- +++++++++ ---------------------')
+        print('Reference model: '+str(fname_in))
+        print(' --------------------- +++++++++ ---------------------')
+
+        model_ref=get_model_ref(filename=fname_in)   
     else:
         sys.exit('Ref model not found... exit')
-    
+
+
     print('got model ref')
     params_inversion=get_metadata(input_directory)
     print('got metadata')
