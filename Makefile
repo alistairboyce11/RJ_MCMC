@@ -13,7 +13,7 @@
 #
 #
 #F77c =  mpif90 -check all  # -check bounds
-F77 =  mpif90 -O3 #-fbounds-check#-O3 #-check bounds # -O3 -Wall
+F77 =  mpif90 -O3 -mcmodel=medium #-fbounds-check#-O3 #-check bounds # -O3 -Wall
 #F77 =  mpiifort -O3 #-Wall -fbounds-check#-O3 #-check bounds
 # F77c =  mpif90  -O3  -fbounds-check #-check bounds
 
@@ -25,48 +25,12 @@ CC = gcc # -O3
 all  :  obj global
 
 
-# driver: params.h data_params.h
-# 	$(F77) -o run RJ_MCMC_store.f90 \
-# 	-L./ -lroutines -lm
-#
-# driver_2: params.h data_params.h
-# 	$(F77) -o run RJ_MCMC_store_2.f90 \
-# 	-L./ -lroutines -lm
-#
 test_combine: params.h data_params.h
 	$(F77) -o run test_combine.f90 \
 	-L./ -lroutines -lm
-#
-# test_new_mineos: params.h data_params.h
-# 	$(F77) -o run test_new_mineos.f90 \
-# 	-L./ -lroutines -lm
-#
-# test_dispersion_minos: params.h data_params.h
-# 	$(F77) -o run test_dispersion_minos.f90 \
-# 	-L./ -lroutines -lm
-#
+
 joint: params.h
-	$(F77) -o run RJ_MCMC_test_joint.f90 \
-	-L./ -lroutines -lm
-
-joint_prepare: params.h
-	$(F77) -o run RJ_MCMC_test_joint_prepare.f90 \
-	-L./ -lroutines -lm
-
-joint_invert: params.h
-	$(F77) -o run2 RJ_MCMC_test_joint_invert.f90 \
-	-L./ -lroutines -lm
-
-joint_store_prepare: params.h
-	$(F77) -o run RJ_MCMC_joint_prepare_store.f90 \
-	-L./ -lroutines -lm
-
-joint_store_prepare_delayed: params.h
-	$(F77) -o run RJ_MCMC_joint_prepare_store_delayed.f90 \
-	-L./ -lroutines -lm
-
-joint_store_invert: params.h
-	$(F77) -o run2 RJ_MCMC_joint_invert_store.f90 \
+	$(F77) -o run RJ_MCMC_joint.f90 \
 	-L./ -lroutines -lm
 
 global: params.h
@@ -96,10 +60,18 @@ synth: params.h data_params.h
 postprocess_binary: params.h
 	$(F77) -o run_binary postprocess_binary_outputs.f90 \
 	-L./ -lroutines -lm
-	
+
 toy: params.h
 	$(F77) -o run_toy create_toy.f90 \
 	-L./ -lroutines -lm
+
+test_crash: params.h
+	$(F77) -o run_crash test_mineos_crash.f90 \
+	-L./ -lroutines -lm
+
+time_mineos: params.h
+	$(F77) -o run_time time_new_mineos.f90 \
+        -L./ -lroutines -lm
 
 obj: params.h
 	$(F77) -c src/whichcell_d.f90
@@ -108,7 +80,7 @@ obj: params.h
 	$(F77) -c src/dispersion_minos.f90
 	$(F77) -c src/interp.f90
 	$(F77) -c src/combine_linear_vp.f90
-
+	$(F77) -c src/combine.f90
 #obj_vp: params.h
 #	$(F77) -c src/whichcell_d.f90
 #	$(F77) -c src/combine_linear_vp.f90
@@ -128,7 +100,7 @@ obj: params.h
 #	matrixops.o readwrite.o spheror.o buildmod.o
 #	\rm ./*.o
 
-	ar -r libroutines.a  whichcell_d.o minos_bran.o dispersion_minos.o interp.o combine_linear_vp.o #combine.à
+	ar -r libroutines.a  whichcell_d.o minos_bran.o dispersion_minos.o interp.o combine_linear_vp.o combine.o #combine.à
 	# ar -r libroutines.a  whichcell_d.o minos_bran.o combine_linear_vp.o dispersion_minos.o interp.o
 	\rm ./*.o
 

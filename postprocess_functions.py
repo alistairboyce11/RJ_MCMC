@@ -7,7 +7,7 @@ Created on Thu Aug 25 14:31:30 2022
 """
 import numpy as np
 
-def create_posterior(file,model,model_ref,dispersion_one,params_dispersion,params_inversion,dispersion_all,alpha_ref,alpha,outputs={},init=False):
+def create_posterior(file,model,model_ref,dispersion_one,params_dispersion,params_inversion,dispersion_all,alpha,outputs={},init=False):
     '''
     example of a function to be applied to the data
     creates a 2D histogram of vsv for the reference and each member of the cluster
@@ -27,8 +27,6 @@ def create_posterior(file,model,model_ref,dispersion_one,params_dispersion,param
 
     dispersion_all : dict
 
-    alpha_ref : float
-
     alpha : numpy array, length numdis
 
     Returns
@@ -37,7 +35,7 @@ def create_posterior(file,model,model_ref,dispersion_one,params_dispersion,param
         has 2 subdicts, 'stack' and 'nostack'.
 
     '''
-    ndatad=200
+    ndatad=100
     ndatav=200
 
     numdis=dispersion_all['numdis']
@@ -78,6 +76,14 @@ def create_posterior(file,model,model_ref,dispersion_one,params_dispersion,param
     alpha_max=dispersion_all['alpha_max']
     #print(np.shape(alpha),np.shape(alpha_max))
     alpha=np.minimum(np.zeros_like(alpha),alpha-alpha_max)
+#    if np.amax(alpha)<-50:
+#        ind_vsv=np.digitize(np.interp(depths,depth_model,vsv_model),bins=vels_vsv,right=True)
+#        outputs['stack']['vsv_all'][np.arange(ndatad),ind_vsv,numdis]+=1.
+#        ind_xi=np.digitize(np.interp(depths,depth_model,xi_model),bins=vels_xi,right=True)
+#        outputs['stack']['xi_all'][np.arange(ndatad),ind_xi,numdis]+=1.
+#        ind_vp=np.digitize(np.interp(depths,depth_model,vp_model),bins=vels_vp,right=True)
+#        outputs['stack']['vp_all'][np.arange(ndatad),ind_vp,numdis]+=1.
+#        return
     alpha=np.exp(alpha)
     #print(numdis)
 
@@ -103,7 +109,7 @@ def create_posterior(file,model,model_ref,dispersion_one,params_dispersion,param
 
     return
 
-def get_average(file,model,model_ref,dispersion_one,params_dispersion,params_inversion,dispersion_all,alpha_ref,alpha,outputs={},init=False):
+def get_average(file,model,model_ref,dispersion_one,params_dispersion,params_inversion,dispersion_all,alpha,outputs={},init=False):
 
     ndatad=200
     numdis=dispersion_all['numdis']
@@ -136,6 +142,15 @@ def get_average(file,model,model_ref,dispersion_one,params_dispersion,params_inv
     depth_model=model['depth']
     alpha_max=dispersion_all['alpha_max']
     alpha=np.minimum(np.zeros_like(alpha),alpha-alpha_max)
+ #   if np.amax(alpha)<-50:
+ #       xi=np.interp(depths,depth_model,xi_model)
+ #       outputs['stack']['probani'][:,numdis]+=(xi!=1).astype(int)
+ #       outputs['stack']['xi'][:,numdis]+=xi
+ #       vp=np.interp(depths,depth_model,vp_model)
+ #       outputs['stack']['vp'][:,numdis]+=vp
+ #       vsv=np.interp(depths,depth_model,vsv_model)
+ #       outputs['stack']['vsv'][:,numdis]+=vsv
+ #       return
     alpha=np.exp(alpha)
 
     xi=np.interp(depths,depth_model,xi_model)
@@ -157,7 +172,7 @@ def get_average(file,model,model_ref,dispersion_one,params_dispersion,params_inv
     outputs['stack']['vsv'][:,numdis]+=vsv
     return #outputs
 
-def get_histograms(file,model,model_ref,dispersion_one,params_dispersion,params_inversion,dispersion_all,alpha_ref,alpha,outputs={},init=False):
+def get_histograms(file,model,model_ref,dispersion_one,params_dispersion,params_inversion,dispersion_all,alpha,outputs={},init=False):
     '''
     example of a function to be applied to the data
     creates a 2D histogram of vsv for the reference and each member of the cluster
@@ -176,8 +191,6 @@ def get_histograms(file,model,model_ref,dispersion_one,params_dispersion,params_
     params_inversion : dict
 
     dispersion_all : dict
-
-    alpha_ref : float
 
     alpha : numpy array, length numdis
 
@@ -226,6 +239,14 @@ def get_histograms(file,model,model_ref,dispersion_one,params_dispersion,params_
     alpha_max=dispersion_all['alpha_max']
     alpha=np.minimum(np.zeros_like(alpha),alpha-alpha_max)
     alpha_old=alpha
+#    if np.amax(alpha)<-50:
+#        ind_nlay=nlay_model-params_inversion['milay']
+#        outputs['stack']['nlay_hist'][ind_nlay,numdis]+=1.
+#        ind_sigmaR=np.digitize(model['Ad_R'],bins=range_sigmaR)
+#        outputs['stack']['sigmaR_hist'][ind_sigmaR,numdis]+=1.
+#        ind_sigmaL=np.digitize(model['Ad_L'],bins=range_sigmaL)
+#        outputs['stack']['sigmaL_hist'][ind_sigmaL,numdis]+=1.
+#        return
     alpha=np.exp(alpha)
 
     #print(nlay_model,params_inversion['milay'],params_inversion['malay'],nlay_model-params_inversion['milay'])
@@ -244,15 +265,13 @@ def get_histograms(file,model,model_ref,dispersion_one,params_dispersion,params_
 
     return #outputs
 
-def get_dispersion_mean(file,model,model_ref,dispersion_one,params_dispersion,params_inversion,dispersion_all,alpha_ref,alpha,outputs={},init=False):
+def get_dispersion_mean(file,model,model_ref,dispersion_one,params_dispersion,params_inversion,dispersion_all,alpha,outputs={},init=False):
 
     numdis=dispersion_all['numdis']
     if init:
         outputs={}
         outputs['stack']={}
         outputs['nostack']={}
-
-        outputs['nostack']['clusters']=params_dispersion['clusters']
 
         outputs['nostack']['ndata_R']=params_dispersion['R']['ndatad']
         outputs['nostack']['ndata_L']=params_dispersion['L']['ndatad']
@@ -279,7 +298,8 @@ def get_dispersion_mean(file,model,model_ref,dispersion_one,params_dispersion,pa
 
     dispersion_R_model=dispersion_one['R']['dispersion']
     dispersion_L_model=dispersion_one['L']['dispersion']
-
+    #if np.amax(alpha)<-50:
+    #    return
     alpha_max=dispersion_all['alpha_max']
     alpha=np.minimum(np.zeros_like(alpha),alpha-alpha_max)
     alpha=np.exp(alpha)
@@ -299,7 +319,7 @@ def get_dispersion_mean(file,model,model_ref,dispersion_one,params_dispersion,pa
     outputs['stack']['dispersion_R_sq'][:,:numdis]+=np.multiply(dis_alt,alpha_alt)
 
     alpha_alt=np.tile(alpha,(params_dispersion['L']['ndatad'],1))
-    outputs['stack']['dispersion_L'][:,:numdis]+=np.multiply(dispersion_R_true_all,alpha_alt)
+    outputs['stack']['dispersion_L'][:,:numdis]+=np.multiply(dispersion_L_true_all,alpha_alt)
 
     dis_alt=np.transpose(np.tile(dispersion_L_model,(numdis,1)))-dispersion_L_true_all
     outputs['stack']['dispersion_L_shift'][:,:numdis]+=np.multiply(dis_alt,alpha_alt)
@@ -309,7 +329,7 @@ def get_dispersion_mean(file,model,model_ref,dispersion_one,params_dispersion,pa
 
     return #outputs
 
-def get_tradeoff(file,model,model_ref,dispersion_one,params_dispersion,params_inversion,dispersion_all,alpha_ref,alpha,outputs={},init=False):
+def get_tradeoff(file,model,model_ref,dispersion_one,params_dispersion,params_inversion,dispersion_all,alpha,outputs={},init=False):
 
     numdis=dispersion_all['numdis']
     if init:
@@ -326,7 +346,11 @@ def get_tradeoff(file,model,model_ref,dispersion_one,params_dispersion,params_in
         outputs['stack']['tradeoff']=np.zeros((malay+1,malay+1,numdis+1))
 
         return outputs
-
+#    if np.amax(alpha)<-50:
+#        nlay=model['npt']
+#        nlay_ani=model['npt_ani']
+#        outputs['stack']['tradeoff'][nlay,nlay_ani,numdis]+=1.
+#        return
 
     alpha_max=dispersion_all['alpha_max']
     alpha=np.minimum(np.zeros_like(alpha),alpha-alpha_max)
